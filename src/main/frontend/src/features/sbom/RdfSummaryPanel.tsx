@@ -1,15 +1,18 @@
 import SchemaOutlinedIcon from '@mui/icons-material/SchemaOutlined';
 import { Box, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
-import type { GraphSummary } from '../../api/types';
+import type { GraphMetadata } from '../../api/types';
 
 interface RdfSummaryPanelProps {
-  summary: GraphSummary | null;
+  metadata: GraphMetadata | null;
 }
 
-export function RdfSummaryPanel({ summary }: RdfSummaryPanelProps) {
-  if (!summary) {
+export function RdfSummaryPanel({ metadata }: RdfSummaryPanelProps) {
+  if (!metadata) {
     return null;
   }
+
+  const summary = metadata.summary;
+  const graphNodeCount = metadata.graph['@graph']?.length ?? 0;
 
   return (
     <Card sx={{ border: '1px solid', borderColor: 'primary.light', backgroundColor: '#f8fbff' }}>
@@ -46,6 +49,7 @@ export function RdfSummaryPanel({ summary }: RdfSummaryPanelProps) {
               value={summary.dependencyEdgeCount.toLocaleString()}
               accent="warning"
             />
+            <MetricCard label="Graph nodes" value={graphNodeCount.toLocaleString()} accent="primary" />
           </Box>
         </Stack>
       </CardContent>

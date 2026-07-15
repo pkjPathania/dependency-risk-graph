@@ -33,4 +33,4 @@ build/
 ### VS Code ###
 .vscode/
 
-./data/tdb2/*
+/data/tdb2/

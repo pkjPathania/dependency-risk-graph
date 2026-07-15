@@ -25,3 +25,11 @@ export interface GraphSummary {
   packageCount: number;
   dependencyEdgeCount: number;
 }
+
+export interface GraphMetadata {
+  summary: GraphSummary;
+  graph: {
+    '@graph': Array<Record<string, unknown>>;
+    '@context'?: Record<string, unknown>;
+  };
+}

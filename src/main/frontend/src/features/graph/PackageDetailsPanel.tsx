@@ -1,4 +1,5 @@
 import { Box, Card, CardContent, Chip, Divider, Stack, Typography } from '@mui/material';
+import { escapePercent } from '../../api/sbomApi';
 import type { GraphModel } from './graphMapper';
 
 interface PackageDetailsPanelProps {
@@ -30,10 +31,10 @@ export function PackageDetailsPanel({
 
           {selectedNode ? (
             <Stack spacing={1.25}>
-              <DetailRow label="Name" value={selectedNode.name} />
-              <DetailRow label="Version" value={selectedNode.version ?? 'Not provided'} />
-              <DetailRow label="PURL" value={selectedNode.purl ?? 'Not provided'} />
-              <DetailRow label="RDF type" value={selectedNode.type ?? 'Not provided'} />
+              <DetailRow label="Name" value={escapePercent(selectedNode.name)} />
+              <DetailRow label="Version" value={escapePercent(selectedNode.version ?? 'Not provided')} />
+              <DetailRow label="PURL" value={escapePercent(selectedNode.purl ?? 'Not provided')} />
+              <DetailRow label="RDF type" value={escapePercent(selectedNode.type ?? 'Not provided')} />
               <DetailRow label="Direct child dependency count" value={String(directChildCount)} />
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 <Chip

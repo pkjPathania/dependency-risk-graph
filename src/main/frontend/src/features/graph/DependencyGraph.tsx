@@ -3,6 +3,7 @@ import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import { useEffect, useMemo, useRef } from 'react';
 import { Box, Chip, Stack, TextField, Typography } from '@mui/material';
+import { escapePercent } from '../../api/sbomApi';
 import type { GraphModel, GraphNodeData } from './graphMapper';
 
 cytoscape.use(dagre);
@@ -289,6 +290,6 @@ function getElements(
 }
 
 function formatNodeLabel(node: GraphNodeData): string {
-  const version = node.version ? `v${node.version}` : 'version unavailable';
-  return `${node.name}\n${version}`;
+  const version = node.version ? `v${escapePercent(node.version)}` : 'version unavailable';
+  return `${escapePercent(node.name)}\n${version}`;
 }

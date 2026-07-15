@@ -1,4 +1,4 @@
-import type { DependencyEdge, NormalizedSbom, PackageComponent } from '../../api/types';
+import type { DependencyEdge, GraphMetadata, NormalizedSbom, PackageComponent } from '../../api/types';
 
 export interface GraphNodeData {
   bomRef: string;
@@ -31,6 +31,20 @@ export interface GraphModel {
 interface GraphTraversalOptions {
   expandedNodeIds?: ReadonlySet<string>;
   maxInitialDepth?: number;
+}
+
+interface JsonLdGraphEntry {
+  '@id': string;
+  '@type'?: string | string[];
+  'rdfs:label'?: string;
+  'drg:version'?: string;
+  'drg:purl'?: string;
+  'drg:dependsOn'?: JsonLdDependency | JsonLdDependency[];
+  [key: string]: unknown;
+}
+
+interface JsonLdDependency {
+  '@id'?: string;
 }
 
 export function mapNormalizedSbomToGraph(
@@ -109,6 +123,86 @@ export function mapNormalizedSbomToGraph(
   };
 }
 
+export function mapGraphMetadataToGraph(
+  metadata: GraphMetadata,
+  options: GraphTraversalOptions = {}
+): GraphModel {
+  const maxInitialDepth = options.maxInitialDepth ?? 2;
+  const expandedNodeIds = options.expandedNodeIds ?? new Set<string>();
+  const graphEntries = normalizeGraphEntries(metadata);
+  const entriesById = new Map(graphEntries.map((entry) => [entry['@id'], entry]));
+  const childRefsBySource = buildJsonLdChildRefsBySource(graphEntries);
+  const rootId = findGraphRootId(graphEntries);
+  const visibleNodeIds = new Set<string>();
+  const depthByNodeId = new Map<string, number>();
+  const edgesById = new Map<string, GraphEdgeData>();
+  const nodesById = new Map<string, GraphNodeData>();
+  const queue: Array<{ ref: string; depth: number }> = [{ ref: rootId, depth: 0 }];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+
+    const { ref, depth } = current;
+    const knownDepth = depthByNodeId.get(ref);
+    if (typeof knownDepth === 'number' && knownDepth <= depth) {
+      continue;
+    }
+
+    depthByNodeId.set(ref, depth);
+    visibleNodeIds.add(ref);
+
+    const childRefs = childRefsBySource.get(ref) ?? [];
+    const shouldTraverseChildren = depth < maxInitialDepth || expandedNodeIds.has(ref);
+
+    for (const childRef of childRefs) {
+      const edgeId = `${ref}__dependsOn__${childRef}`;
+      if (!edgesById.has(edgeId)) {
+        edgesById.set(edgeId, {
+          predicate: 'dependsOn',
+          label: 'dependsOn'
+        });
+      }
+
+      const nextDepth = depth + 1;
+      const existingDepth = depthByNodeId.get(childRef);
+      if (shouldTraverseChildren && (typeof existingDepth !== 'number' || nextDepth < existingDepth)) {
+        queue.push({ ref: childRef, depth: nextDepth });
+      }
+    }
+  }
+
+  for (const ref of visibleNodeIds) {
+    const depth = depthByNodeId.get(ref) ?? 0;
+    const entry = entriesById.get(ref);
+    const childRefs = childRefsBySource.get(ref) ?? [];
+    const visibleChildCount = childRefs.filter((childRef) => visibleNodeIds.has(childRef)).length;
+
+    nodesById.set(
+      ref,
+      buildGraphNodeDataFromJsonLd({
+        ref,
+        entry,
+        depth,
+        isApplication: ref === rootId,
+        childCount: childRefs.length,
+        visibleChildCount
+      })
+    );
+  }
+
+  return {
+    rootId,
+    nodesById,
+    edgesById,
+    visibleNodeIds,
+    childRefsBySource,
+    depthByNodeId
+  };
+}
+
 export function getGraphElements(
   graph: GraphModel,
   selectedNodeId: string | null,
@@ -171,6 +265,58 @@ function buildChildRefsBySource(dependencies: DependencyEdge[]): Map<string, str
   return map;
 }
 
+function normalizeGraphEntries(metadata: GraphMetadata): JsonLdGraphEntry[] {
+  const graph = metadata.graph['@graph'];
+  if (!Array.isArray(graph)) {
+    return [];
+  }
+
+  return graph.filter(isJsonLdGraphEntry);
+}
+
+function isJsonLdGraphEntry(value: Record<string, unknown>): value is JsonLdGraphEntry {
+  return typeof value['@id'] === 'string';
+}
+
+function buildJsonLdChildRefsBySource(entries: JsonLdGraphEntry[]): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+
+  for (const entry of entries) {
+    const current = map.get(entry['@id']) ?? [];
+    for (const targetRef of extractDependencyRefs(entry['drg:dependsOn'])) {
+      if (!current.includes(targetRef)) {
+        current.push(targetRef);
+      }
+    }
+    map.set(entry['@id'], current);
+  }
+
+  return map;
+}
+
+function extractDependencyRefs(value: JsonLdDependency | JsonLdDependency[] | undefined): string[] {
+  if (!value) {
+    return [];
+  }
+
+  const dependencies = Array.isArray(value) ? value : [value];
+  return dependencies.map((dependency) => dependency['@id']).filter((ref): ref is string => typeof ref === 'string');
+}
+
+function findGraphRootId(entries: JsonLdGraphEntry[]): string {
+  const application = entries.find((entry) => hasGraphType(entry, 'drg:Application'));
+  if (application) {
+    return application['@id'];
+  }
+
+  return entries[0]?.['@id'] ?? 'application:unknown';
+}
+
+function hasGraphType(entry: JsonLdGraphEntry, expectedType: string): boolean {
+  const type = entry['@type'];
+  return typeof type === 'string' ? type === expectedType : Array.isArray(type) && type.includes(expectedType);
+}
+
 function findApplicationRef(
   sbom: NormalizedSbom,
   componentsByRef: Map<string, PackageComponent>,
@@ -210,6 +356,34 @@ function buildGraphNodeData(input: {
   const version = input.component?.version ?? null;
   const purl = input.component?.purl ?? null;
   const type = input.component?.type ?? null;
+
+  return {
+    bomRef: input.ref,
+    name,
+    version,
+    purl,
+    type,
+    isApplication: input.isApplication,
+    depth: input.depth,
+    childCount: input.childCount,
+    visibleChildCount: input.visibleChildCount,
+    hasHiddenChildren: input.childCount > input.visibleChildCount,
+    searchText: `${name} ${version ?? ''} ${purl ?? ''} ${input.ref}`.toLowerCase()
+  };
+}
+
+function buildGraphNodeDataFromJsonLd(input: {
+  ref: string;
+  entry: JsonLdGraphEntry | undefined;
+  depth: number;
+  isApplication: boolean;
+  childCount: number;
+  visibleChildCount: number;
+}): GraphNodeData {
+  const name = input.entry?.['rdfs:label']?.trim() || input.ref;
+  const version = typeof input.entry?.['drg:version'] === 'string' ? input.entry['drg:version'] : null;
+  const purl = typeof input.entry?.['drg:purl'] === 'string' ? input.entry['drg:purl'] : null;
+  const type = typeof input.entry?.['@type'] === 'string' ? input.entry['@type'] : null;
 
   return {
     bomRef: input.ref,

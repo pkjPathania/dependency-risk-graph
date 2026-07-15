@@ -1,60 +1,77 @@
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material';
-import { useMemo, useState } from 'react';
-import { exportSbomRdf, uploadSbom } from '../api/sbomApi';
-import type { NormalizedSbom } from '../api/types';
+import { useEffect, useMemo, useState } from 'react';
+import { escapePercent, fetchGraphMetadata, uploadSbom } from '../api/sbomApi';
+import type { GraphMetadata } from '../api/types';
 import { SummaryCard } from '../components/SummaryCard';
 import { AssistantPanel } from '../features/assistant/AssistantPanel';
 import { DependencyGraph } from '../features/graph/DependencyGraph';
-import { mapNormalizedSbomToGraph } from '../features/graph/graphMapper';
+import { mapGraphMetadataToGraph } from '../features/graph/graphMapper';
 import { PackageDetailsPanel } from '../features/graph/PackageDetailsPanel';
 import { RdfSummaryPanel } from '../features/sbom/RdfSummaryPanel';
 import { SbomUploadPanel } from '../features/sbom/SbomUploadPanel';
-import type { GraphSummary } from '../api/types';
-
-const INITIAL_SBOM: NormalizedSbom | null = null;
 
 export function DashboardPage() {
-  const [sbom, setSbom] = useState<NormalizedSbom | null>(INITIAL_SBOM);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [rdfStatusMessage, setRdfStatusMessage] = useState<string | null>(null);
-  const [rdfSummary, setRdfSummary] = useState<GraphSummary | null>(null);
+  const [graphMetadata, setGraphMetadata] = useState<GraphMetadata | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
 
   const graph = useMemo(() => {
-    if (!sbom) {
+    if (!graphMetadata) {
       return null;
     }
 
-    return mapNormalizedSbomToGraph(sbom, { expandedNodeIds, maxInitialDepth: 2 });
-  }, [expandedNodeIds, sbom]);
+    return mapGraphMetadataToGraph(graphMetadata, { expandedNodeIds, maxInitialDepth: 2 });
+  }, [expandedNodeIds, graphMetadata]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadGraphMetadata() {
+      setIsLoadingMetadata(true);
+      try {
+        const metadata = await fetchGraphMetadata();
+        if (!active) {
+          return;
+        }
+        setGraphMetadata(metadata);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        setBackendError(error instanceof Error ? error.message : 'Failed to load graph metadata.');
+      } finally {
+        if (active) {
+          setIsLoadingMetadata(false);
+        }
+      }
+    }
+
+    void loadGraphMetadata();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleUpload(file: File) {
     setIsUploading(true);
     setBackendError(null);
     setSuccessMessage(null);
     setRdfStatusMessage(null);
-    setRdfSummary(null);
 
     try {
-      const nextSbom = await uploadSbom(file);
-      setSbom(nextSbom);
+      await uploadSbom(file);
       setSelectedNodeId(null);
       setExpandedNodeIds(new Set());
       setSearchTerm('');
-      setSuccessMessage(`Uploaded ${nextSbom.applicationName} successfully.`);
-      try {
-        const summary = await exportSbomRdf(file);
-        setRdfSummary(summary);
-        setRdfStatusMessage(
-          `RDF graph ready: ${summary.trippleCount} triples, ${summary.applicationCount} application, ${summary.packageCount} packages, ${summary.dependencyEdgeCount} dependency edges.`
-        );
-      } catch {
-        setRdfStatusMessage('RDF export could not be generated.');
-      }
+      setSuccessMessage(`Uploaded ${escapePercent(file.name)} successfully.`);
+      setRdfStatusMessage('SBOM ingested. Click Dashboard to reload /metadata.');
     } catch (error) {
       setBackendError(error instanceof Error ? error.message : 'Failed to upload SBOM.');
     } finally {
@@ -74,10 +91,11 @@ export function DashboardPage() {
     });
   }
 
-  const applicationName = sbom?.applicationName ?? 'Waiting for upload';
-  const applicationVersion = sbom?.applicationVersion ?? 'Not provided';
+  const applicationNode = graph?.nodesById.get(graph.rootId);
+  const applicationName = applicationNode ? escapePercent(applicationNode.name) : 'Waiting for metadata';
+  const applicationVersion = applicationNode?.version ? escapePercent(applicationNode.version) : 'Not provided';
   const directDependencyCount = graph ? graph.childRefsBySource.get(graph.rootId)?.length ?? 0 : 0;
-  const totalComponentCount = sbom?.components.length ?? 0;
+  const totalComponentCount = graph?.nodesById.size ?? 0;
 
   return (
     <Stack spacing={3}>
@@ -98,7 +116,7 @@ export function DashboardPage() {
         rdfStatusMessage={rdfStatusMessage}
       />
 
-      <RdfSummaryPanel summary={rdfSummary} />
+      <RdfSummaryPanel metadata={graphMetadata} />
 
       <Box
         sx={{
@@ -145,7 +163,9 @@ export function DashboardPage() {
                 <Stack spacing={1.5}>
                   <Typography variant="h6">Dependency graph</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Upload a CycloneDX JSON SBOM to render the application and dependency inventory.
+                    {isLoadingMetadata
+                      ? 'Loading graph metadata from /api/v1/metadata...'
+                      : 'No graph metadata is available yet.'}
                   </Typography>
                 </Stack>
               )}

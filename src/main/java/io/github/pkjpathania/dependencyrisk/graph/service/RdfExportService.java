@@ -1,6 +1,7 @@
 package io.github.pkjpathania.dependencyrisk.graph.service;
 
 import io.github.pkjpathania.dependencyrisk.graph.mapper.SbomRdfMapper;
+import io.github.pkjpathania.dependencyrisk.graph.model.GraphMetadata;
 import io.github.pkjpathania.dependencyrisk.graph.model.GraphSummary;
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
 import io.github.pkjpathania.dependencyrisk.graph.vocabulary.RiskVocabulary;
@@ -25,10 +26,15 @@ public class RdfExportService {
 
   private final JenaGraphRepository jenaGraphRepository;
 
-  public String toJsonLd(NormalizedSbom sbom) {
-    Model model = mapper.map(sbom);
-    jenaGraphRepository.saveAll(model);
+  private static GraphSummary getGraphSummary(Model model) {
+    return new GraphSummary(
+        model.size(),
+        model.listResourcesWithProperty(RDF.type, RiskVocabulary.APPLICATION).toList().size(),
+        model.listResourcesWithProperty(RDF.type, RiskVocabulary.PACKAGE_VERSION).toList().size(),
+        model.listStatements(null, RiskVocabulary.DEPENDS_ON, (RDFNode) null).toList().size());
+  }
 
+  private static String modelToString(Model model) {
     try (StringWriter writer = new StringWriter()) {
       RDFDataMgr.write(writer, model, RDFFormat.JSONLD_PRETTY);
       return writer.toString();
@@ -37,20 +43,22 @@ public class RdfExportService {
     }
   }
 
+  public String toJsonLd(NormalizedSbom sbom) {
+    Model model = mapper.map(sbom);
+    jenaGraphRepository.saveAll(model);
+
+    return modelToString(model);
+  }
+
   public GraphSummary newGraph(MultipartFile file) {
     NormalizedSbom sbom = parser.ingest(file);
     Model model = mapper.map(sbom);
     jenaGraphRepository.saveAll(model);
 
-    return new GraphSummary(
-        model.size(),
-        model.listResourcesWithProperty(RDF.type, RiskVocabulary.APPLICATION).toList().size(),
-        model.listResourcesWithProperty(RDF.type, RiskVocabulary.PACKAGE_VERSION).toList().size(),
-        model.listStatements(null, RiskVocabulary.DEPENDS_ON, (RDFNode) null).toList().size());
+    return getGraphSummary(model);
   }
 
-  public String toJsonLd(MultipartFile file) {
-    NormalizedSbom parsed = parser.ingest(file);
-    return toJsonLd(parsed);
+  public GraphMetadata getSummary() {
+    return jenaGraphRepository.getMetadata();
   }
 }
