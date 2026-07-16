@@ -33,3 +33,22 @@ export interface GraphMetadata {
     '@context'?: Record<string, unknown>;
   };
 }
+
+export interface SparqlSelectResponse {
+  columns: string[];
+  rows: Array<Record<string, string>>;
+}
+
+export interface DependencyPathNode {
+  iri?: string | null;
+  label?: string | null;
+  version?: string | null;
+  purl?: string | null;
+  type?: string | null;
+}
+
+export interface DependencyPathResponse {
+  found?: boolean | null;
+  hops?: number | null;
+  path?: DependencyPathNode[] | null;
+}

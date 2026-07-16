@@ -43,9 +43,15 @@
     <springdoc.version>3.0.3</springdoc.version>
     <jena.version>6.1.0</jena.version>
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
+    <jgrapht-core.version>1.5.3</jgrapht-core.version>
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>org.jgrapht</groupId>
+      <artifactId>jgrapht-core</artifactId>
+      <version>${jgrapht-core.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.apache.jena</groupId>
       <artifactId>jena-core</artifactId>
@@ -153,8 +159,8 @@
             </goals>
             <configuration>
               <target>
-                <delete dir="${project.basedir}/src/main/frontend/node_modules" quiet="true" />
-                <delete dir="${project.basedir}/src/main/frontend/.vite" quiet="true" />
+                <delete dir="${project.basedir}/src/main/frontend/node_modules" quiet="true"/>
+                <delete dir="${project.basedir}/src/main/frontend/.vite" quiet="true"/>
               </target>
             </configuration>
           </execution>

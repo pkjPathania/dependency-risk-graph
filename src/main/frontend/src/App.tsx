@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { AdminLayout } from './layouts/AdminLayout';
 import type { NavigationId } from './navigation/navigationItems';
 import { DashboardPage } from './pages/DashboardPage';
+import { SparqlQueryPage } from './pages/SparqlQueryPage';
+import { DependencyPathPage } from './pages/DependencyPathPage';
 import { ApplicationsPage } from './pages/ApplicationsPage';
 import { DependenciesPage } from './pages/DependenciesPage';
 import { VulnerabilitiesPage } from './pages/VulnerabilitiesPage';
@@ -10,6 +12,8 @@ import { SettingsPage } from './pages/SettingsPage';
 
 const pageTitles: Record<NavigationId, string> = {
   dashboard: 'Dashboard',
+  sparql: 'SPARQL Query',
+  dependencyPath: 'Dependency Path',
   applications: 'Applications',
   dependencies: 'Dependencies',
   vulnerabilities: 'Vulnerabilities',
@@ -30,6 +34,10 @@ export default function App() {
     switch (selectedPageId) {
       case 'dashboard':
         return <DashboardPage />;
+      case 'sparql':
+        return <SparqlQueryPage />;
+      case 'dependencyPath':
+        return <DependencyPathPage />;
       case 'applications':
         return <ApplicationsPage />;
       case 'dependencies':
