@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { fetchDependencyPath } from '../api/dependencyPathApi';
 import type { DependencyPathResponse } from '../api/types';
 import { DependencyPathForm } from '../components/DependencyPathForm';
+import { RestCallProgress } from '../components/RestCallProgress';
 import { DependencyPathView } from '../components/DependencyPathView';
 
 const DEFAULT_PACKAGE_NAME = 'spring-core';
@@ -39,6 +40,7 @@ export function DependencyPathPage() {
 
   return (
     <Stack spacing={3}>
+      <RestCallProgress visible={loading} />
       <Box>
         <Typography variant="h4" sx={{ fontSize: { xs: '1.8rem', md: '2.1rem' } }}>
           Dependency Path

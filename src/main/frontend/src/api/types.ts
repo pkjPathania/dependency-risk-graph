@@ -52,3 +52,12 @@ export interface DependencyPathResponse {
   hops?: number | null;
   path?: DependencyPathNode[] | null;
 }
+
+export interface ApiErrorResponse {
+  timestamp: string;
+  status: number;
+  error: string;
+  message: string;
+  details?: string[] | null;
+  path?: string | null;
+}

@@ -58,7 +58,6 @@ public class JenaGraphRepository {
   public void saveAll(Model model) {
     dataset.executeWrite(
         () -> {
-          dataset.getDefaultModel().removeAll();
           dataset.getDefaultModel().add(model);
         });
   }

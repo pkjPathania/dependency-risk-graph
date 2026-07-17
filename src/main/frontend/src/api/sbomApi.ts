@@ -1,30 +1,31 @@
-import type { GraphMetadata, NormalizedSbom } from './types';
+import type { GraphMetadata, GraphSummary } from './types';
+import { readApiErrorMessage } from './httpError';
 
-const SBOM_UPLOAD_URL = '/api/v1/sboms';
+const SBOM_RDF_UPLOAD_URL = '/api/v1/sboms/rdf';
 const GRAPH_METADATA_URL = '/api/v1/metadata';
 
-export async function uploadSbom(file: File): Promise<NormalizedSbom> {
+export async function uploadSbomAsRdf(file: File): Promise<GraphSummary> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(SBOM_UPLOAD_URL, {
+  const response = await fetch(SBOM_RDF_UPLOAD_URL, {
     method: 'POST',
     body: formData
   });
 
   if (!response.ok) {
-    const message = await readErrorMessage(response);
+    const message = await readApiErrorMessage(response, 'Upload failed');
     throw new Error(message);
   }
 
-  return (await response.json()) as NormalizedSbom;
+  return (await response.json()) as GraphSummary;
 }
 
 export async function fetchGraphMetadata(): Promise<GraphMetadata> {
   const response = await fetch(GRAPH_METADATA_URL);
 
   if (!response.ok) {
-    const message = await readErrorMessage(response);
+    const message = await readApiErrorMessage(response, 'Failed to load graph metadata');
     throw new Error(message);
   }
 
@@ -33,13 +34,4 @@ export async function fetchGraphMetadata(): Promise<GraphMetadata> {
 
 export function escapePercent(value: string): string {
   return value.replaceAll('%', '%25');
-}
-
-async function readErrorMessage(response: Response): Promise<string> {
-  try {
-    const text = await response.text();
-    return text.trim() || `Upload failed with status ${response.status}`;
-  } catch {
-    return `Upload failed with status ${response.status}`;
-  }
 }

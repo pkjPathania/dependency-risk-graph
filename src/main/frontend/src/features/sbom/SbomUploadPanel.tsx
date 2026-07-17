@@ -10,6 +10,7 @@ import {
   Typography
 } from '@mui/material';
 import { useId, useMemo, useState, type FormEvent } from 'react';
+import { RestCallProgress } from '../../components/RestCallProgress';
 
 interface SbomUploadPanelProps {
   onUpload: (file: File) => Promise<void>;
@@ -53,10 +54,11 @@ export function SbomUploadPanel({
     <Card>
       <CardContent>
         <Stack spacing={2}>
+          <RestCallProgress visible={loading} />
           <Box>
             <Typography variant="h6">SBOM upload</Typography>
             <Typography variant="body2" color="text.secondary">
-              Upload a CycloneDX JSON SBOM to populate the inventory and graph views.
+              Upload a CycloneDX JSON SBOM to update the RDF graph and refresh the inventory and graph views.
             </Typography>
           </Box>
 
@@ -90,10 +92,26 @@ export function SbomUploadPanel({
             </Stack>
           </Box>
 
-          {validationError ? <Alert severity="warning">{validationError}</Alert> : null}
-          {backendError ? <Alert severity="error">{backendError}</Alert> : null}
-          {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
-          {rdfStatusMessage ? <Alert severity="info">{rdfStatusMessage}</Alert> : null}
+          {validationError ? (
+            <Alert severity="warning" sx={{ whiteSpace: 'pre-wrap' }}>
+              {validationError}
+            </Alert>
+          ) : null}
+          {backendError ? (
+            <Alert severity="error" sx={{ whiteSpace: 'pre-wrap' }}>
+              {backendError}
+            </Alert>
+          ) : null}
+          {successMessage ? (
+            <Alert severity="success" sx={{ whiteSpace: 'pre-wrap' }}>
+              {successMessage}
+            </Alert>
+          ) : null}
+          {rdfStatusMessage ? (
+            <Alert severity="info" sx={{ whiteSpace: 'pre-wrap' }}>
+              {rdfStatusMessage}
+            </Alert>
+          ) : null}
         </Stack>
       </CardContent>
     </Card>

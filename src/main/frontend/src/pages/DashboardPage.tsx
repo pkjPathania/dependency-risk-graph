@@ -1,7 +1,8 @@
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
-import { escapePercent, fetchGraphMetadata, uploadSbom } from '../api/sbomApi';
+import { escapePercent, fetchGraphMetadata, uploadSbomAsRdf } from '../api/sbomApi';
 import type { GraphMetadata } from '../api/types';
+import { RestCallProgress } from '../components/RestCallProgress';
 import { SummaryCard } from '../components/SummaryCard';
 import { DependencyGraph } from '../features/graph/DependencyGraph';
 import { mapGraphMetadataToGraph } from '../features/graph/graphMapper';
@@ -65,12 +66,16 @@ export function DashboardPage() {
     setRdfStatusMessage(null);
 
     try {
-      await uploadSbom(file);
+      const summary = await uploadSbomAsRdf(file);
+      const metadata = await fetchGraphMetadata();
+      setGraphMetadata(metadata);
       setSelectedNodeId(null);
       setExpandedNodeIds(new Set());
       setSearchTerm('');
       setSuccessMessage(`Uploaded ${escapePercent(file.name)} successfully.`);
-      setRdfStatusMessage('SBOM ingested. Click Dashboard to reload /metadata.');
+      setRdfStatusMessage(
+        `RDF graph updated: ${summary.trippleCount} triples, ${summary.applicationCount} applications, ${summary.packageCount} packages.`
+      );
     } catch (error) {
       setBackendError(error instanceof Error ? error.message : 'Failed to upload SBOM.');
     } finally {
@@ -98,6 +103,7 @@ export function DashboardPage() {
 
   return (
     <Stack spacing={3}>
+      <RestCallProgress visible={isLoadingMetadata || isUploading} />
       <Box>
         <Typography variant="h4" sx={{ fontSize: { xs: '1.8rem', md: '2.1rem' } }}>
           Dependency Risk Dashboard

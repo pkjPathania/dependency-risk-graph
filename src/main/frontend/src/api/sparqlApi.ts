@@ -1,4 +1,5 @@
 import type { SparqlSelectResponse } from './types';
+import { readApiErrorMessage } from './httpError';
 
 const SPARQL_FORMAT_URL = '/api/v1/sparql/format';
 const SPARQL_EXEC_URL = '/api/v1/sparql/exec';
@@ -13,7 +14,7 @@ export async function formatSparqlQuery(query: string): Promise<string> {
   });
 
   if (!response.ok) {
-    const message = await readErrorMessage(response);
+    const message = await readApiErrorMessage(response, 'Formatting failed');
     throw new Error(message);
   }
 
@@ -32,20 +33,11 @@ export async function executeSparqlQuery(query: string): Promise<SparqlSelectRes
   });
 
   if (!response.ok) {
-    const message = await readErrorMessage(response);
+    const message = await readApiErrorMessage(response, 'Execution failed');
     throw new Error(message);
   }
 
   return (await response.json()) as SparqlSelectResponse;
-}
-
-async function readErrorMessage(response: Response): Promise<string> {
-  try {
-    const text = await response.text();
-    return text.trim() || `Formatting failed with status ${response.status}`;
-  } catch {
-    return `Formatting failed with status ${response.status}`;
-  }
 }
 
 function normalizeFormattedQuery(body: string, contentType: string): string {

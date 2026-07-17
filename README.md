@@ -79,7 +79,7 @@ This starts the backend on port `8080` and serves the React UI from the same Spr
 If you want to force the frontend and backend build pipeline before starting the app, use:
 
 ```bash
-./mvnw clean package generate-resources spring-boot:run
+./mvnw clean install package generate-resources spring-boot:run
 ```
 
 On the first run, Maven will also:

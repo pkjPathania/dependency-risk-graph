@@ -26,6 +26,7 @@ export interface GraphModel {
   visibleNodeIds: Set<string>;
   childRefsBySource: Map<string, string[]>;
   depthByNodeId: Map<string, number>;
+  parentByNodeId: Map<string, string | null>;
 }
 
 interface GraphTraversalOptions {
@@ -60,7 +61,8 @@ export function mapNormalizedSbomToGraph(
   const depthByNodeId = new Map<string, number>();
   const edgesById = new Map<string, GraphEdgeData>();
   const nodesById = new Map<string, GraphNodeData>();
-  const queue: Array<{ ref: string; depth: number }> = [{ ref: rootId, depth: 0 }];
+  const parentByNodeId = new Map<string, string | null>([[rootId, null]]);
+  const queue: Array<{ ref: string; depth: number; parent: string | null }> = [{ ref: rootId, depth: 0, parent: null }];
 
   while (queue.length > 0) {
     const current = queue.shift();
@@ -68,13 +70,14 @@ export function mapNormalizedSbomToGraph(
       continue;
     }
 
-    const { ref, depth } = current;
+    const { ref, depth, parent } = current;
     const knownDepth = depthByNodeId.get(ref);
     if (typeof knownDepth === 'number' && knownDepth <= depth) {
       continue;
     }
 
     depthByNodeId.set(ref, depth);
+    parentByNodeId.set(ref, parent);
     visibleNodeIds.add(ref);
 
     const childRefs = childRefsBySource.get(ref) ?? [];
@@ -92,7 +95,7 @@ export function mapNormalizedSbomToGraph(
       const nextDepth = depth + 1;
       const existingDepth = depthByNodeId.get(childRef);
       if (shouldTraverseChildren && (typeof existingDepth !== 'number' || nextDepth < existingDepth)) {
-        queue.push({ ref: childRef, depth: nextDepth });
+        queue.push({ ref: childRef, depth: nextDepth, parent: ref });
       }
     }
   }
@@ -119,7 +122,8 @@ export function mapNormalizedSbomToGraph(
     edgesById,
     visibleNodeIds,
     childRefsBySource,
-    depthByNodeId
+    depthByNodeId,
+    parentByNodeId
   };
 }
 
@@ -137,7 +141,8 @@ export function mapGraphMetadataToGraph(
   const depthByNodeId = new Map<string, number>();
   const edgesById = new Map<string, GraphEdgeData>();
   const nodesById = new Map<string, GraphNodeData>();
-  const queue: Array<{ ref: string; depth: number }> = [{ ref: rootId, depth: 0 }];
+  const parentByNodeId = new Map<string, string | null>([[rootId, null]]);
+  const queue: Array<{ ref: string; depth: number; parent: string | null }> = [{ ref: rootId, depth: 0, parent: null }];
 
   while (queue.length > 0) {
     const current = queue.shift();
@@ -145,13 +150,14 @@ export function mapGraphMetadataToGraph(
       continue;
     }
 
-    const { ref, depth } = current;
+    const { ref, depth, parent } = current;
     const knownDepth = depthByNodeId.get(ref);
     if (typeof knownDepth === 'number' && knownDepth <= depth) {
       continue;
     }
 
     depthByNodeId.set(ref, depth);
+    parentByNodeId.set(ref, parent);
     visibleNodeIds.add(ref);
 
     const childRefs = childRefsBySource.get(ref) ?? [];
@@ -169,7 +175,7 @@ export function mapGraphMetadataToGraph(
       const nextDepth = depth + 1;
       const existingDepth = depthByNodeId.get(childRef);
       if (shouldTraverseChildren && (typeof existingDepth !== 'number' || nextDepth < existingDepth)) {
-        queue.push({ ref: childRef, depth: nextDepth });
+        queue.push({ ref: childRef, depth: nextDepth, parent: ref });
       }
     }
   }
@@ -199,7 +205,8 @@ export function mapGraphMetadataToGraph(
     edgesById,
     visibleNodeIds,
     childRefsBySource,
-    depthByNodeId
+    depthByNodeId,
+    parentByNodeId
   };
 }
 
