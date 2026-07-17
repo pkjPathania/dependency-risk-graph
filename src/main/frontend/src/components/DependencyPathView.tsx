@@ -2,15 +2,27 @@ import ArrowDownwardOutlinedIcon from '@mui/icons-material/ArrowDownwardOutlined
 import { Alert, Box, Card, CardContent, CircularProgress, Stack, Typography } from '@mui/material';
 import type { DependencyPathNode, DependencyPathResponse } from '../api/types';
 import { DependencyPathNodeCard } from './DependencyPathNodeCard';
+import { OverviewMetricCard } from '../features/explore/OverviewMetricCard';
 
 interface DependencyPathViewProps {
   loading: boolean;
   error: string | null;
   hasQueried: boolean;
   response: DependencyPathResponse | null;
+  idleMessage?: string;
+  notFoundMessage?: string;
+  emptyPathMessage?: string;
 }
 
-export function DependencyPathView({ loading, error, hasQueried, response }: DependencyPathViewProps) {
+export function DependencyPathView({
+  loading,
+  error,
+  hasQueried,
+  response,
+  idleMessage = 'Enter a package name and optional version, then run the search to display the dependency chain.',
+  notFoundMessage = 'The backend did not return a dependency chain for the selected package and version.',
+  emptyPathMessage = 'The API reported a match, but the dependency chain was empty.'
+}: DependencyPathViewProps) {
   const path = Array.isArray(response?.path) ? response.path : [];
   const found = response?.found === true;
   const hops = typeof response?.hops === 'number' ? response.hops : 0;
@@ -18,9 +30,9 @@ export function DependencyPathView({ loading, error, hasQueried, response }: Dep
 
   if (loading) {
     return (
-      <Card>
-        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-          <Stack alignItems="center" justifyContent="center" spacing={1} sx={{ py: 3 }}>
+      <Card variant="outlined">
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Stack alignItems="center" justifyContent="center" spacing={1} sx={{ py: 2.5 }}>
             <CircularProgress size={22} />
             <Typography variant="body2" color="text.secondary">
               Loading dependency path...
@@ -41,10 +53,10 @@ export function DependencyPathView({ loading, error, hasQueried, response }: Dep
 
   if (!hasQueried) {
     return (
-      <Card>
-        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+      <Card variant="outlined">
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
           <Typography variant="body2" color="text.secondary">
-            Enter a package name and optional version, then run the search to display the dependency chain.
+            {idleMessage}
           </Typography>
         </CardContent>
       </Card>
@@ -53,14 +65,14 @@ export function DependencyPathView({ loading, error, hasQueried, response }: Dep
 
   if (!found) {
     return (
-      <Card>
-        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-          <Stack spacing={1}>
-            <Typography variant="subtitle1" fontWeight={700}>
+      <Card variant="outlined">
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Stack spacing={1.25}>
+            <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.05rem' }, fontWeight: 800 }}>
               Dependency path not found
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              The backend did not return a dependency chain for the selected package and version.
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
+              {notFoundMessage}
             </Typography>
             <SummaryBar found={found} hops={hops} nodeCount={nodeCount} />
           </Stack>
@@ -71,14 +83,14 @@ export function DependencyPathView({ loading, error, hasQueried, response }: Dep
 
   if (path.length === 0) {
     return (
-      <Card>
-        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-          <Stack spacing={1}>
-            <Typography variant="subtitle1" fontWeight={700}>
+      <Card variant="outlined">
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Stack spacing={1.25}>
+            <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.05rem' }, fontWeight: 800 }}>
               No path data returned
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              The API reported a match, but the dependency chain was empty.
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
+              {emptyPathMessage}
             </Typography>
             <SummaryBar found={found} hops={hops} nodeCount={nodeCount} />
           </Stack>
@@ -89,14 +101,11 @@ export function DependencyPathView({ loading, error, hasQueried, response }: Dep
 
   return (
     <Stack spacing={1.5}>
-      <Card>
-        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-          <Stack spacing={1}>
-            <Typography variant="subtitle1" fontWeight={700}>
+      <Card variant="outlined">
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Stack spacing={1.25}>
+            <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.05rem' }, fontWeight: 800 }}>
               Dependency path
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              A vertical chain from the application root to the selected dependency.
             </Typography>
             <SummaryBar found={found} hops={hops} nodeCount={nodeCount} />
           </Stack>
@@ -134,52 +143,16 @@ function SummaryBar({
   nodeCount: number;
 }) {
   return (
-      <Box
+    <Box
       sx={{
         display: 'grid',
         gap: 0.75,
         gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }
       }}
     >
-      <Metric label="Found" value={found ? 'Yes' : 'No'} accent={found ? 'success' : 'warning'} />
-      <Metric label="Hops" value={String(hops)} accent="primary" />
-      <Metric label="Nodes" value={String(nodeCount)} accent="info" />
-    </Box>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  accent
-}: {
-  label: string;
-  value: string;
-  accent: 'primary' | 'success' | 'info' | 'warning';
-}) {
-  return (
-    <Box
-      sx={{
-        border: '1px solid',
-        borderColor: `${accent}.main`,
-        borderRadius: 1,
-        px: 1,
-        py: 0.9,
-        bgcolor: `${accent}.light`
-      }}
-    >
-      <Stack spacing={0.4}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}
-        >
-          {label}
-        </Typography>
-        <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.1 }}>
-          {value}
-        </Typography>
-      </Stack>
+      <OverviewMetricCard label="Found" value={found ? 'Yes' : 'No'} caption="" loading={false} />
+      <OverviewMetricCard label="Hops" value={String(hops)} caption="" loading={false} />
+      <OverviewMetricCard label="Nodes" value={String(nodeCount)} caption="" loading={false} />
     </Box>
   );
 }

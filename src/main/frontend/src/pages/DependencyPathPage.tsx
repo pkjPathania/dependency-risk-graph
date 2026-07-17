@@ -39,26 +39,27 @@ export function DependencyPathPage() {
   }
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={2}>
       <RestCallProgress visible={loading} />
-      <Box>
-        <Typography variant="h4" sx={{ fontSize: { xs: '1.8rem', md: '2.1rem' } }}>
+      <Box sx={{ display: 'grid', gap: 0.25 }}>
+        <Typography variant="h4" sx={{ fontSize: { xs: '1.55rem', md: '1.8rem' }, fontWeight: 800, lineHeight: 1.1 }}>
           Dependency Path
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
           Inspect the ordered dependency chain returned by the backend for a package and version.
         </Typography>
       </Box>
 
-      <Card>
-        <CardContent>
-          <Stack spacing={2.5}>
-            <Box>
-              <Typography variant="h6">Find path</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Search for a package name and optional version using the dependency path endpoint.
-              </Typography>
-            </Box>
+      <Card variant="outlined">
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Stack spacing={1.25}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, fontSize: '0.68rem' }}
+            >
+              Search
+            </Typography>
 
             <DependencyPathForm
               packageName={packageName}

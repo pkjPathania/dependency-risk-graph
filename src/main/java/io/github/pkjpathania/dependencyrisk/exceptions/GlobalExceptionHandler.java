@@ -19,6 +19,28 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+  private static List<String> detailsFor(Exception exception) {
+    List<String> details = new ArrayList<>();
+    details.add("Exception: " + exception.getClass().getSimpleName());
+    String causeMessage = exception.getCause() != null ? exception.getCause().getMessage() : null;
+    if (causeMessage != null && !causeMessage.isBlank()) {
+      details.add("Cause: " + causeMessage);
+    }
+
+    return List.copyOf(details);
+  }
+
+  private static String describeFieldError(FieldError fieldError) {
+    if (fieldError == null) {
+      return null;
+    }
+
+    String objectName = fieldError.getObjectName();
+    String fieldName = fieldError.getField();
+    String defaultMessage = fieldError.getDefaultMessage();
+    return objectName + "." + fieldName + ": " + (defaultMessage != null ? defaultMessage : "invalid value");
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ApiErrorResponse> handleIllegalArgument(
       IllegalArgumentException exception, HttpServletRequest request) {
@@ -104,27 +126,5 @@ public class GlobalExceptionHandler {
             request.getRequestURI());
 
     return ResponseEntity.status(status).body(payload);
-  }
-
-  private static List<String> detailsFor(Exception exception) {
-    List<String> details = new ArrayList<>();
-    details.add("Exception: " + exception.getClass().getSimpleName());
-    String causeMessage = exception.getCause() != null ? exception.getCause().getMessage() : null;
-    if (causeMessage != null && !causeMessage.isBlank()) {
-      details.add("Cause: " + causeMessage);
-    }
-
-    return List.copyOf(details);
-  }
-
-  private static String describeFieldError(FieldError fieldError) {
-    if (fieldError == null) {
-      return null;
-    }
-
-    String objectName = fieldError.getObjectName();
-    String fieldName = fieldError.getField();
-    String defaultMessage = fieldError.getDefaultMessage();
-    return objectName + "." + fieldName + ": " + (defaultMessage != null ? defaultMessage : "invalid value");
   }
 }

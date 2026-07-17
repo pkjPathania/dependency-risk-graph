@@ -1,12 +1,14 @@
 package io.github.pkjpathania.dependencyrisk.graph.repo;
 
 import io.github.pkjpathania.dependencyrisk.graph.enums.NodeType;
+import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationSummary;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyGraphSnapshot;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyNode;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyVertex;
 import io.github.pkjpathania.dependencyrisk.graph.model.GraphMetadata;
 import io.github.pkjpathania.dependencyrisk.graph.model.GraphSummary;
 import io.github.pkjpathania.dependencyrisk.graph.model.SparqlSelectResponse;
+import io.github.pkjpathania.dependencyrisk.graph.util.SparqlUtil;
 import io.github.pkjpathania.dependencyrisk.graph.vocabulary.RiskVocabulary;
 import java.io.IOException;
 import java.io.StringWriter;
@@ -17,12 +19,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.apache.jena.query.Dataset;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
+import org.apache.jena.query.ResultSetFactory;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Property;
@@ -56,10 +60,7 @@ public class JenaGraphRepository {
   }
 
   public void saveAll(Model model) {
-    dataset.executeWrite(
-        () -> {
-          dataset.getDefaultModel().add(model);
-        });
+    dataset.executeWrite(() -> dataset.getDefaultModel().add(model));
   }
 
   public Model getModel() {
@@ -121,6 +122,38 @@ public class JenaGraphRepository {
         });
   }
 
+  public <T> List<T> execSelect(String sparql, Function<QuerySolution, T> mapper) {
+    Query query = SparqlUtil.selectOnly(sparql);
+    return select(query, mapper);
+  }
+
+  public <T> List<T> select(Query query, Function<QuerySolution, T> mapper) {
+    Objects.requireNonNull(query, "query must not be null");
+    Objects.requireNonNull(mapper, "mapper must not be null");
+    return dataset.calculateRead(
+        () -> {
+          try (QueryExecution qe = QueryExecution.dataset(dataset).query(query).build()) {
+            ResultSet rs = qe.execSelect();
+
+            List<T> result = new ArrayList<>();
+
+            while (rs.hasNext()) {
+              result.add(mapper.apply(rs.nextSolution()));
+            }
+            return List.copyOf(result);
+          }
+        });
+  }
+
+  private ResultSet from(Query query) {
+    return dataset.calculateRead(
+        () -> {
+          try (QueryExecution qe = QueryExecution.dataset(dataset).query(query).build()) {
+            return ResultSetFactory.copyResults(qe.execSelect());
+          }
+        });
+  }
+
   public DependencyGraphSnapshot build() {
     return dataset.calculateRead(
         () -> {
@@ -164,6 +197,45 @@ public class JenaGraphRepository {
         });
   }
 
+  public List<ApplicationSummary> summaries(Query query) {
+    return dataset.calculateRead(
+        () -> {
+          try (QueryExecution qe = QueryExecution.dataset(dataset).query(query).build()) {
+
+            ResultSet rs = qe.execSelect();
+            List<ApplicationSummary> summaries = new ArrayList<>();
+
+            while (rs.hasNext()) {
+              QuerySolution qs = rs.next();
+
+              summaries.add(
+                  new ApplicationSummary(
+                      getValue(qs, "application"), getValue(qs, "name"), getValue(qs, "version")));
+            }
+
+            return List.copyOf(summaries);
+          }
+        });
+  }
+
+  public String getValue(QuerySolution solution, String variable) {
+    RDFNode node = solution.get(variable);
+
+    if (node == null) {
+      return null;
+    }
+
+    if (node.isLiteral()) {
+      return node.asLiteral().getString();
+    }
+
+    if (node.isResource()) {
+      return node.asResource().getURI();
+    }
+
+    return node.toString();
+  }
+
   private DependencyNode toMetadata(Model model, Resource resource) {
     String label = literalValue(resource, RDFS.label);
     String version = literalValue(resource, RiskVocabulary.VERSION);
@@ -184,5 +256,25 @@ public class JenaGraphRepository {
     }
 
     return statement.getString();
+  }
+
+  public long getLong(QuerySolution solution, String variable) {
+    RDFNode node = solution.get(variable);
+
+    if (node == null || !node.isLiteral()) {
+      return 0L;
+    }
+
+    return node.asLiteral().getLong();
+  }
+
+  public boolean getBoolean(QuerySolution solution, String variable) {
+    RDFNode node = solution.get(variable);
+
+    if (node == null || !node.isLiteral()) {
+      return false;
+    }
+
+    return node.asLiteral().getBoolean();
   }
 }

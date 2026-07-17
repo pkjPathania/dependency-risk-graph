@@ -1,5 +1,6 @@
 export type NavigationId =
   | 'dashboard'
+  | 'explorer'
   | 'sparql'
   | 'dependencyPath';
 
@@ -9,7 +10,8 @@ export interface NavigationItem {
 }
 
 export const navigationItems: NavigationItem[] = [
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'sparql', label: 'SPARQL Query' },
+  { id: 'dashboard', label: 'Overview' },
+  { id: 'explorer', label: 'Explore' },
+  { id: 'sparql', label: 'SPARQL' },
   { id: 'dependencyPath', label: 'Dependency Path' }
 ];

@@ -4,6 +4,7 @@ import io.github.pkjpathania.dependencyrisk.graph.service.SparqlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,5 +33,10 @@ public class SparqlController {
   @PostMapping("/exec")
   public ResponseEntity<?> exec(@RequestBody String rawSparql) {
     return ResponseEntity.ok(sparqlService.execute(rawSparql));
+  }
+
+  @GetMapping("/summaries")
+  public ResponseEntity<?> getSummaries() {
+    return ResponseEntity.ok(sparqlService.getSummaries());
   }
 }

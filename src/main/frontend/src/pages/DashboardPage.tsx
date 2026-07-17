@@ -1,63 +1,138 @@
-import { Box, Card, CardContent, Stack, Typography } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
-import { escapePercent, fetchGraphMetadata, uploadSbomAsRdf } from '../api/sbomApi';
-import type { GraphMetadata } from '../api/types';
+import { Alert, Box, Button, Card, CardContent, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { fetchApplicationSummaries } from '../api/summariesApi';
+import type { ApplicationSummary, GraphMetadata } from '../api/types';
+import { fetchGraphMetadata, uploadSbomAsRdf, escapePercent } from '../api/sbomApi';
 import { RestCallProgress } from '../components/RestCallProgress';
-import { SummaryCard } from '../components/SummaryCard';
-import { DependencyGraph } from '../features/graph/DependencyGraph';
-import { mapGraphMetadataToGraph } from '../features/graph/graphMapper';
-import { PackageDetailsPanel } from '../features/graph/PackageDetailsPanel';
-import { RdfSummaryPanel } from '../features/sbom/RdfSummaryPanel';
+import { ExploreDataTable } from '../features/explore/ExploreDataTable';
+import { OverviewMetricCard } from '../features/explore/OverviewMetricCard';
+import { fetchApplicationOverview } from '../features/explore/exploreApi';
 import { SbomUploadPanel } from '../features/sbom/SbomUploadPanel';
 
-export function DashboardPage() {
+interface DashboardPageProps {
+  onExploreApplication: (applicationIri: string) => void;
+}
+
+interface ApplicationRow {
+  iri: string;
+  name: string;
+  version: string | null;
+  packageCount: number | null;
+}
+
+export function DashboardPage({ onExploreApplication }: DashboardPageProps) {
+  const mountedRef = useRef(true);
   const [isLoadingMetadata, setIsLoadingMetadata] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [rdfStatusMessage, setRdfStatusMessage] = useState<string | null>(null);
   const [graphMetadata, setGraphMetadata] = useState<GraphMetadata | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set());
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const graph = useMemo(() => {
-    if (!graphMetadata) {
-      return null;
-    }
-
-    return mapGraphMetadataToGraph(graphMetadata, { expandedNodeIds, maxInitialDepth: 2 });
-  }, [expandedNodeIds, graphMetadata]);
+  const [applicationRows, setApplicationRows] = useState<ApplicationRow[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(true);
+  const [applicationsError, setApplicationsError] = useState<string | null>(null);
 
   useEffect(() => {
-    let active = true;
-
-    async function loadGraphMetadata() {
-      setIsLoadingMetadata(true);
-      try {
-        const metadata = await fetchGraphMetadata();
-        if (!active) {
-          return;
-        }
-        setGraphMetadata(metadata);
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-        setBackendError(error instanceof Error ? error.message : 'Failed to load graph metadata.');
-      } finally {
-        if (active) {
-          setIsLoadingMetadata(false);
-        }
-      }
-    }
-
-    void loadGraphMetadata();
-
     return () => {
-      active = false;
+      mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    void loadGraphMetadata();
+    void loadApplicationRows();
+  }, []);
+
+  const metrics = useMemo(() => {
+    const summary = graphMetadata?.summary;
+    const graphNodeCount = graphMetadata?.graph['@graph']?.length ?? null;
+
+    return [
+      { label: 'Triples', value: formatCount(summary?.trippleCount), caption: 'RDF statements' },
+      { label: 'Applications', value: formatCount(summary?.applicationCount), caption: 'Ingested applications' },
+      { label: 'Packages', value: formatCount(summary?.packageCount), caption: 'Package-version resources' },
+      {
+        label: 'Dependency edges',
+        value: formatCount(summary?.dependencyEdgeCount),
+        caption: 'Relationships in the graph'
+      },
+      { label: 'Graph nodes', value: formatCount(graphNodeCount), caption: 'Nodes in the RDF graph' }
+    ];
+  }, [graphMetadata]);
+
+  async function loadGraphMetadata() {
+    setIsLoadingMetadata(true);
+    try {
+      const metadata = await fetchGraphMetadata();
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setGraphMetadata(metadata);
+    } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      console.error('Failed to load graph metadata.', error);
+      setBackendError(error instanceof Error ? error.message : 'Failed to load graph metadata.');
+    } finally {
+      if (mountedRef.current) {
+        setIsLoadingMetadata(false);
+      }
+    }
+  }
+
+  async function loadApplicationRows() {
+    setApplicationsLoading(true);
+    setApplicationsError(null);
+    setApplicationRows([]);
+
+    try {
+      const summaries = await fetchApplicationSummaries();
+      const selectableSummaries = summaries.filter(
+        (summary): summary is ApplicationSummary & { iri: string } => Boolean(summary.iri?.trim())
+      );
+
+      const nextRows = await Promise.all(
+        selectableSummaries.map(async (summary) => {
+          let packageCount: number | null = null;
+
+          try {
+            const overview = await fetchApplicationOverview(summary.iri);
+            packageCount = overview.uniquePackageCount ?? null;
+          } catch (error) {
+            console.error(`Failed to load application overview for ${summary.iri}.`, error);
+          }
+
+          return {
+            iri: summary.iri,
+            name: summary.name ?? 'Unknown',
+            version: summary.version ?? null,
+            packageCount
+          };
+        })
+      );
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setApplicationRows(nextRows);
+    } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      console.error('Failed to load application summaries.', error);
+      setApplicationsError('Unable to load applications.');
+      setApplicationRows([]);
+    } finally {
+      if (mountedRef.current) {
+        setApplicationsLoading(false);
+      }
+    }
+  }
 
   async function handleUpload(file: File) {
     setIsUploading(true);
@@ -68,48 +143,41 @@ export function DashboardPage() {
     try {
       const summary = await uploadSbomAsRdf(file);
       const metadata = await fetchGraphMetadata();
+      if (!mountedRef.current) {
+        return;
+      }
+
       setGraphMetadata(metadata);
-      setSelectedNodeId(null);
-      setExpandedNodeIds(new Set());
-      setSearchTerm('');
+      await loadApplicationRows();
       setSuccessMessage(`Uploaded ${escapePercent(file.name)} successfully.`);
       setRdfStatusMessage(
         `RDF graph updated: ${summary.trippleCount} triples, ${summary.applicationCount} applications, ${summary.packageCount} packages.`
       );
     } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
       setBackendError(error instanceof Error ? error.message : 'Failed to upload SBOM.');
     } finally {
-      setIsUploading(false);
+      if (mountedRef.current) {
+        setIsUploading(false);
+      }
     }
   }
 
-  function handleToggleExpandNode(nodeId: string) {
-    setExpandedNodeIds((current) => {
-      const next = new Set(current);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-      }
-      return next;
-    });
-  }
-
-  const applicationNode = graph?.nodesById.get(graph.rootId);
-  const applicationName = applicationNode ? escapePercent(applicationNode.name) : 'Waiting for metadata';
-  const applicationVersion = applicationNode?.version ? escapePercent(applicationNode.version) : 'Not provided';
-  const directDependencyCount = graph ? graph.childRefsBySource.get(graph.rootId)?.length ?? 0 : 0;
-  const totalComponentCount = graph?.nodesById.size ?? 0;
+  const isBusy = isLoadingMetadata || isUploading || applicationsLoading;
 
   return (
-    <Stack spacing={3}>
-      <RestCallProgress visible={isLoadingMetadata || isUploading} />
-      <Box>
-        <Typography variant="h4" sx={{ fontSize: { xs: '1.8rem', md: '2.1rem' } }}>
-          Dependency Risk Dashboard
+    <Stack spacing={2}>
+      <RestCallProgress visible={isBusy} />
+
+      <Box sx={{ display: 'grid', gap: 0.25 }}>
+        <Typography variant="h4" sx={{ fontSize: { xs: '1.55rem', md: '1.8rem' }, fontWeight: 800, lineHeight: 1.1 }}>
+          Overview
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-          Analyze SBOMs, dependency paths, and vulnerability exposure
+        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
+          Repository summary and application entry point.
         </Typography>
       </Box>
 
@@ -121,68 +189,104 @@ export function DashboardPage() {
         rdfStatusMessage={rdfStatusMessage}
       />
 
-      <RdfSummaryPanel metadata={graphMetadata} />
+      {applicationsError ? <Alert severity="error">{applicationsError}</Alert> : null}
 
-      <Box
-        sx={{
-          display: 'grid',
-          gap: 2,
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }
-        }}
+      <Card variant="outlined">
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gap: 1,
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' }
+            }}
+          >
+            {metrics.map((metric) => (
+              <OverviewMetricCard
+                key={metric.label}
+                label={metric.label}
+                value={metric.value}
+                caption={metric.caption}
+                loading={isLoadingMetadata}
+              />
+            ))}
+          </Box>
+        </CardContent>
+      </Card>
+
+      <ExploreDataTable
+        title="Applications"
+        description="Open an application in Explore."
+        loading={applicationsLoading}
+        error={null}
+        emptyMessage="No applications have been ingested yet. Upload a CycloneDX SBOM to begin."
+        isEmpty={applicationRows.length === 0}
       >
-        <Box>
-          <SummaryCard label="Application name" value={applicationName} />
+        <Box sx={{ overflowX: 'auto' }}>
+          <Table size="small" aria-label="Applications table">
+            <TableHead>
+              <TableRow>
+                <HeaderCell>Name</HeaderCell>
+                <HeaderCell>Version</HeaderCell>
+                <HeaderCell align="right">Package Count</HeaderCell>
+                <HeaderCell align="center">Explore action</HeaderCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {applicationsLoading
+                ? Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`application-skeleton-${index}`}>
+                      <TableCell colSpan={4}>
+                        <Typography variant="body2" color="text.secondary">
+                          Loading applications...
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                : applicationRows.map((row) => (
+                    <TableRow hover key={row.iri}>
+                      <TableCell sx={{ fontWeight: 700 }}>{row.name}</TableCell>
+                      <TableCell sx={{ fontWeight: 700 }}>{row.version ?? 'Unknown'}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700 }}>
+                        {formatCount(row.packageCount)}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => onExploreApplication(row.iri)}
+                          sx={{ minWidth: 92 }}
+                        >
+                          Explore
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+            </TableBody>
+          </Table>
         </Box>
-        <Box>
-          <SummaryCard label="Application version" value={applicationVersion} />
-        </Box>
-        <Box>
-          <SummaryCard label="Direct dependency count" value={String(directDependencyCount)} />
-        </Box>
-        <Box>
-          <SummaryCard label="Total component count" value={String(totalComponentCount)} />
-        </Box>
-      </Box>
-
-      <Box
-        sx={{
-          display: 'grid',
-          gap: 2,
-          alignItems: 'stretch',
-          gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 3fr) minmax(320px, 1fr)' }
-        }}
-      >
-        <Box>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              {graph ? (
-                <DependencyGraph
-                  graph={graph}
-                  selectedNodeId={selectedNodeId}
-                  searchTerm={searchTerm}
-                  onSearchTermChange={setSearchTerm}
-                  onSelectNode={setSelectedNodeId}
-                  onToggleExpandNode={handleToggleExpandNode}
-                />
-              ) : (
-                <Stack spacing={1.5}>
-                  <Typography variant="h6">Dependency graph</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {isLoadingMetadata
-                      ? 'Loading graph metadata from /api/v1/metadata...'
-                      : 'No graph metadata is available yet.'}
-                  </Typography>
-                </Stack>
-              )}
-            </CardContent>
-          </Card>
-        </Box>
-
-        <Box>
-          <PackageDetailsPanel graph={graph} selectedNodeId={selectedNodeId} onToggleExpandNode={handleToggleExpandNode} />
-        </Box>
-      </Box>
-
+      </ExploreDataTable>
     </Stack>
   );
+}
+
+function HeaderCell({
+  children,
+  align = 'left'
+}: {
+  children: string;
+  align?: 'left' | 'right' | 'center';
+}) {
+  return (
+    <TableCell align={align} sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
+      {children}
+    </TableCell>
+  );
+}
+
+function formatCount(value: number | null | undefined): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '—';
+  }
+
+  return value.toLocaleString();
 }

@@ -1,15 +1,16 @@
 # Dependency Risk Graph
 
-Dependency Risk Graph is a Spring Boot + React application for ingesting CycloneDX SBOMs, storing them as an RDF knowledge graph, exploring the dependency graph, and querying the graph with SPARQL.
+Dependency Risk Graph is a Spring Boot + React application for ingesting CycloneDX SBOMs, storing them as an RDF knowledge graph, exploring applications and dependencies, and querying the graph with SPARQL.
 
 This repository currently contains the first working slice of the product:
 
 - SBOM upload and normalization
 - RDF graph generation and persistence with Apache Jena TDB2
-- Graph summary and visual dependency exploration in the UI
+- Overview metrics and application entry points in the UI
+- Explore page for application summaries, dependency data, and graph-derived application details
 - SPARQL query formatting and execution
 - Dependency path lookup for a package and version
-- A dashboard shell with several future pages scaffolded out
+- A compact Material UI navigation shell for the four main pages
 
 ## What is implemented so far
 
@@ -19,26 +20,17 @@ This repository currently contains the first working slice of the product:
 - Normalizes SBOM data into applications, components, and dependency edges.
 - Maps SBOM data into an RDF model.
 - Persists the latest graph into a local Jena TDB2 dataset at `./data/tdb2`.
-- Exposes graph metadata, dependency path lookup, and SPARQL endpoints.
+- Exposes graph metadata, application exploration, dependency path lookup, and SPARQL endpoints.
 - Supports SPARQL `SELECT` execution only.
 
 ### Frontend
 
 - React + TypeScript + Vite app bundled into the Spring Boot build.
-- Dashboard with SBOM upload, graph summary cards, Cytoscape dependency graph, and package details panel.
+- Overview page with compact graph metrics, SBOM upload, and application list.
+- Explore page with application selector, summary cards, dependency table, and inner tabs.
 - SPARQL page with editor, formatter, execution, and result table.
 - Dependency path page for finding the shortest dependency chain to a package.
-- Navigation shell for the rest of the application sections.
-
-### Scaffolded pages
-
-These sections are present in the UI shell but are still placeholders:
-
-- Applications
-- Dependencies
-- Vulnerabilities
-- Security Assistant
-- Settings
+- Navigation shell for the four primary application sections.
 
 ## Tech Stack
 
@@ -131,6 +123,15 @@ Then start the backend in another terminal:
 - `GET /api/v1/metadata`
   - Returns the current RDF graph summary and serialized graph payload.
 
+### Explore
+
+- `GET /api/v1/explore/applications`
+  - Returns application summaries with IRI, name, and version.
+- `GET /api/v1/explore/overview?applicationIri=...`
+  - Returns overview metrics for the selected application.
+- `GET /api/v1/explore/dependencies?applicationIri=...`
+  - Returns dependency rows for the selected application.
+
 ### Dependency path
 
 - `GET /api/dependencies/path?packageName=...&version=...`
@@ -139,6 +140,8 @@ Then start the backend in another terminal:
 
 ### SPARQL
 
+- `GET /api/v1/sparql/summaries`
+  - Returns application summaries used by the UI.
 - `POST /api/v1/sparql/format`
   - Formats a raw SPARQL query.
 - `POST /api/v1/sparql/exec`
@@ -146,7 +149,7 @@ Then start the backend in another terminal:
 
 ## UI Pages
 
-- Dashboard: upload SBOMs, inspect summary counts, and browse the dependency graph
-- SPARQL Query: format and execute SPARQL against the current graph
+- Overview: graph metrics, SBOM upload, and application list
+- Explore: application-centric dependency inspection workspace
+- SPARQL: format and execute SPARQL against the current graph
 - Dependency Path: inspect a shortest path between the application and a package version
-- Applications, Dependencies, Vulnerabilities, Security Assistant, Settings: navigation shells for future work

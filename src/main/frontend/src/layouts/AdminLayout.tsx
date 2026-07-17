@@ -1,4 +1,3 @@
-import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import {
   AppBar,
   Box,
@@ -6,11 +5,11 @@ import {
   Tabs,
   Toolbar,
   Stack,
-  Typography,
   useTheme
 } from '@mui/material';
 import type { ReactNode } from 'react';
 import { navigationItems, type NavigationId } from '../navigation/navigationItems';
+import logoImage from '../logo/img.png';
 
 interface AdminLayoutProps {
   selectedPageId: NavigationId;
@@ -48,29 +47,20 @@ export function AdminLayout({
             gap: 2,
             flexWrap: 'wrap'
           }}
-        >
+          >
           <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, flexWrap: 'wrap' }}>
             <Box
+              component="img"
+              src={logoImage}
+              alt="Dependency Risk Graph"
               sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 0.8,
-                px: 1.15,
-                py: 0.75,
-                borderRadius: 999,
-                background: 'linear-gradient(135deg, rgba(23, 32, 51, 0.98), rgba(37, 99, 235, 0.9))',
-                color: '#f8fafc',
-                boxShadow: '0 10px 26px rgba(23, 32, 51, 0.16)',
-                fontWeight: 900,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                whiteSpace: 'nowrap'
+                display: 'block',
+                width: { xs: 210, sm: 260, md: 300 },
+                maxWidth: '100%',
+                height: 'auto',
+                flexShrink: 0
               }}
             >
-              <AccountTreeOutlinedIcon fontSize="small" />
-              <Typography variant="body2" component="span" sx={{ fontWeight: 900, letterSpacing: '0.04em' }}>
-                Dependency Risk Graph
-              </Typography>
             </Box>
           </Stack>
 

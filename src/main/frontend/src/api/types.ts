@@ -34,6 +34,36 @@ export interface GraphMetadata {
   };
 }
 
+export interface ApplicationSummary {
+  iri: string | null;
+  name: string | null;
+  version: string | null;
+}
+
+export interface ApplicationOverview {
+  directDependencyCount?: number | null;
+  transitiveDependencyCount?: number | null;
+  uniquePackageCount?: number | null;
+  graphNodeCount?: number | null;
+  graphEdgeCount?: number | null;
+  vulnerablePackageCount?: number | null;
+  criticalVulnerabilityCount?: number | null;
+  lastEnrichedAt?: string | null;
+}
+
+export interface DependencySummary {
+  iri: string;
+  name: string;
+  version?: string | null;
+  purl?: string | null;
+  direct?: boolean | null;
+  depth?: number | null;
+  outgoingDependencyCount?: number | null;
+  incomingDependencyCount?: number | null;
+  vulnerabilityCount?: number | null;
+  highestSeverity?: string | null;
+}
+
 export interface SparqlSelectResponse {
   columns: string[];
   rows: Array<Record<string, string>>;

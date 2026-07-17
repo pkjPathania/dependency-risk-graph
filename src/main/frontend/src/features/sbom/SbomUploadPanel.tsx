@@ -51,19 +51,22 @@ export function SbomUploadPanel({
   }
 
   return (
-    <Card>
-      <CardContent>
-        <Stack spacing={2}>
+    <Card variant="outlined">
+      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Stack spacing={1.25}>
           <RestCallProgress visible={loading} />
-          <Box>
-            <Typography variant="h6">SBOM upload</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Upload a CycloneDX JSON SBOM to update the RDF graph and refresh the inventory and graph views.
+          <Box sx={{ display: 'grid', gap: 0.2 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, fontSize: '0.68rem' }}
+            >
+              Upload SBOM
             </Typography>
           </Box>
 
           <Box component="form" onSubmit={handleSubmit}>
-            <Stack spacing={1.5}>
+            <Stack spacing={1}>
               <TextField
                 id={fileInputId}
                 label="CycloneDX JSON file"
@@ -85,7 +88,7 @@ export function SbomUploadPanel({
                 >
                   {loading ? 'Uploading...' : 'Upload SBOM'}
                 </Button>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 700 }}>
                   Submit as multipart form data
                 </Typography>
               </Stack>

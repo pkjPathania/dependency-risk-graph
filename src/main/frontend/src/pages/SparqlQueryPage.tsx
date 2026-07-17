@@ -4,8 +4,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
-  Divider,
   Paper,
   Table,
   TableBody,
@@ -147,22 +145,6 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
     >
       <Stack spacing={3}>
         <RestCallProgress visible={isFormatting || isExecuting} />
-        <Box>
-          <Typography variant="h6" sx={{ fontSize: { xs: '1.05rem', md: '1.15rem' }, fontWeight: 700 }}>
-            Prefix presets
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Apply a prefix block to the current query before formatting or execution.
-          </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
-            {SPARQL_PREFIX_PRESETS.map((preset) => (
-              <Button key={preset.id} variant="outlined" size="small" onClick={() => handlePrefixPresetSelect(preset.id)}>
-                {preset.label}
-              </Button>
-            ))}
-          </Stack>
-        </Box>
-
         <Box
           sx={{
             display: 'flex',
@@ -172,12 +154,29 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
         >
           <Card sx={{ minWidth: 0 }}>
             <CardContent sx={{ px: { xs: 2, md: 2.5 }, py: { xs: 2, md: 2.5 } }}>
-              <Stack spacing={2}>
-                <Stack spacing={0.5}>
-                  <Typography variant="h6">Query editor</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    The SPARQL formatter endpoint returns normalized text and updates this box in place.
+              <Stack spacing={1.75}>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  spacing={1}
+                  alignItems={{ xs: 'stretch', md: 'center' }}
+                  justifyContent="space-between"
+                >
+                  <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.05rem' }, fontWeight: 800 }}>
+                    Query editor
                   </Typography>
+                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap justifyContent="flex-end">
+                    {SPARQL_PREFIX_PRESETS.map((preset) => (
+                      <Button
+                        key={preset.id}
+                        variant="outlined"
+                        size="small"
+                        onClick={() => handlePrefixPresetSelect(preset.id)}
+                        sx={compactActionButtonSx}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </Stack>
                 </Stack>
 
                 <TextField
@@ -197,31 +196,32 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
                   }}
                 />
 
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }}>
-                  <Button variant="outlined" onClick={handleExecuteQuery} disabled={!hasQuery || isExecuting}>
-                    {isExecuting ? 'Executing query' : 'Run query'}
-                  </Button>
-                  <Button variant="contained" onClick={handleFormatQuery} disabled={!hasQuery || isFormatting}>
-                    {isFormatting ? 'Formatting query' : 'Format query'}
-                  </Button>
-                  <Typography variant="body2" color="text.secondary">
-                    Format updates the editor. Run fills the results table below.
-                  </Typography>
-                </Stack>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  spacing={1}
+                  alignItems={{ xs: 'stretch', md: 'center' }}
+                  justifyContent="space-between"
+                >
+                  <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                    <Button variant="outlined" onClick={handleExecuteQuery} disabled={!hasQuery || isExecuting}>
+                      {isExecuting ? 'Executing query' : 'Run query'}
+                    </Button>
+                    <Button variant="contained" onClick={handleFormatQuery} disabled={!hasQuery || isFormatting}>
+                      {isFormatting ? 'Formatting query' : 'Format query'}
+                    </Button>
+                  </Stack>
 
-                <Divider />
-
-                <Stack spacing={1}>
-                  <Typography variant="subtitle2">Examples</Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap justifyContent="flex-end">
                     {EXAMPLE_QUERIES.map((example) => (
-                      <Chip
+                      <Button
                         key={example.label}
-                        label={example.label}
                         variant="outlined"
-                        clickable
+                        size="small"
                         onClick={() => handleExampleSelect(example.query)}
-                      />
+                        sx={compactActionButtonSx}
+                      >
+                        {example.label}
+                      </Button>
                     ))}
                   </Stack>
                 </Stack>
@@ -240,9 +240,6 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
                 >
                   <Stack spacing={0.5}>
                     <Typography variant="h6">Query results</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      This table displays the response returned from <code>/api/v1/sparql/exec</code>.
-                    </Typography>
                   </Stack>
                   <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                     {execResult ? (
@@ -335,6 +332,14 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
     </Box>
   );
 }
+
+const compactActionButtonSx = {
+  minWidth: 0,
+  px: 1,
+  py: 0.45,
+  textTransform: 'none',
+  fontWeight: 700
+};
 
 function formatResultsForClipboard(result: SparqlSelectResponse): string {
   if (result.columns.length === 0) {

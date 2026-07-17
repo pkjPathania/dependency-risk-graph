@@ -1,4 +1,4 @@
-package io.github.pkjpathania.dependencyrisk.graph.service;
+package io.github.pkjpathania.dependencyrisk.graph.util;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.query.Query;
@@ -15,5 +15,12 @@ public class SparqlUtil {
 
   public static Query from(String query) {
     return QueryFactory.create(query, Syntax.syntaxSPARQL_11);
+  }
+
+  public static Query selectOnly(String query) {
+    Query valid = from(query);
+    if (!valid.isSelectType()) throw new IllegalStateException("Only select are supported");
+
+    return valid;
   }
 }
