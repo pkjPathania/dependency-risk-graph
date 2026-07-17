@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { escapePercent, fetchGraphMetadata, uploadSbom } from '../api/sbomApi';
 import type { GraphMetadata } from '../api/types';
 import { SummaryCard } from '../components/SummaryCard';
-import { AssistantPanel } from '../features/assistant/AssistantPanel';
 import { DependencyGraph } from '../features/graph/DependencyGraph';
 import { mapGraphMetadataToGraph } from '../features/graph/graphMapper';
 import { PackageDetailsPanel } from '../features/graph/PackageDetailsPanel';
@@ -178,7 +177,6 @@ export function DashboardPage() {
         </Box>
       </Box>
 
-      <AssistantPanel />
     </Stack>
   );
 }

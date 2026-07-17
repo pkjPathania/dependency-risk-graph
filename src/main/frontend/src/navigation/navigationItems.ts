@@ -1,21 +1,11 @@
-import AppsOutlinedIcon from '@mui/icons-material/AppsOutlined';
-import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
 import AltRouteOutlinedIcon from '@mui/icons-material/AltRouteOutlined';
 import ManageSearchOutlinedIcon from '@mui/icons-material/ManageSearchOutlined';
-import SecurityOutlinedIcon from '@mui/icons-material/SecurityOutlined';
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
-import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 
 export type NavigationId =
   | 'dashboard'
   | 'sparql'
-  | 'dependencyPath'
-  | 'applications'
-  | 'dependencies'
-  | 'vulnerabilities'
-  | 'assistant'
-  | 'settings';
+  | 'dependencyPath';
 
 export interface NavigationItem {
   id: NavigationId;
@@ -26,10 +16,5 @@ export interface NavigationItem {
 export const navigationItems: NavigationItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: DashboardOutlinedIcon },
   { id: 'sparql', label: 'SPARQL Query', icon: ManageSearchOutlinedIcon },
-  { id: 'dependencyPath', label: 'Dependency Path', icon: AltRouteOutlinedIcon },
-  { id: 'applications', label: 'Applications', icon: AppsOutlinedIcon },
-  { id: 'dependencies', label: 'Dependencies', icon: AccountTreeOutlinedIcon },
-  { id: 'vulnerabilities', label: 'Vulnerabilities', icon: SecurityOutlinedIcon },
-  { id: 'assistant', label: 'Security Assistant', icon: SmartToyOutlinedIcon },
-  { id: 'settings', label: 'Settings', icon: SettingsOutlinedIcon }
+  { id: 'dependencyPath', label: 'Dependency Path', icon: AltRouteOutlinedIcon }
 ];
