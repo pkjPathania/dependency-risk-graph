@@ -1,106 +1,133 @@
-import MenuIcon from '@mui/icons-material/Menu';
+import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import {
   AppBar,
   Box,
-  Chip,
-  Divider,
-  Drawer,
-  IconButton,
-  Stack,
+  Tab,
+  Tabs,
   Toolbar,
+  Stack,
   Typography,
-  useMediaQuery,
   useTheme
 } from '@mui/material';
 import type { ReactNode } from 'react';
-import { SidebarNavigation } from '../navigation/SidebarNavigation';
 import { navigationItems, type NavigationId } from '../navigation/navigationItems';
 
-const DRAWER_WIDTH = 240;
-
 interface AdminLayoutProps {
-  title: string;
   selectedPageId: NavigationId;
-  mobileDrawerOpen: boolean;
-  onMobileDrawerToggle: () => void;
   onNavigationSelect: (id: NavigationId) => void;
   children: ReactNode;
 }
 
 export function AdminLayout({
-  title,
   selectedPageId,
-  mobileDrawerOpen,
-  onMobileDrawerToggle,
   onNavigationSelect,
   children
 }: AdminLayoutProps) {
   const theme = useTheme();
-  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
-
-  const drawerContent = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ px: 2.25, minHeight: 64 }}>
-        <Stack spacing={0.25}>
-          <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2}>
-            Dependency Risk Graph
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Supply-chain security console
-          </Typography>
-        </Stack>
-      </Toolbar>
-      <Divider />
-      <SidebarNavigation items={navigationItems} selectedId={selectedPageId} onSelect={onNavigationSelect} />
-    </Box>
-  );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="fixed" sx={{ zIndex: theme.zIndex.drawer + 1 }}>
-        <Toolbar sx={{ minHeight: 64, px: { xs: 1.5, sm: 2.5 } }}>
-          {!isDesktop ? (
-            <IconButton
-              edge="start"
-              onClick={onMobileDrawerToggle}
-              aria-label="Open navigation"
-              sx={{ mr: 1 }}
-            >
-              <MenuIcon />
-            </IconButton>
-          ) : null}
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h6" noWrap sx={{ fontSize: '1.05rem' }}>
-              {title}
-            </Typography>
-            <Chip label="Dependency risk graph" size="small" variant="outlined" />
-          </Stack>
-        </Toolbar>
-      </AppBar>
-
-      <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}>
-        <Drawer
-          variant={isDesktop ? 'permanent' : 'temporary'}
-          open={isDesktop || mobileDrawerOpen}
-          onClose={onMobileDrawerToggle}
-          ModalProps={{ keepMounted: true }}
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <AppBar
+        position="sticky"
+        color="default"
+        sx={{
+          zIndex: theme.zIndex.appBar,
+          backdropFilter: 'blur(12px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.84)',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 'none'
+        }}
+      >
+        <Toolbar
           sx={{
-            '& .MuiDrawer-paper': {
-              width: DRAWER_WIDTH,
-              boxSizing: 'border-box'
-            }
+            minHeight: 64,
+            px: { xs: 1.5, sm: 2.5 },
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            flexWrap: 'wrap'
           }}
         >
-          {drawerContent}
-        </Drawer>
-      </Box>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, flexWrap: 'wrap' }}>
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.8,
+                px: 1.15,
+                py: 0.75,
+                borderRadius: 999,
+                background: 'linear-gradient(135deg, rgba(23, 32, 51, 0.98), rgba(37, 99, 235, 0.9))',
+                color: '#f8fafc',
+                boxShadow: '0 10px 26px rgba(23, 32, 51, 0.16)',
+                fontWeight: 900,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <AccountTreeOutlinedIcon fontSize="small" />
+              <Typography variant="body2" component="span" sx={{ fontWeight: 900, letterSpacing: '0.04em' }}>
+                Dependency Risk Graph
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Box
+            component="nav"
+            sx={{
+              ml: 'auto',
+              width: { xs: '100%', sm: 'auto' },
+              overflowX: 'auto'
+            }}
+          >
+            <Tabs
+              value={selectedPageId}
+              onChange={(_, value: NavigationId) => onNavigationSelect(value)}
+              variant="scrollable"
+              scrollButtons="auto"
+              allowScrollButtonsMobile
+              aria-label="Primary navigation"
+              sx={{
+                minHeight: 40,
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: 999,
+                  backgroundColor: theme.palette.primary.dark
+                }
+              }}
+            >
+              {navigationItems.map((item) => (
+                <Tab
+                  key={item.id}
+                  value={item.id}
+                  label={item.label}
+                  disableRipple
+                  sx={{
+                    minHeight: 40,
+                    minWidth: 0,
+                    px: 1.5,
+                    py: 0.8,
+                    borderRadius: 999,
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    color: 'text.primary',
+                    '&.Mui-selected': {
+                      color: 'primary.dark'
+                    }
+                  }}
+                />
+              ))}
+            </Tabs>
+          </Box>
+        </Toolbar>
+      </AppBar>
 
       <Box
         component="main"
         sx={{
-          flexGrow: 1,
-          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-          pt: 8,
+          pt: 3,
           px: { xs: 1.5, sm: 2.5, md: 3 },
           pb: 3
         }}

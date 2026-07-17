@@ -19,19 +19,17 @@ import {
 import { useMemo, useState } from 'react';
 import { executeSparqlQuery, formatSparqlQuery } from '../api/sparqlApi';
 import type { SparqlSelectResponse } from '../api/types';
-
-const DEFAULT_QUERY = `PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
-
-SELECT ?subject ?predicate ?object
-WHERE {
-  ?subject ?predicate ?object
-}
-LIMIT 25`;
+import {
+  applySparqlPrefixPreset,
+  DEFAULT_SPARQL_QUERY,
+  SPARQL_PREFIX_PRESETS,
+  type SparqlPrefixPresetId
+} from '../features/sparql/prefixPresets';
 
 const EXAMPLE_QUERIES = [
   {
     label: 'All triples',
-    query: DEFAULT_QUERY
+    query: DEFAULT_SPARQL_QUERY
   },
   {
     label: 'Applications',
@@ -57,8 +55,12 @@ LIMIT 50`
   }
 ] as const;
 
-export function SparqlQueryPage() {
-  const [query, setQuery] = useState(DEFAULT_QUERY);
+interface SparqlQueryPageProps {
+  query: string;
+  onQueryChange: (query: string) => void;
+}
+
+export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) {
   const [isFormatting, setIsFormatting] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [formatError, setFormatError] = useState<string | null>(null);
@@ -66,6 +68,10 @@ export function SparqlQueryPage() {
   const [execResult, setExecResult] = useState<SparqlSelectResponse | null>(null);
 
   const hasQuery = useMemo(() => query.trim().length > 0, [query]);
+
+  function handlePrefixPresetSelect(presetId: SparqlPrefixPresetId) {
+    onQueryChange(applySparqlPrefixPreset(query, presetId));
+  }
 
   async function handleFormatQuery() {
     if (!hasQuery) {
@@ -78,7 +84,7 @@ export function SparqlQueryPage() {
 
     try {
       const formattedText = await formatSparqlQuery(query);
-      setQuery(formattedText);
+      onQueryChange(formattedText);
     } catch (error) {
       setFormatError(error instanceof Error ? error.message : 'Formatting failed.');
     } finally {
@@ -87,7 +93,7 @@ export function SparqlQueryPage() {
   }
 
   function handleExampleSelect(exampleQuery: string) {
-    setQuery(exampleQuery);
+    onQueryChange(exampleQuery);
     setFormatError(null);
     setExecError(null);
     setExecResult(null);
@@ -114,26 +120,37 @@ export function SparqlQueryPage() {
   }
 
   return (
-    <Stack spacing={3}>
+    <Box
+      sx={{
+        mx: { xs: -1.5, sm: -2.5, md: -3 }
+      }}
+    >
+      <Stack spacing={3}>
       <Box>
-        <Typography variant="h4" sx={{ fontSize: { xs: '1.8rem', md: '2.1rem' } }}>
-          SPARQL Controller
+        <Typography variant="h6" sx={{ fontSize: { xs: '1.05rem', md: '1.15rem' }, fontWeight: 700 }}>
+          Prefix presets
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
-          Write SPARQL in the editor, then send it to the formatter and replace the editor contents.
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          Apply a prefix block to the current query before formatting or execution.
         </Typography>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
+          {SPARQL_PREFIX_PRESETS.map((preset) => (
+            <Button key={preset.id} variant="outlined" size="small" onClick={() => handlePrefixPresetSelect(preset.id)}>
+              {preset.label}
+            </Button>
+          ))}
+        </Stack>
       </Box>
 
       <Box
         sx={{
-          display: 'grid',
-          gap: 2,
-          gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 1.05fr) minmax(0, 0.95fr)' },
-          alignItems: 'start'
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2
         }}
       >
-        <Card>
-          <CardContent>
+        <Card sx={{ minWidth: 0 }}>
+          <CardContent sx={{ px: { xs: 2, md: 2.5 }, py: { xs: 2, md: 2.5 } }}>
             <Stack spacing={2}>
               <Stack spacing={0.5}>
                 <Typography variant="h6">Query editor</Typography>
@@ -144,7 +161,7 @@ export function SparqlQueryPage() {
 
               <TextField
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => onQueryChange(event.target.value)}
                 multiline
                 minRows={18}
                 fullWidth
@@ -193,57 +210,57 @@ export function SparqlQueryPage() {
             </Stack>
           </CardContent>
         </Card>
-      </Box>
+        <Card sx={{ minWidth: 0 }}>
+          <CardContent sx={{ px: { xs: 2, md: 2.5 }, py: { xs: 2, md: 2.5 } }}>
+            <Stack spacing={2}>
+              <Stack spacing={0.5}>
+                <Typography variant="h6">Query results</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  This table displays the response returned from <code>/api/v1/sparql/exec</code>.
+                </Typography>
+              </Stack>
 
-      <Card>
-        <CardContent>
-          <Stack spacing={2}>
-            <Stack spacing={0.5}>
-              <Typography variant="h6">Query results</Typography>
-              <Typography variant="body2" color="text.secondary">
-                This table displays the response returned from <code>/api/v1/sparql/exec</code>.
-              </Typography>
-            </Stack>
-
-            {execResult ? (
-              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 560 }}>
-                <Table stickyHeader size="small">
-                  <TableHead>
-                    <TableRow>
-                      {execResult.columns.map((column) => (
-                        <TableCell key={column}>{column}</TableCell>
-                      ))}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {execResult.rows.map((row, rowIndex) => (
-                      <TableRow key={rowIndex}>
+              {execResult ? (
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 560 }}>
+                  <Table stickyHeader size="small">
+                    <TableHead>
+                      <TableRow>
                         {execResult.columns.map((column) => (
-                          <TableCell key={column}>{row[column] ?? '—'}</TableCell>
+                          <TableCell key={column}>{column}</TableCell>
                         ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : (
-              <Box
-                sx={{
-                  p: 3,
-                  border: '1px dashed',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  bgcolor: 'background.default'
-                }}
-              >
-                <Typography variant="body2" color="text.secondary">
-                  Run a SELECT query to see the `/exec` response here.
-                </Typography>
-              </Box>
-            )}
-          </Stack>
-        </CardContent>
-      </Card>
-    </Stack>
+                    </TableHead>
+                    <TableBody>
+                      {execResult.rows.map((row, rowIndex) => (
+                        <TableRow key={rowIndex}>
+                          {execResult.columns.map((column) => (
+                            <TableCell key={column}>{row[column] ?? '—'}</TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Box
+                  sx={{
+                    p: 3,
+                    border: '1px dashed',
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    bgcolor: 'background.default'
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary">
+                    Run a SELECT query to see the `/exec` response here.
+                  </Typography>
+                </Box>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Box>
+      </Stack>
+    </Box>
   );
 }
