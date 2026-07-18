@@ -26,6 +26,20 @@ export interface GraphSummary {
   dependencyEdgeCount: number;
 }
 
+export interface SbomImportResult {
+  importId: string;
+  activeImportId: string;
+  importRunIri: string;
+  rootOccurrenceIri: string;
+  productName: string | null;
+  productVersion: string | null;
+  specificationVersion: string;
+  componentCount: number;
+  dependencyEdgeCount: number;
+  graphQuality: string;
+  issues: Array<{ severity: string; code: string; message: string }>;
+}
+
 export interface GraphMetadata {
   summary: GraphSummary;
   graph: {

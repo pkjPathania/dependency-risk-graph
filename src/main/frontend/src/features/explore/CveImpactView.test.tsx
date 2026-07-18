@@ -26,6 +26,17 @@ describe('CveImpactView', () => {
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2);
   });
 
+  it('shows vulnerabilities affecting the most applications first', () => {
+    renderView({ response: listResponse([
+      listItem({ preferredIdentifier: 'CVE-2026-2000', vulnerabilityIri: 'urn:test:smaller', affectedApplicationCount: 1 }),
+      listItem()
+    ]) });
+
+    const rows = screen.getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('CVE-2026-1000');
+    expect(rows[2]).toHaveTextContent('CVE-2026-2000');
+  });
+
   it('opens the focused graph and renders the vulnerability once', async () => {
     renderView();
     await userEvent.click(screen.getByText('CVE-2026-1000'));
@@ -82,12 +93,13 @@ function listResponse(items: ReturnType<typeof listItem>[]): CveImpactListRespon
   return { scope: 'selected', applicationIri: 'urn:test:application', total: items.length, items };
 }
 
-function listItem() {
+function listItem(overrides: Partial<CveImpactListResponse['items'][number]> = {}) {
   return {
     vulnerabilityIri: 'urn:test:vulnerability', preferredIdentifier: 'CVE-2026-1000', osvId: 'GHSA-IMPACT',
     aliases: ['CVE-2026-1000'], summary: 'Shared vulnerability', severityLevel: 'HIGH',
     affectedApplicationCount: 2, affectedPackageVersionCount: 2, referenceCount: 2,
-    applicationNames: ['Orders', 'Analytics'], packageNames: ['jackson-databind']
+    applicationNames: ['Orders', 'Analytics'], packageNames: ['jackson-databind'],
+    ...overrides
   };
 }
 

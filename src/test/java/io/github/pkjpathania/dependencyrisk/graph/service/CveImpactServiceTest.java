@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactDetailResponse;
 import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactListResponse;
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
+import io.github.pkjpathania.dependencyrisk.graph.repo.JenaImportContextRepository;
+import io.github.pkjpathania.dependencyrisk.graph.repo.JenaPackageOccurrenceRepository;
 import io.github.pkjpathania.dependencyrisk.graph.vocabulary.RiskVocabulary;
 import org.apache.jena.query.Dataset;
 import org.apache.jena.query.DatasetFactory;
@@ -34,7 +36,7 @@ class CveImpactServiceTest {
     assertEquals("DIRECT", detail.exposures().getFirst().dependencyType());
     assertEquals(1, detail.exposures().getFirst().dependencyHops());
     assertEquals(
-        fixture.firstApplicationIri,
+        "urn:test:impact:root:one",
         detail.exposures().getFirst().path().getFirst().iri());
     assertEquals(
         fixture.vulnerabilityIri,
@@ -48,7 +50,7 @@ class CveImpactServiceTest {
     CveImpactListResponse list = fixture.service.list("all", null);
     CveImpactDetailResponse detail = fixture.service.detail(fixture.vulnerabilityIri, "all", null);
 
-    assertEquals(1, list.total());
+    assertEquals(2, list.total());
     assertEquals(2, list.items().getFirst().affectedApplicationCount());
     assertEquals(2, list.items().getFirst().affectedPackageVersionCount());
     assertEquals(2, detail.exposures().size());
@@ -57,6 +59,18 @@ class CveImpactServiceTest {
     assertEquals(1, detail.graph().nodes().stream().filter(node -> node.nodeType().equals("VULNERABILITY")).count());
     assertEquals(2, detail.graph().nodes().stream().filter(node -> node.nodeType().equals("VULNERABLE_PACKAGE")).count());
     assertTrue(detail.exposures().stream().anyMatch(exposure -> exposure.dependencyType().equals("TRANSITIVE")));
+  }
+
+  @Test
+  void allScopeSortsVulnerabilitiesByAffectedApplicationCountDescending() {
+    Fixture fixture = fixture();
+
+    CveImpactListResponse list = fixture.service.list("all", null);
+
+    assertEquals("CVE-2026-1000", list.items().get(0).preferredIdentifier());
+    assertEquals(2, list.items().get(0).affectedApplicationCount());
+    assertEquals("CVE-2026-2000", list.items().get(1).preferredIdentifier());
+    assertEquals(1, list.items().get(1).affectedApplicationCount());
   }
 
   @Test
@@ -81,10 +95,14 @@ class CveImpactServiceTest {
     dataset.executeWrite(
         () -> populate(dataset.getDefaultModel(), firstApplicationIri, secondApplicationIri, vulnerabilityIri));
     JenaGraphRepository repository = new JenaGraphRepository(dataset, new ObjectMapper());
-    DependencyPathService pathService =
-        new DependencyPathService(new DependencyGraphIndex(repository));
+    JenaImportContextRepository contexts = new JenaImportContextRepository(repository);
+    JenaPackageOccurrenceRepository occurrences = new JenaPackageOccurrenceRepository(repository);
     return new Fixture(
-        new CveImpactService(repository, pathService),
+        new CveImpactService(
+            repository,
+            contexts,
+            occurrences,
+            new JenaDependencyPathResolver(repository, occurrences)),
         firstApplicationIri,
         vulnerabilityIri);
   }
@@ -99,9 +117,16 @@ class CveImpactServiceTest {
     Resource bridge = packageVersion(model, "urn:test:impact:bridge", "reporting", "5.0");
     Resource firstPackage = packageVersion(model, "urn:test:impact:jackson:210", "jackson-databind", "2.10.0");
     Resource secondPackage = packageVersion(model, "urn:test:impact:jackson:298", "jackson-databind", "2.9.8");
-    firstApplication.addProperty(RiskVocabulary.DEPENDS_ON, firstPackage);
-    secondApplication.addProperty(RiskVocabulary.DEPENDS_ON, bridge);
-    bridge.addProperty(RiskVocabulary.DEPENDS_ON, secondPackage);
+    Resource firstRun = importRun(model, firstApplication, "one", "urn:test:impact:root:one");
+    Resource secondRun = importRun(model, secondApplication, "two", "urn:test:impact:root:two");
+    Resource firstRoot = firstRun.getPropertyResourceValue(RiskVocabulary.ROOT_OCCURRENCE);
+    Resource secondRoot = secondRun.getPropertyResourceValue(RiskVocabulary.ROOT_OCCURRENCE);
+    Resource bridgeOccurrence = occurrence(model, "urn:test:impact:occurrence:bridge", bridge, secondRun);
+    Resource firstOccurrence = occurrence(model, "urn:test:impact:occurrence:jackson:210", firstPackage, firstRun);
+    Resource secondOccurrence = occurrence(model, "urn:test:impact:occurrence:jackson:298", secondPackage, secondRun);
+    firstRoot.addProperty(RiskVocabulary.DEPENDS_ON, firstOccurrence);
+    secondRoot.addProperty(RiskVocabulary.DEPENDS_ON, bridgeOccurrence);
+    bridgeOccurrence.addProperty(RiskVocabulary.DEPENDS_ON, secondOccurrence);
 
     Resource vulnerability =
         model.createResource(vulnerabilityIri)
@@ -115,6 +140,15 @@ class CveImpactServiceTest {
             .addProperty(RiskVocabulary.REFERENCE_URL, "https://github.com/example/repo/commit/fix");
     firstPackage.addProperty(RiskVocabulary.AFFECTED_BY, vulnerability);
     secondPackage.addProperty(RiskVocabulary.AFFECTED_BY, vulnerability);
+
+    Resource singleApplicationVulnerability =
+        model.createResource("urn:test:impact:single-application-vulnerability")
+            .addProperty(RDF.type, RiskVocabulary.VULNERABILITY)
+            .addProperty(RiskVocabulary.OSV_ID, "GHSA-SINGLE")
+            .addProperty(RiskVocabulary.ALIAS, "CVE-2026-2000")
+            .addProperty(RiskVocabulary.SUMMARY, "Single application vulnerability")
+            .addProperty(RiskVocabulary.SEVERITY_LEVEL, "MEDIUM");
+    bridge.addProperty(RiskVocabulary.AFFECTED_BY, singleApplicationVulnerability);
 
     Resource assessment =
         model.createResource("urn:test:impact:assessment")
@@ -141,6 +175,31 @@ class CveImpactServiceTest {
         .addProperty(RDFS.label, name)
         .addProperty(RiskVocabulary.VERSION, version)
         .addProperty(RiskVocabulary.PURL, "pkg:maven/example/" + name + "@" + version);
+  }
+
+  private Resource importRun(Model model, Resource application, String id, String rootIri) {
+    Resource run = model.createResource("urn:test:impact:import:" + id)
+        .addProperty(RDF.type, RiskVocabulary.IMPORT_RUN)
+        .addLiteral(RiskVocabulary.IMPORT_ID, id);
+    Resource root = model.createResource(rootIri)
+        .addProperty(RDF.type, RiskVocabulary.APPLICATION_OCCURRENCE)
+        .addProperty(RDFS.label, application.getProperty(RDFS.label).getString())
+        .addProperty(RiskVocabulary.BELONGS_TO_IMPORT, run)
+        .addProperty(RiskVocabulary.INSTANCE_OF, application);
+    run.addProperty(RiskVocabulary.ROOT_OCCURRENCE, root);
+    application.addProperty(RiskVocabulary.ACTIVE_IMPORT, run);
+    return run;
+  }
+
+  private Resource occurrence(Model model, String iri, Resource packageVersion, Resource importRun) {
+    return model.createResource(iri)
+        .addProperty(RDF.type, RiskVocabulary.PACKAGE_OCCURRENCE)
+        .addProperty(RiskVocabulary.BELONGS_TO_IMPORT, importRun)
+        .addProperty(RDFS.label, packageVersion.getProperty(RDFS.label).getString())
+        .addProperty(
+            RiskVocabulary.VERSION,
+            packageVersion.getProperty(RiskVocabulary.VERSION).getString())
+        .addProperty(RiskVocabulary.INSTANCE_OF, packageVersion);
   }
 
   private record Fixture(

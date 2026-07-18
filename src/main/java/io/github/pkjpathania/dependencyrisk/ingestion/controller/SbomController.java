@@ -1,8 +1,10 @@
 package io.github.pkjpathania.dependencyrisk.ingestion.controller;
 
-import io.github.pkjpathania.dependencyrisk.graph.service.RdfExportService;
-import io.github.pkjpathania.dependencyrisk.ingestion.model.NormalizedSbom;
-import io.github.pkjpathania.dependencyrisk.ingestion.service.SbomIngestionService;
+import io.github.pkjpathania.dependencyrisk.graph.sbom.application.ImportSbomUseCase;
+import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.SbomImportCommand;
+import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.SbomImportResult;
+import java.io.IOException;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,14 +18,13 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1/sboms")
 public class SbomController {
-  private final SbomIngestionService sbomIngestionService;
-  private final RdfExportService rdfExportService;
+  private final ImportSbomUseCase importSbomUseCase;
 
   @PostMapping(
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
-  public NormalizedSbom upload(@RequestPart("file") MultipartFile file) {
-    return sbomIngestionService.ingest(file);
+  public SbomImportResult upload(@RequestPart("file") MultipartFile file) {
+    return importFile(file);
   }
 
   @PostMapping(
@@ -31,6 +32,19 @@ public class SbomController {
       consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
       produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity<?> newGraph(@RequestPart("file") MultipartFile file) {
-    return ResponseEntity.ok(rdfExportService.newGraph(file));
+    return ResponseEntity.ok(importFile(file));
+  }
+
+  private SbomImportResult importFile(MultipartFile file) {
+    if (file == null || file.isEmpty()) {
+      throw new IllegalArgumentException("SBOM file is required");
+    }
+    try {
+      String filename = file.getOriginalFilename() == null ? "uploaded-sbom.json" : file.getOriginalFilename();
+      return importSbomUseCase.importSbom(
+          new SbomImportCommand(file.getBytes(), filename, "HTTP_UPLOAD", Instant.now()));
+    } catch (IOException exception) {
+      throw new IllegalStateException("Unable to read uploaded SBOM", exception);
+    }
   }
 }

@@ -9,10 +9,12 @@ import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationVulnerability
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
 import io.github.pkjpathania.dependencyrisk.graph.vocabulary.RiskVocabulary;
 import java.util.List;
+import java.util.ArrayDeque;
 import org.apache.jena.query.Dataset;
 import org.apache.jena.query.DatasetFactory;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 import org.junit.jupiter.api.Test;
@@ -146,12 +148,15 @@ class ExplorerServiceTest {
     Resource firstVulnerability = model.createResource("urn:test:vulnerability:one");
     Resource secondVulnerability = model.createResource("urn:test:vulnerability:two");
 
-    application.addProperty(RiskVocabulary.DEPENDS_ON, firstPackage);
-    firstPackage.addProperty(RiskVocabulary.DEPENDS_ON, secondPackage);
+    Resource firstOccurrence = occurrence(model, "urn:test:occurrence:first", firstPackage);
+    Resource secondOccurrence = occurrence(model, "urn:test:occurrence:second", secondPackage);
+    application.addProperty(RiskVocabulary.DEPENDS_ON, firstOccurrence);
+    firstOccurrence.addProperty(RiskVocabulary.DEPENDS_ON, secondOccurrence);
     firstPackage.addProperty(RiskVocabulary.AFFECTED_BY, firstVulnerability);
     firstPackage.addProperty(RiskVocabulary.AFFECTED_BY, secondVulnerability);
     secondPackage.addProperty(RiskVocabulary.AFFECTED_BY, firstVulnerability);
     unrelatedPackage.addProperty(RiskVocabulary.AFFECTED_BY, firstVulnerability);
+    scopeApplication(model, application, "overview");
   }
 
   private void populateVulnerabilityGraph(Model model) {
@@ -166,8 +171,10 @@ class ExplorerServiceTest {
         model.createResource("urn:test:package:beta")
             .addProperty(RDF.type, RiskVocabulary.PACKAGE_VERSION)
             .addProperty(RDFS.label, "beta");
-    application.addProperty(RiskVocabulary.DEPENDS_ON, directPackage);
-    directPackage.addProperty(RiskVocabulary.DEPENDS_ON, nestedPackage);
+    Resource directOccurrence = occurrence(model, "urn:test:occurrence:alpha", directPackage);
+    Resource nestedOccurrence = occurrence(model, "urn:test:occurrence:beta", nestedPackage);
+    application.addProperty(RiskVocabulary.DEPENDS_ON, directOccurrence);
+    directOccurrence.addProperty(RiskVocabulary.DEPENDS_ON, nestedOccurrence);
 
     Resource detailedVulnerability =
         model.createResource("urn:test:vulnerability:detailed")
@@ -193,14 +200,19 @@ class ExplorerServiceTest {
             .addProperty(RDF.type, RiskVocabulary.VULNERABILITY)
             .addProperty(RiskVocabulary.OSV_ID, "OSV-MINIMAL");
     nestedPackage.addProperty(RiskVocabulary.AFFECTED_BY, minimalVulnerability);
+    scopeApplication(model, application, "vulnerable");
   }
 
   private void populateReferenceGraph(Model model) {
     Resource application = model.createResource("urn:test:reference-app");
     Resource firstVersion = referencePackage(model, "alpha-one", "alpha", "1.0");
     Resource secondVersion = referencePackage(model, "alpha-two", "alpha", "2.0");
-    application.addProperty(RiskVocabulary.DEPENDS_ON, firstVersion);
-    application.addProperty(RiskVocabulary.DEPENDS_ON, secondVersion);
+    application.addProperty(
+        RiskVocabulary.DEPENDS_ON,
+        occurrence(model, "urn:test:reference-occurrence:alpha-one", firstVersion));
+    application.addProperty(
+        RiskVocabulary.DEPENDS_ON,
+        occurrence(model, "urn:test:reference-occurrence:alpha-two", secondVersion));
 
     Resource firstAdvisory =
         model.createResource("urn:test:reference-vulnerability:one")
@@ -229,8 +241,38 @@ class ExplorerServiceTest {
         model.createResource("urn:test:reference-vulnerability:unrelated")
             .addProperty(RiskVocabulary.OSV_ID, "CVE-UNRELATED")
             .addProperty(RiskVocabulary.REFERENCE_URL, "https://example.test/unrelated");
-    unrelatedApplication.addProperty(RiskVocabulary.DEPENDS_ON, unrelatedPackage);
+    unrelatedApplication.addProperty(
+        RiskVocabulary.DEPENDS_ON,
+        occurrence(model, "urn:test:reference-occurrence:unrelated", unrelatedPackage));
     unrelatedPackage.addProperty(RiskVocabulary.AFFECTED_BY, unrelatedAdvisory);
+    scopeApplication(model, application, "reference");
+    scopeApplication(model, unrelatedApplication, "unrelated");
+  }
+
+  private void scopeApplication(Model model, Resource application, String id) {
+    Resource run = model.createResource("urn:test:import:" + id)
+        .addProperty(RDF.type, RiskVocabulary.IMPORT_RUN)
+        .addLiteral(RiskVocabulary.IMPORT_ID, id);
+    Resource root = model.createResource("urn:test:root:" + id)
+        .addProperty(RDF.type, RiskVocabulary.APPLICATION_OCCURRENCE)
+        .addProperty(RiskVocabulary.BELONGS_TO_IMPORT, run)
+        .addProperty(RiskVocabulary.INSTANCE_OF, application);
+    application.addProperty(RDF.type, RiskVocabulary.APPLICATION)
+        .addProperty(RiskVocabulary.ACTIVE_IMPORT, run);
+    run.addProperty(RiskVocabulary.ROOT_OCCURRENCE, root);
+    var direct = model.listObjectsOfProperty(application, RiskVocabulary.DEPENDS_ON).toList();
+    model.removeAll(application, RiskVocabulary.DEPENDS_ON, null);
+    direct.forEach(node -> root.addProperty(RiskVocabulary.DEPENDS_ON, node));
+    ArrayDeque<Resource> queue = new ArrayDeque<>();
+    direct.stream().filter(RDFNode::isResource).map(RDFNode::asResource).forEach(queue::add);
+    java.util.Set<Resource> visited = new java.util.HashSet<>();
+    while (!queue.isEmpty()) {
+      Resource occurrence = queue.remove();
+      if (!visited.add(occurrence)) continue;
+      occurrence.addProperty(RiskVocabulary.BELONGS_TO_IMPORT, run);
+      model.listObjectsOfProperty(occurrence, RiskVocabulary.DEPENDS_ON).toList().stream()
+          .filter(RDFNode::isResource).map(RDFNode::asResource).forEach(queue::add);
+    }
   }
 
   private Resource referencePackage(
@@ -238,6 +280,12 @@ class ExplorerServiceTest {
     return model.createResource("urn:test:reference-package:" + iriSuffix)
         .addProperty(RDFS.label, packageName)
         .addProperty(RiskVocabulary.VERSION, installedVersion);
+  }
+
+  private Resource occurrence(Model model, String iri, Resource packageVersion) {
+    return model.createResource(iri)
+        .addProperty(RDF.type, RiskVocabulary.COMPONENT_OCCURRENCE)
+        .addProperty(RiskVocabulary.INSTANCE_OF, packageVersion);
   }
 
   private void addAssessment(

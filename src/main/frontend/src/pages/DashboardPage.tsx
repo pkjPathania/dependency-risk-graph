@@ -150,7 +150,7 @@ export function DashboardPage({ onExploreApplication }: DashboardPageProps) {
       await loadApplicationRows();
       setSuccessMessage(`Uploaded ${escapePercent(file.name)} successfully.`);
       setRdfStatusMessage(
-        `RDF graph updated: ${summary.trippleCount} triples, ${summary.applicationCount} applications, ${summary.packageCount} packages.`
+        `SBOM import ${summary.importId} mapped ${summary.componentCount} components and ${summary.dependencyEdgeCount} explicit dependency edges (${summary.graphQuality}).`
       );
     } catch (error) {
       if (!mountedRef.current) {

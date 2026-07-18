@@ -73,15 +73,19 @@ export function CveImpactView({
   const items = response?.items ?? [];
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return items;
-    return items.filter((item) => [
+    const matchingItems = query ? items.filter((item) => [
       item.preferredIdentifier,
       item.osvId,
       item.summary,
       ...item.aliases,
       ...item.applicationNames,
       ...item.packageNames
-    ].some((value) => value?.toLowerCase().includes(query)));
+    ].some((value) => value?.toLowerCase().includes(query))) : items;
+    return [...matchingItems].sort((left, right) =>
+      right.affectedApplicationCount - left.affectedApplicationCount
+      || left.preferredIdentifier.localeCompare(right.preferredIdentifier, undefined, { sensitivity: 'base' })
+      || left.osvId.localeCompare(right.osvId, undefined, { sensitivity: 'base' })
+    );
   }, [items, search]);
   const pagedItems = useMemo(() => {
     const start = page * rowsPerPage;

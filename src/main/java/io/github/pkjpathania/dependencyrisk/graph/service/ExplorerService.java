@@ -71,7 +71,10 @@ public class ExplorerService {
                   ?direct
                 WHERE {
 
-                  ?application risk:dependsOn+ ?package .
+                  ?application risk:activeImport ?importRun .
+                  ?importRun risk:rootOccurrence ?root .
+                  ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
+                  ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
 
                   ?package
                       rdf:type risk:PackageVersion ;
@@ -87,7 +90,7 @@ public class ExplorerService {
 
                   BIND(
                     EXISTS {
-                      ?application risk:dependsOn ?package
+                      ?root risk:dependsOn ?occurrence
                     }
                     AS ?direct
                   )
@@ -155,7 +158,10 @@ public class ExplorerService {
         """
         SELECT (COUNT(DISTINCT ?dependency) AS ?count)
         WHERE {
-          ?application risk:dependsOn ?dependency .
+          ?application risk:activeImport ?importRun .
+          ?importRun risk:rootOccurrence ?root .
+          ?root risk:belongsToImport ?importRun ; risk:dependsOn ?dependency .
+          ?dependency risk:belongsToImport ?importRun .
         }
         """);
   }
@@ -167,7 +173,10 @@ public class ExplorerService {
         """
         SELECT (COUNT(DISTINCT ?package) AS ?count)
         WHERE {
-          ?application risk:dependsOn+ ?package .
+          ?application risk:activeImport ?importRun .
+          ?importRun risk:rootOccurrence ?root .
+          ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
+          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
         }
         """);
   }
@@ -180,9 +189,9 @@ public class ExplorerService {
         SELECT (COUNT(DISTINCT ?edge) AS ?count)
         WHERE {
 
-          ?application risk:dependsOn* ?source .
-
-          ?source risk:dependsOn ?target .
+          ?application risk:activeImport ?importRun .
+          ?source risk:belongsToImport ?importRun ; risk:dependsOn ?target .
+          ?target risk:belongsToImport ?importRun .
 
           BIND(
             CONCAT(
@@ -202,7 +211,10 @@ public class ExplorerService {
         """
         SELECT (COUNT(DISTINCT ?package) AS ?count)
         WHERE {
-          ?application risk:dependsOn+ ?package .
+          ?application risk:activeImport ?importRun .
+          ?importRun risk:rootOccurrence ?root .
+          ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
+          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
           ?package risk:affectedBy ?vulnerability .
         }
         """);
@@ -214,7 +226,10 @@ public class ExplorerService {
         """
         SELECT (COUNT(DISTINCT ?vulnerability) AS ?count)
         WHERE {
-          ?application risk:dependsOn+ ?package .
+          ?application risk:activeImport ?importRun .
+          ?importRun risk:rootOccurrence ?root .
+          ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
+          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
           ?package risk:affectedBy ?vulnerability .
           ?vulnerability risk:hasSeverity ?assessment .
           ?assessment risk:severityLevel ?severityLevel .
@@ -515,7 +530,10 @@ public class ExplorerService {
       WHERE {
           VALUES ?application { ?applicationValue }
 
-          ?application risk:dependsOn+ ?package .
+          ?application risk:activeImport ?importRun .
+          ?importRun risk:rootOccurrence ?root .
+          ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
+          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
           ?package a risk:PackageVersion ;
                    rdfs:label ?packageName ;
                    risk:affectedBy ?vulnerability .
@@ -524,7 +542,7 @@ public class ExplorerService {
           OPTIONAL { ?package risk:purl ?installedPurl . }
 
           BIND(
-              IF(EXISTS { ?application risk:dependsOn ?package }, "DIRECT", "TRANSITIVE")
+              IF(EXISTS { ?root risk:dependsOn ?occurrence }, "DIRECT", "TRANSITIVE")
               AS ?dependencyType
           )
 
@@ -563,7 +581,10 @@ public class ExplorerService {
       WHERE {
           VALUES ?application { ?applicationValue }
 
-          ?application risk:dependsOn+ ?package .
+          ?application risk:activeImport ?importRun .
+          ?importRun risk:rootOccurrence ?root .
+          ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
+          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
           ?package rdfs:label ?packageName ;
                    risk:version ?installedVersion ;
                    risk:affectedBy ?vulnerability .

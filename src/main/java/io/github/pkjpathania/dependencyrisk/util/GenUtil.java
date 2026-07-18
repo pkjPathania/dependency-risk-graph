@@ -10,10 +10,13 @@ public class GenUtil {
   private static final ObjectMapper OM = new ObjectMapper();
 
   public static String sha256(String value) {
+    return sha256Bytes(value.getBytes(StandardCharsets.UTF_8));
+  }
+
+  public static String sha256Bytes(byte[] value) {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
-
-      byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+      byte[] hash = digest.digest(value);
 
       return HexFormat.of().formatHex(hash);
     } catch (NoSuchAlgorithmException exception) {

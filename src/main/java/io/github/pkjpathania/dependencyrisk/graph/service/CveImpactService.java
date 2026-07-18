@@ -5,8 +5,11 @@ import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactDetailResponse;
 import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactListItem;
 import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactListResponse;
 import io.github.pkjpathania.dependencyrisk.graph.model.CvssAssessmentView;
-import io.github.pkjpathania.dependencyrisk.graph.model.DependencyNode;
+import io.github.pkjpathania.dependencyrisk.graph.model.DependencyPathNode;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyPathResult;
+import io.github.pkjpathania.dependencyrisk.graph.model.DependencyPathStatus;
+import io.github.pkjpathania.dependencyrisk.graph.model.ImportContext;
+import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactStatus;
 import io.github.pkjpathania.dependencyrisk.graph.model.ExposurePath;
 import io.github.pkjpathania.dependencyrisk.graph.model.FixedVersionView;
 import io.github.pkjpathania.dependencyrisk.graph.model.ImpactGraph;
@@ -16,6 +19,8 @@ import io.github.pkjpathania.dependencyrisk.graph.model.PackageVersionView;
 import io.github.pkjpathania.dependencyrisk.graph.model.PathNodeView;
 import io.github.pkjpathania.dependencyrisk.graph.model.VulnerabilityDetail;
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
+import io.github.pkjpathania.dependencyrisk.graph.repo.ImportContextRepository;
+import io.github.pkjpathania.dependencyrisk.graph.repo.PackageOccurrenceRepository;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -46,7 +51,9 @@ public class CveImpactService {
       """;
 
   private final JenaGraphRepository repository;
-  private final DependencyPathService dependencyPathService;
+  private final ImportContextRepository importContextRepository;
+  private final PackageOccurrenceRepository packageOccurrenceRepository;
+  private final DependencyPathResolver dependencyPathResolver;
 
   public CveImpactListResponse list(String scopeValue, String applicationIri) {
     Scope scope = validateScope(scopeValue, applicationIri);
@@ -65,7 +72,9 @@ public class CveImpactService {
         grouped.values().stream()
             .map(ListAccumulator::toItem)
             .sorted(
-                Comparator.comparing(
+                Comparator.comparingInt(CveImpactListItem::affectedApplicationCount)
+                    .reversed()
+                    .thenComparing(
                         CveImpactListItem::preferredIdentifier,
                         Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
                     .thenComparing(
@@ -133,29 +142,38 @@ public class CveImpactService {
   private ExposurePath resolveExposure(ExposureTarget target, String vulnerabilityIri) {
     String exposureId = target.application.iri() + "\u0000" + target.vulnerablePackage.iri();
     try {
+      ImportContext importContext = target.importContext();
       DependencyPathResult result =
-          dependencyPathService.shortestByIri(
-              target.application.iri(), target.vulnerablePackage.iri());
-      if (!result.found()) {
+          dependencyPathResolver.resolve(importContext, target.vulnerablePackage.iri());
+      if (result.status() != DependencyPathStatus.PATH_RESOLVED) {
         return unavailableExposure(exposureId, target, vulnerabilityIri);
       }
 
       List<PathNodeView> path =
           result.path().stream().map(CveImpactService::toPathNode).collect(ArrayList::new, List::add, List::addAll);
+      path.add(
+          new PathNodeView(
+              target.vulnerablePackage.iri(),
+              target.vulnerablePackage.name(),
+              target.vulnerablePackage.version(),
+              target.vulnerablePackage.purl(),
+              "PACKAGE_VERSION"));
       path.add(new PathNodeView(vulnerabilityIri, null, null, null, "VULNERABILITY"));
       List<String> nodeIds = path.stream().map(PathNodeView::iri).toList();
       List<String> edgeIds = new ArrayList<>();
       for (int index = 0; index < result.path().size() - 1; index++) {
-        edgeIds.add(edgeId(result.path().get(index).iri(), "DEPENDS_ON", result.path().get(index + 1).iri()));
+        edgeIds.add(edgeId(result.path().get(index).occurrenceIri(), "DEPENDS_ON", result.path().get(index + 1).occurrenceIri()));
       }
+      edgeIds.add(
+          edgeId(result.matchedOccurrenceIri(), "INSTANCE_OF", target.vulnerablePackage.iri()));
       edgeIds.add(edgeId(target.vulnerablePackage.iri(), "AFFECTED_BY", vulnerabilityIri));
       return new ExposurePath(
           exposureId,
           target.application,
           target.vulnerablePackage,
-          result.hops() == 1 ? "DIRECT" : "TRANSITIVE",
-          result.hops(),
-          "AVAILABLE",
+          result.path().size() == 2 ? "DIRECT" : "TRANSITIVE",
+          Math.max(0, result.path().size() - 1),
+          CveImpactStatus.AFFECTED_PATH_RESOLVED.name(),
           path,
           nodeIds,
           edgeIds);
@@ -176,7 +194,7 @@ public class CveImpactService {
         exposureId,
         target.application,
         target.vulnerablePackage,
-        "PATH_UNAVAILABLE",
+        CveImpactStatus.AFFECTED_PATH_UNAVAILABLE.name(),
         0,
         "PATH_UNAVAILABLE",
         List.of(),
@@ -325,8 +343,8 @@ public class CveImpactService {
     return source + "\u0000" + relationship + "\u0000" + target;
   }
 
-  private static PathNodeView toPathNode(DependencyNode node) {
-    return new PathNodeView(node.iri(), node.label(), node.version(), node.purl(), node.type().name());
+  private static PathNodeView toPathNode(DependencyPathNode node) {
+    return new PathNodeView(node.occurrenceIri(), node.label(), node.version(), node.purl(), node.type());
   }
 
   private static ExposureTarget toExposureTarget(QuerySolution solution) {
@@ -339,7 +357,11 @@ public class CveImpactService {
             resourceIri(solution, "package"),
             literalValue(solution, "packageName"),
             literalValue(solution, "installedVersion"),
-            literalValue(solution, "installedPurl")));
+            literalValue(solution, "installedPurl")),
+        new ImportContext(
+            literalValue(solution, "importId"),
+            resourceIri(solution, "importRun"),
+            resourceIri(solution, "rootOccurrence")));
   }
 
   private static void accumulateListRow(
@@ -549,7 +571,10 @@ public class CveImpactService {
     }
   }
 
-  private record ExposureTarget(ApplicationView application, PackageVersionView vulnerablePackage) {}
+  private record ExposureTarget(
+      ApplicationView application,
+      PackageVersionView vulnerablePackage,
+      ImportContext importContext) {}
 
   private static final class EdgeAccumulator {
     private final String id;
@@ -574,10 +599,13 @@ public class CveImpactService {
       """
       SELECT DISTINCT
           ?vulnerability ?osvId ?alias ?summary ?severityLevel
-          ?application ?applicationName ?package ?packageName ?installedVersion ?referenceUrl
+          ?application ?applicationName ?importRun ?rootOccurrence ?occurrence ?package ?packageName ?installedVersion ?referenceUrl
       WHERE {
-          ?application a risk:Application ; rdfs:label ?applicationName ; risk:dependsOn+ ?package .
+          ?application a risk:Application ; rdfs:label ?applicationName ; risk:activeImport ?importRun .
           #SCOPE#
+          ?importRun risk:rootOccurrence ?rootOccurrence .
+          ?rootOccurrence risk:belongsToImport ?importRun .
+          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
           ?package a risk:PackageVersion ; rdfs:label ?packageName ;
                    risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
           ?vulnerability a risk:Vulnerability ; risk:osvId ?osvId .
@@ -597,12 +625,15 @@ public class CveImpactService {
   private static final String EXPOSURE_QUERY =
       """
       SELECT DISTINCT ?application ?applicationName ?applicationVersion
-                      ?package ?packageName ?installedVersion ?installedPurl
+                      ?importRun ?importId ?rootOccurrence ?package ?packageName ?installedVersion ?installedPurl
       WHERE {
           VALUES ?vulnerability { ?vulnerabilityValue }
-          ?application a risk:Application ; rdfs:label ?applicationName ; risk:dependsOn+ ?package .
+          ?application a risk:Application ; rdfs:label ?applicationName ; risk:activeImport ?importRun .
           #SCOPE#
           OPTIONAL { ?application risk:version ?applicationVersion . }
+          ?importRun risk:importId ?importId ; risk:rootOccurrence ?rootOccurrence .
+          ?rootOccurrence risk:belongsToImport ?importRun .
+          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
           ?package a risk:PackageVersion ; rdfs:label ?packageName ;
                    risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
           OPTIONAL { ?package risk:purl ?installedPurl . }

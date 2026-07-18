@@ -249,7 +249,9 @@ public class JenaGraphRepository {
     NodeType type =
         model.contains(resource, RDF.type, RiskVocabulary.APPLICATION)
             ? NodeType.APPLICATION
-            : NodeType.PACKAGE_VERSION;
+            : model.contains(resource, RDF.type, RiskVocabulary.SERVICE)
+                ? NodeType.SERVICE
+                : NodeType.PACKAGE_VERSION;
 
     return new DependencyNode(resource.getURI(), label, version, purl, type);
   }
