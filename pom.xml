@@ -36,10 +36,11 @@
     <tag/>
     <url/>
   </scm>
-  <properties>
+    <properties>
     <java.version>21</java.version>
     <cyclonedx.version>12.2.0</cyclonedx.version>
     <commons-lang.version>3.20.0</commons-lang.version>
+    <commons-collections4.version>4.4</commons-collections4.version>
     <springdoc.version>3.0.3</springdoc.version>
     <jena.version>6.1.0</jena.version>
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
@@ -83,6 +84,11 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
       <version>${commons-lang.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
+      <version>${commons-collections4.version}</version>
     </dependency>
     <dependency>
       <groupId>org.cyclonedx</groupId>
@@ -223,7 +229,7 @@
               <outputDirectory>${project.build.outputDirectory}</outputDirectory>
               <resources>
                 <resource>
-                  <directory>target/generated-resources/frontend</directory>
+                  <directory>/private/tmp/dependency-risk-graph-frontend/generated-resources/frontend</directory>
                   <includes>
                     <include>static/**</include>
                   </includes>

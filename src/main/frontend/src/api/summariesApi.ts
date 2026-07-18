@@ -1,7 +1,7 @@
 import type { ApplicationSummary } from './types';
 import { readApiErrorMessage } from './httpError';
 
-const SUMMARIES_URL = '/api/v1/summaries';
+const SUMMARIES_URL = '/api/v1/sparql/summaries';
 
 export async function fetchApplicationSummaries(): Promise<ApplicationSummary[]> {
   const response = await fetch(SUMMARIES_URL);

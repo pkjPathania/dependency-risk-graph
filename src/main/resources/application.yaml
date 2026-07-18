@@ -8,5 +8,13 @@ spring:
     multipart:
       max-file-size: 20MB
       max-request-size: 20MB
-  server:
-    port: 8080
+
+server:
+  port: 8080
+
+dependency-risk:
+  osv:
+    enabled: true
+    batch-size: 100
+    advisory-fetch-threads: 8
+    output-directory: src/main/resources/osv

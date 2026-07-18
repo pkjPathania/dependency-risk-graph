@@ -1,0 +1,15 @@
+{
+  "applicationIri" : "urn:io.github.pkjpathania.dependencyrisk:resource:application:dependency-risk-graph-frontend:0.0.1",
+  "applicationName" : "dependency-risk-graph-frontend",
+  "applicationVersion" : "0.0.1",
+  "scannedAt" : "2026-07-17T22:02:44.710823Z",
+  "packagesDiscovered" : 175,
+  "packagesQueried" : 175,
+  "packagesSkipped" : 0,
+  "vulnerablePackages" : 0,
+  "uniqueVulnerabilities" : 0,
+  "failedPackages" : 0,
+  "advisoryFetchFailures" : 0,
+  "durationMs" : 1251,
+  "findings" : [ ]
+}

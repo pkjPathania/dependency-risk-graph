@@ -22,9 +22,13 @@ public final class RiskVocabulary {
   public static final Property PUBLISHED_AT = property("publishedAt");
   public static final Property MODIFIED_AT = property("modifiedAt");
   public static final Property WITHDRAWN_AT = property("withdrawnAt");
-  public static final Property REFERENCE = property("reference");
   public static final Property FIXED_VERSION = property("fixedVersion");
+  public static final Property FIXED_IN = property("fixedIn");
   public static final Property SOURCE = property("source");
+  public static final Resource REFERENCE = property("Reference");
+  public static final Property HAS_REFERENCE = property("hasReference");
+  public static final Property REFERENCE_TYPE = property("referenceType");
+  public static final Property REFERENCE_URL = property("referenceUrl");
 
   private RiskVocabulary() {}
 

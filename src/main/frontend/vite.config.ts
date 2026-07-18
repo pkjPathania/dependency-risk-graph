@@ -8,6 +8,7 @@ const frontendRoot = fileURLToPath(new URL('.', import.meta.url));
 export default defineConfig({
   plugins: [react()],
   base: '/',
+  cacheDir: '/private/tmp/dependency-risk-graph-frontend-vite-cache',
   server: {
     proxy: {
       '/api': {
@@ -17,7 +18,7 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: resolve(frontendRoot, '../../../target/generated-resources/frontend/static'),
+    outDir: '/private/tmp/dependency-risk-graph-frontend/generated-resources/frontend/static',
     emptyOutDir: true
   }
 });

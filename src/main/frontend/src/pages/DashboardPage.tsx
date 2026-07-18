@@ -1,12 +1,11 @@
 import { Alert, Box, Button, Card, CardContent, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchApplicationSummaries } from '../api/summariesApi';
 import type { ApplicationSummary, GraphMetadata } from '../api/types';
 import { fetchGraphMetadata, uploadSbomAsRdf, escapePercent } from '../api/sbomApi';
 import { RestCallProgress } from '../components/RestCallProgress';
 import { ExploreDataTable } from '../features/explore/ExploreDataTable';
 import { OverviewMetricCard } from '../features/explore/OverviewMetricCard';
-import { fetchApplicationOverview } from '../features/explore/exploreApi';
+import { fetchApplicationOverview, fetchApplicationSummaries } from '../features/explore/exploreApi';
 import { SbomUploadPanel } from '../features/sbom/SbomUploadPanel';
 
 interface DashboardPageProps {
@@ -171,15 +170,6 @@ export function DashboardPage({ onExploreApplication }: DashboardPageProps) {
   return (
     <Stack spacing={2}>
       <RestCallProgress visible={isBusy} />
-
-      <Box sx={{ display: 'grid', gap: 0.25 }}>
-        <Typography variant="h4" sx={{ fontSize: { xs: '1.55rem', md: '1.8rem' }, fontWeight: 800, lineHeight: 1.1 }}>
-          Overview
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700, fontSize: '0.82rem' }}>
-          Repository summary and application entry point.
-        </Typography>
-      </Box>
 
       <SbomUploadPanel
         onUpload={handleUpload}

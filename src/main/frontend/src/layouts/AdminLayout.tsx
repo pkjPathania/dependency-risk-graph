@@ -93,6 +93,7 @@ export function AdminLayout({
                   key={item.id}
                   value={item.id}
                   label={item.label}
+                  {...(item.icon ? { icon: item.icon, iconPosition: 'start' as const } : {})}
                   disableRipple
                   sx={{
                     minHeight: 40,

@@ -1,0 +1,15 @@
+{
+  "applicationIri" : "urn:io.github.pkjpathania.dependencyrisk:resource:application:keycloak-parent:10.0.2",
+  "applicationName" : "keycloak-parent",
+  "applicationVersion" : "10.0.2",
+  "scannedAt" : "2026-07-17T22:03:03.635678Z",
+  "packagesDiscovered" : 0,
+  "packagesQueried" : 0,
+  "packagesSkipped" : 0,
+  "vulnerablePackages" : 0,
+  "uniqueVulnerabilities" : 0,
+  "failedPackages" : 0,
+  "advisoryFetchFailures" : 0,
+  "durationMs" : 8,
+  "findings" : [ ]
+}

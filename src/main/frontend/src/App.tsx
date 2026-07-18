@@ -3,6 +3,7 @@ import { AdminLayout } from './layouts/AdminLayout';
 import type { NavigationId } from './navigation/navigationItems';
 import { DashboardPage } from './pages/DashboardPage';
 import { ExplorerPage } from './pages/ExplorerPage';
+import { VulnerabilityEnrichmentPage } from './pages/VulnerabilityEnrichmentPage';
 import { SparqlQueryPage } from './pages/SparqlQueryPage';
 import { DependencyPathPage } from './pages/DependencyPathPage';
 import { DEFAULT_SPARQL_QUERY } from './features/sparql/prefixPresets';
@@ -23,6 +24,8 @@ export default function App() {
         return <DashboardPage onExploreApplication={handleExploreApplication} />;
       case 'explorer':
         return <ExplorerPage initialApplicationIri={exploreApplicationIri} />;
+      case 'vulnerabilityEnrichment':
+        return <VulnerabilityEnrichmentPage />;
       case 'sparql':
         return <SparqlQueryPage query={sparqlQuery} onQueryChange={setSparqlQuery} />;
       case 'dependencyPath':

@@ -6,6 +6,7 @@
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "noEmit": true,
+    "tsBuildInfoFile": "/private/tmp/dependency-risk-graph-frontend-tsconfig.node.tsbuildinfo",
     "types": ["node"]
   },
   "include": ["vite.config.ts"]

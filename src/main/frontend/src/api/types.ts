@@ -91,3 +91,41 @@ export interface ApiErrorResponse {
   details?: string[] | null;
   path?: string | null;
 }
+
+export interface ApplicationVulnerabilityScanRequest {
+  applicationIri: string;
+}
+
+export interface ApplicationVulnerabilityRow {
+  packageIri: string;
+  packageName: string;
+  packageVersion: string;
+  purl: string;
+  osvId: string;
+  displayId: string;
+  summary: string;
+  aliases: string[];
+  severity: string;
+  severityType: string;
+  severityScore: string;
+  fixedVersions: string[];
+  publishedAt: string | null;
+  modifiedAt: string | null;
+  withdrawnAt: string | null;
+}
+
+export interface ApplicationVulnerabilityScanResponse {
+  applicationIri: string;
+  applicationName: string;
+  applicationVersion: string | null;
+  scannedAt: string;
+  packagesDiscovered: number;
+  packagesQueried: number;
+  packagesSkipped: number;
+  vulnerablePackages: number;
+  uniqueVulnerabilities: number;
+  failedPackages: number;
+  advisoryFetchFailures: number;
+  durationMs: number;
+  findings: ApplicationVulnerabilityRow[];
+}

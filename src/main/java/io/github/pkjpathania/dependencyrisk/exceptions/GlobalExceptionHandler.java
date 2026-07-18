@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
+import io.github.pkjpathania.dependencyrisk.vulnerability.exception.OsvDisabledException;
+import io.github.pkjpathania.dependencyrisk.vulnerability.exception.OsvSnapshotWriteException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -69,6 +71,28 @@ public class GlobalExceptionHandler {
     return buildResponse(
         HttpStatus.BAD_REQUEST,
         "Bad Request",
+        exception.getMessage(),
+        detailsFor(exception),
+        request);
+  }
+
+  @ExceptionHandler(OsvDisabledException.class)
+  public ResponseEntity<ApiErrorResponse> handleOsvDisabled(
+      OsvDisabledException exception, HttpServletRequest request) {
+    return buildResponse(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        "Service Unavailable",
+        exception.getMessage(),
+        detailsFor(exception),
+        request);
+  }
+
+  @ExceptionHandler(OsvSnapshotWriteException.class)
+  public ResponseEntity<ApiErrorResponse> handleOsvSnapshotWriteFailure(
+      OsvSnapshotWriteException exception, HttpServletRequest request) {
+    return buildResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        "Internal Server Error",
         exception.getMessage(),
         detailsFor(exception),
         request);
