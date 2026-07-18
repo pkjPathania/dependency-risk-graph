@@ -4,7 +4,10 @@ import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationOverview;
 import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationReferencesResponse;
 import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationSummary;
 import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationVulnerabilitiesResponse;
+import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactDetailResponse;
+import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactListResponse;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencySummary;
+import io.github.pkjpathania.dependencyrisk.graph.service.CveImpactService;
 import io.github.pkjpathania.dependencyrisk.graph.service.ExplorerService;
 import io.github.pkjpathania.dependencyrisk.graph.service.SparqlService;
 import java.util.List;
@@ -22,6 +25,7 @@ public class ExploreController {
 
   private final SparqlService sparqlService;
   private final ExplorerService explorerService;
+  private final CveImpactService cveImpactService;
 
   @GetMapping("/applications")
   public List<ApplicationSummary> applications() {
@@ -49,5 +53,20 @@ public class ExploreController {
   public ApplicationReferencesResponse references(
       @RequestParam("applicationIri") String applicationIri) {
     return explorerService.getReferences(applicationIri);
+  }
+
+  @GetMapping("/cve-impact")
+  public CveImpactListResponse cveImpact(
+      @RequestParam(value = "scope", defaultValue = "selected") String scope,
+      @RequestParam(value = "applicationIri", required = false) String applicationIri) {
+    return cveImpactService.list(scope, applicationIri);
+  }
+
+  @GetMapping("/cve-impact/detail")
+  public CveImpactDetailResponse cveImpactDetail(
+      @RequestParam("vulnerabilityIri") String vulnerabilityIri,
+      @RequestParam(value = "scope", defaultValue = "selected") String scope,
+      @RequestParam(value = "applicationIri", required = false) String applicationIri) {
+    return cveImpactService.detail(vulnerabilityIri, scope, applicationIri);
   }
 }

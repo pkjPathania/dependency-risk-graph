@@ -37,6 +37,32 @@ public class DependencyPathService {
     return new DependencyPathResult(true, path.getLength(), nodes);
   }
 
+  public DependencyPathResult shortestByIri(String applicationIri, String packageIri) {
+    DependencyGraphSnapshot snapshot = graphIndex.current();
+    DependencyVertex source = vertex(snapshot, applicationIri, NodeType.APPLICATION);
+    DependencyVertex target = vertex(snapshot, packageIri, NodeType.PACKAGE_VERSION);
+    GraphPath<DependencyVertex, DefaultEdge> path =
+        new BFSShortestPath<>(snapshot.graph()).getPath(source, target);
+
+    if (path == null) {
+      return new DependencyPathResult(false, 0, List.of());
+    }
+
+    List<DependencyNode> nodes =
+        path.getVertexList().stream().map(snapshot.metadata()::get).toList();
+    return new DependencyPathResult(true, path.getLength(), nodes);
+  }
+
+  private DependencyVertex vertex(
+      DependencyGraphSnapshot snapshot, String iri, NodeType expectedType) {
+    DependencyVertex vertex = new DependencyVertex(iri);
+    DependencyNode node = snapshot.metadata().get(vertex);
+    if (node == null || node.type() != expectedType) {
+      throw new NoSuchElementException("Graph resource not found: " + iri);
+    }
+    return vertex;
+  }
+
   private DependencyVertex findApplication(DependencyGraphSnapshot snapshot) {
     return snapshot.metadata().entrySet().stream()
         .filter(entry -> entry.getValue().type() == NodeType.APPLICATION)

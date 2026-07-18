@@ -128,11 +128,11 @@ function item(overrides: Partial<ApplicationVulnerabilityItem> = {}): Applicatio
     publishedAt: '2026-07-18T00:00:00Z',
     modifiedAt: '2026-07-18T01:00:00Z',
     cvssAssessments: [
-      { type: 'CVSS_V3', version: '3.1', vector: 'CVSS:3.1/AV:N/AC:L' }
+      { iri: 'urn:test:assessment', type: 'CVSS_V3', version: '3.1', vector: 'CVSS:3.1/AV:N/AC:L' }
     ],
     fixedVersions: [
-      { packageName: 'jackson-databind', version: '2.18.9', purl: 'pkg:maven/jackson@2.18.9' },
-      { packageName: 'jackson-databind', version: '2.21.5', purl: 'pkg:maven/jackson@2.21.5' }
+      { iri: 'urn:test:fixed:2189', packageName: 'jackson-databind', version: '2.18.9', purl: 'pkg:maven/jackson@2.18.9' },
+      { iri: 'urn:test:fixed:2215', packageName: 'jackson-databind', version: '2.21.5', purl: 'pkg:maven/jackson@2.21.5' }
     ],
     referenceUrls: ['https://example.test/advisory'],
     ...overrides

@@ -281,6 +281,7 @@ public class ExplorerService {
     if (StringUtils.isNotBlank(vector)) {
       accumulator.cvssAssessments.add(
           new CvssAssessmentView(
+              resourceIri(solution, "assessment"),
               trimmedOrNull(stringValue(solution, "cvssType")),
               trimmedOrNull(stringValue(solution, "cvssVersion")),
               vector.trim()));
@@ -290,6 +291,7 @@ public class ExplorerService {
     if (StringUtils.isNotBlank(fixedVersion)) {
       accumulator.fixedVersions.add(
           new FixedVersionView(
+              resourceIri(solution, "fixedPackage"),
               trimmedOrNull(stringValue(solution, "fixedPackageName")),
               fixedVersion.trim(),
               trimmedOrNull(stringValue(solution, "fixedPurl"))));

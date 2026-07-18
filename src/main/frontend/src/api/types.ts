@@ -65,12 +65,14 @@ export interface DependencySummary {
 }
 
 export interface CvssAssessmentView {
+  iri: string | null;
   type: string | null;
   version: string | null;
   vector: string;
 }
 
 export interface FixedVersionView {
+  iri: string | null;
   packageName: string | null;
   version: string;
   purl: string | null;
@@ -120,6 +122,107 @@ export interface ApplicationReferencesResponse {
   applicationIri: string;
   total: number;
   items: AdvisoryReferenceItem[];
+}
+
+export type CveImpactScope = 'selected' | 'all';
+
+export interface CveImpactListItem {
+  vulnerabilityIri: string;
+  preferredIdentifier: string;
+  osvId: string;
+  aliases: string[];
+  summary: string | null;
+  severityLevel: string | null;
+  affectedApplicationCount: number;
+  affectedPackageVersionCount: number;
+  referenceCount: number;
+  applicationNames: string[];
+  packageNames: string[];
+}
+
+export interface CveImpactListResponse {
+  scope: CveImpactScope;
+  applicationIri: string | null;
+  total: number;
+  items: CveImpactListItem[];
+}
+
+export interface VulnerabilityDetail {
+  iri: string;
+  preferredIdentifier: string;
+  osvId: string;
+  aliases: string[];
+  summary: string | null;
+  details: string | null;
+  severityLevel: string | null;
+  publishedAt: string | null;
+  modifiedAt: string | null;
+  affectedApplicationCount: number;
+  affectedPackageVersionCount: number;
+}
+
+export interface ApplicationView {
+  iri: string;
+  name: string;
+  version: string | null;
+}
+
+export interface PackageVersionView {
+  iri: string;
+  name: string;
+  version: string | null;
+  purl: string | null;
+}
+
+export interface PathNodeView {
+  iri: string;
+  label: string | null;
+  version: string | null;
+  purl: string | null;
+  nodeType: string;
+}
+
+export interface ExposurePath {
+  exposureId: string;
+  application: ApplicationView;
+  vulnerablePackage: PackageVersionView;
+  dependencyType: string;
+  dependencyHops: number;
+  pathStatus: string;
+  path: PathNodeView[];
+  pathNodeIds: string[];
+  pathEdgeIds: string[];
+}
+
+export interface ImpactGraphNode {
+  id: string;
+  iri: string;
+  label: string | null;
+  version: string | null;
+  nodeType: 'APPLICATION' | 'DEPENDENCY' | 'VULNERABLE_PACKAGE' | 'VULNERABILITY' | 'FIXED_VERSION';
+  metadata: Record<string, unknown>;
+}
+
+export interface ImpactGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  relationship: 'DEPENDS_ON' | 'AFFECTED_BY' | 'FIXED_IN';
+  exposureIds: string[];
+}
+
+export interface ImpactGraph {
+  nodes: ImpactGraphNode[];
+  edges: ImpactGraphEdge[];
+}
+
+export interface CveImpactDetailResponse {
+  vulnerability: VulnerabilityDetail;
+  exposures: ExposurePath[];
+  fixedVersions: FixedVersionView[];
+  cvssAssessments: CvssAssessmentView[];
+  referenceUrls: string[];
+  graph: ImpactGraph;
 }
 
 export interface SparqlSelectResponse {

@@ -28,6 +28,7 @@ export function ExploreTabs({ value, onChange, disabled }: ExploreTabsProps) {
       <Tab disabled={disabled} label="Dependencies" value="dependencies" sx={tabSx} />
       <Tab disabled={disabled} label="Vulnerabilities" value="vulnerabilities" sx={tabSx} />
       <Tab disabled={disabled} label="References" value="references" sx={tabSx} />
+      <Tab disabled={disabled} label="CVE Impact" value="cve-impact" sx={tabSx} />
     </Tabs>
   );
 }

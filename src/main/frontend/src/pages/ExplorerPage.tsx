@@ -3,18 +3,22 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type {
   ApplicationReferencesResponse,
   ApplicationSummary,
-  ApplicationVulnerabilitiesResponse
+  ApplicationVulnerabilitiesResponse,
+  CveImpactListResponse,
+  CveImpactScope
 } from '../api/types';
 import { RestCallProgress } from '../components/RestCallProgress';
 import { ApplicationSelector } from '../features/explore/ApplicationSelector';
 import { ApplicationOverview } from '../features/explore/ApplicationOverview';
 import { DependenciesView } from '../features/explore/DependenciesView';
+import { CveImpactView } from '../features/explore/CveImpactView';
 import {
   fetchApplicationDependencies,
   fetchApplicationOverview,
   fetchApplicationReferences,
   fetchApplicationSummaries,
-  fetchApplicationVulnerabilities
+  fetchApplicationVulnerabilities,
+  fetchCveImpactList
 } from '../features/explore/exploreApi';
 import type { ExploreTab } from '../features/explore/exploreTypes';
 import { ExploreTabs } from '../features/explore/ExploreTabs';
@@ -41,6 +45,11 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
   const [referencesLoading, setReferencesLoading] = useState(false);
   const [referencesError, setReferencesError] = useState<string | null>(null);
   const [referencesReloadCounter, setReferencesReloadCounter] = useState(0);
+  const [cveImpactScope, setCveImpactScope] = useState<CveImpactScope>('selected');
+  const [cveImpact, setCveImpact] = useState<CveImpactListResponse | null>(null);
+  const [cveImpactLoading, setCveImpactLoading] = useState(false);
+  const [cveImpactError, setCveImpactError] = useState<string | null>(null);
+  const [cveImpactReloadCounter, setCveImpactReloadCounter] = useState(0);
   const [summariesLoading, setSummariesLoading] = useState(true);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [summariesError, setSummariesError] = useState<string | null>(null);
@@ -228,6 +237,32 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
     };
   }, [activeTab, referencesReloadCounter, selectedApplication?.iri]);
 
+  useEffect(() => {
+    setCveImpact(null);
+    setCveImpactError(null);
+  }, [selectedApplication?.iri, cveImpactScope]);
+
+  useEffect(() => {
+    let active = true;
+    const applicationIri = selectedApplication?.iri?.trim() ?? '';
+    if (activeTab !== 'cve-impact' || !applicationIri) {
+      return () => { active = false; };
+    }
+    setCveImpactLoading(true);
+    setCveImpactError(null);
+    void fetchCveImpactList(cveImpactScope, applicationIri)
+      .then((response) => { if (active) setCveImpact(response); })
+      .catch((error: unknown) => {
+        if (active) {
+          console.error(`Failed to load CVE impact for ${applicationIri}.`, error);
+          setCveImpact(null);
+          setCveImpactError('Unable to load CVE impact data.');
+        }
+      })
+      .finally(() => { if (active) setCveImpactLoading(false); });
+    return () => { active = false; };
+  }, [activeTab, cveImpactReloadCounter, cveImpactScope, selectedApplication?.iri]);
+
   function handleApplicationSelect(applicationIri: string) {
     const nextApplication = selectableSummaries.find((summary) => summary.iri === applicationIri) ?? null;
     setSelectedApplication(nextApplication);
@@ -334,6 +369,18 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
                     loading={referencesLoading || (!references && !referencesError)}
                     error={referencesError}
                     onRefresh={() => setReferencesReloadCounter((current) => current + 1)}
+                    onOpenEnrichment={() => onOpenVulnerabilityEnrichment(selectedApplicationIri)}
+                  />
+                ) : null}
+                {activeTab === 'cve-impact' ? (
+                  <CveImpactView
+                    applicationIri={selectedApplicationIri}
+                    scope={cveImpactScope}
+                    response={cveImpact}
+                    loading={cveImpactLoading || (!cveImpact && !cveImpactError)}
+                    error={cveImpactError}
+                    onScopeChange={setCveImpactScope}
+                    onRefresh={() => setCveImpactReloadCounter((current) => current + 1)}
                     onOpenEnrichment={() => onOpenVulnerabilityEnrichment(selectedApplicationIri)}
                   />
                 ) : null}

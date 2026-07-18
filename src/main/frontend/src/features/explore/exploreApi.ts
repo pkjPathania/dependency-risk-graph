@@ -3,6 +3,9 @@ import type {
   ApplicationReferencesResponse,
   ApplicationSummary,
   ApplicationVulnerabilitiesResponse,
+  CveImpactDetailResponse,
+  CveImpactListResponse,
+  CveImpactScope,
   DependencySummary
 } from '../../api/types';
 import { readApiErrorMessage } from '../../api/httpError';
@@ -58,6 +61,37 @@ export async function fetchApplicationReferences(
   );
 
   return (await response.json()) as ApplicationReferencesResponse;
+}
+
+export async function fetchCveImpactList(
+  scope: CveImpactScope,
+  applicationIri: string
+): Promise<CveImpactListResponse> {
+  const params = new URLSearchParams({ scope });
+  if (scope === 'selected') {
+    params.set('applicationIri', applicationIri);
+  }
+  const response = await fetch(`${EXPLORE_BASE_URL}/cve-impact?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(await readApiErrorMessage(response, 'Unable to load CVE impact data.'));
+  }
+  return (await response.json()) as CveImpactListResponse;
+}
+
+export async function fetchCveImpactDetail(
+  vulnerabilityIri: string,
+  scope: CveImpactScope,
+  applicationIri: string
+): Promise<CveImpactDetailResponse> {
+  const params = new URLSearchParams({ vulnerabilityIri, scope });
+  if (scope === 'selected') {
+    params.set('applicationIri', applicationIri);
+  }
+  const response = await fetch(`${EXPLORE_BASE_URL}/cve-impact/detail?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(await readApiErrorMessage(response, 'Unable to load CVE impact data.'));
+  }
+  return (await response.json()) as CveImpactDetailResponse;
 }
 
 async function fetchExploreResource(path: string, applicationIri: string, fallbackMessage: string): Promise<Response> {
