@@ -18,6 +18,9 @@ The long-term direction is a hybrid dependency-risk and Graph-RAG system, but on
 - Graph metadata and application exploration APIs.
 - SPARQL `SELECT` execution and query formatting.
 - Dependency-path lookup with a JGraphT BFS projection.
+- Application-level OSV batch scanning with full advisory loading.
+- Raw OSV application snapshots and vulnerability RDF persistence.
+- Explore views for vulnerability metrics, findings, CVSS assessments, fixed versions, and advisory references.
 - OSV query passthrough to the public OSV API.
 - React + Material UI frontend bundled into the Spring Boot application.
 
@@ -38,7 +41,10 @@ flowchart LR
     Sparql --> UI
     Metadata --> UI
     Path --> UI
-    OSV[Public OSV API] --> Osv[OSV query endpoint]
+    OSV[Public OSV API] --> Osv[OSV scan and query APIs]
+    Osv --> Snapshot[Raw application JSON snapshot]
+    Osv --> VulnMap[Vulnerability RDF mapper]
+    VulnMap --> Jena
     Osv --> UI
 ```
 
@@ -47,7 +53,7 @@ flowchart LR
 - The RDF model is the authoritative graph representation.
 - Jena TDB2 stores the graph in a local embedded dataset.
 - JGraphT is a read-optimized in-memory projection used for shortest-path lookup, not the primary database.
-- The frontend is a single-page shell that switches between Overview, Explore, SPARQL, and Dependency Path without React Router.
+- The frontend is a single-page shell that switches between Overview, Explore, Vulnerability Enrichment, SPARQL, and Dependency Path without React Router.
 
 ## Data Flow
 
@@ -55,9 +61,11 @@ flowchart LR
 2. The parser normalizes the SBOM into applications, components, and dependency edges.
 3. The RDF mapper converts the normalized model into RDF triples.
 4. The RDF triples are added to the local Jena TDB2 dataset.
-5. Explore and SPARQL APIs read from the dataset.
-6. The dependency-path service builds or reuses a JGraphT snapshot from the repository state.
-7. The React UI renders the resulting data in the Overview, Explore, SPARQL, and Dependency Path pages.
+5. An optional application OSV scan batches versioned package PURLs, loads each distinct advisory, and writes a raw JSON snapshot.
+6. The scan maps package-to-vulnerability, CVSS assessment, and fixed-version resources into Jena TDB2.
+7. Explore and SPARQL APIs read the persisted graph data without calling OSV.
+8. The dependency-path service builds or reuses a JGraphT snapshot from the repository state.
+9. The React UI renders the resulting data in the Overview, Explore, Vulnerability Enrichment, SPARQL, and Dependency Path pages.
 
 ## RDF Graph Model
 
@@ -70,6 +78,7 @@ Implemented RDF concepts and properties include:
 - `risk:Application`
 - `risk:PackageVersion`
 - `risk:Vulnerability`
+- `risk:CvssAssessment`
 - `risk:dependsOn`
 - `risk:version`
 - `risk:purl`
@@ -81,8 +90,13 @@ Implemented RDF concepts and properties include:
 - `risk:publishedAt`
 - `risk:modifiedAt`
 - `risk:withdrawnAt`
-- `risk:reference`
-- `risk:fixedVersion`
+- `risk:referenceUrl`
+- `risk:fixedIn`
+- `risk:hasSeverity`
+- `risk:cvssType`
+- `risk:cvssVersion`
+- `risk:vector`
+- `risk:severityLevel`
 - `risk:source`
 
 The mapper currently materializes the following RDF shape:
@@ -91,9 +105,12 @@ The mapper currently materializes the following RDF shape:
 - Package versions are typed as `risk:PackageVersion` and labeled with `rdfs:label`.
 - Package versions can carry `risk:version` and `risk:purl`.
 - Dependency edges are expressed with `risk:dependsOn`.
+- Installed packages link to deterministic vulnerability resources through `risk:affectedBy`.
+- Vulnerabilities link to deterministic CVSS assessment resources through `risk:hasSeverity`.
+- Vulnerabilities link to deterministic fixed package-version resources through `risk:fixedIn`.
 - Resource IRIs are generated as URNs, not raw PURLs.
 
-The current implementation keeps the vocabulary intentionally small. Vulnerability-related terms are defined in code, but persistence of enriched vulnerability data is not yet wired into the main graph flow.
+The current implementation keeps the vocabulary intentionally small. OSV enrichment persists advisory attributes, aliases, reference URLs, CVSS vectors, and fixed package versions. It does not calculate numeric CVSS scores or infer additional RDF statements.
 
 ## Technology Stack
 
@@ -110,7 +127,7 @@ The current implementation keeps the vocabulary intentionally small. Vulnerabili
 
 ## Screens or UI Capabilities
 
-The UI currently exposes four main pages:
+The UI currently exposes five main pages:
 
 - Overview
   - Graph metrics
@@ -118,9 +135,13 @@ The UI currently exposes four main pages:
   - Application list with an Explore action
 - Explore
   - Application selector
-  - Application summary cards
-  - Dependencies table
-  - Empty-state tabs for vulnerabilities and references
+  - Application summary cards, including vulnerable-package and critical-vulnerability metrics
+  - Dependencies table with search, count, and refresh controls
+  - Vulnerabilities table with search, filters, count, refresh, pagination, severity, CVSS, fixed versions, and advisory details
+  - Grouped advisory references with search, category filtering, count, refresh, pagination, and affected package versions
+- Vulnerability Enrichment
+  - Application selection and explicit OSV scan action
+  - Scan metrics and package-level findings
 - SPARQL
   - Query editor
   - Prefix helpers
@@ -193,11 +214,43 @@ Use this alongside the Vite dev server if you want live frontend development wit
 | `GET` | `/api/v1/explore/applications` | List application summaries for the Explore page. | None. | `List<ApplicationSummary>` |
 | `GET` | `/api/v1/explore/overview` | Return application-level graph metrics. | `applicationIri` query parameter. | `ApplicationOverview` |
 | `GET` | `/api/v1/explore/dependencies` | Return dependency rows for the selected application. | `applicationIri` query parameter. | `List<DependencySummary>` |
+| `GET` | `/api/v1/explore/vulnerabilities` | Read structured package vulnerability data from RDF. | `applicationIri` query parameter. | `ApplicationVulnerabilitiesResponse` |
+| `GET` | `/api/v1/explore/references` | Read advisory references from RDF, grouped by vulnerability. | `applicationIri` query parameter. | `ApplicationReferencesResponse` |
+| `POST` | `/api/v1/vulnerabilities/scan` | Scan one application through OSV, write its raw snapshot, and persist vulnerability RDF. | JSON body containing `applicationIri`. | `ApplicationVulnerabilityScanResponse` |
 | `GET` | `/api/v1/sparql/summaries` | List application summaries for the SPARQL page. | None. | `List<ApplicationSummary>` |
 | `POST` | `/api/v1/sparql/format` | Format raw SPARQL text. | Plain-text request body. | `String` in `application/sparql-query` format |
 | `POST` | `/api/v1/sparql/exec` | Execute a SPARQL `SELECT` query. | Plain-text request body. | `SparqlSelectResponse` |
 | `GET` | `/api/dependencies/path` | Find the shortest dependency chain to a package version. | `packageName`, optional `version`. | `DependencyPathResult` |
 | `POST` | `/api/osv` | Proxy an OSV package query to the public OSV service. | JSON body with `package.purl`. | `OsvQueryResponse` |
+
+## OSV Vulnerability Enrichment
+
+OSV enrichment is enabled in `src/main/resources/application.yaml`:
+
+```yaml
+dependency-risk:
+  osv:
+    enabled: true
+    batch-size: 100
+    advisory-fetch-threads: 8
+    output-directory: src/main/resources/osv
+```
+
+The application must already exist in the RDF graph. Invoke a scan with its application IRI:
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/vulnerabilities/scan \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "applicationIri": "urn:io.github.pkjpathania.dependencyrisk:resource:application:kafka:4.4.0-snapshot"
+  }'
+```
+
+The same operation is available in the **Vulnerability Enrichment** screen. Scans are explicit; opening Explore does not trigger OSV calls. After a successful scan, Explore reads the newly persisted RDF through its overview, vulnerability, and reference endpoints.
+
+Only packages with versioned PURLs are queryable. Missing or unversioned PURLs are reported as skipped. Batch and advisory failures are isolated where possible so one failed request does not abort the complete application scan.
+
+Raw snapshots are written to `<output-directory>/data/osv/{sanitized-application-name}.json`. Each successful write replaces the previous snapshot for that application.
 
 ## Example CycloneDX Upload
 
@@ -338,9 +391,11 @@ If multiple versions share the same package name, pass `version` to disambiguate
 - The Jena dataset is stored locally under `data/tdb2`.
 - `POST /api/v1/sboms/rdf` adds the mapped RDF model to the default Jena dataset; it does not clear existing triples first.
 - Graph metadata and SPARQL queries read directly from the dataset.
+- Application OSV scans replace the configured raw JSON snapshot for that application and add or refresh vulnerability RDF in one repository write transaction.
+- Explore vulnerability and reference endpoints read only from Jena TDB2 and never invoke OSV.
 - The JGraphT dependency-path projection is cached in memory and built from the repository snapshot on demand.
 - There is no automatic invalidation hook for the JGraphT cache after RDF writes, so a long-running process can become stale for path queries.
-- The OSV endpoint is a live query passthrough to `https://api.osv.dev/v1`; it does not persist vulnerability observations back into RDF.
+- `POST /api/osv` remains a standalone live-query passthrough; application persistence is performed by `/api/v1/vulnerabilities/scan`.
 
 ## Current Limitations
 
@@ -350,7 +405,7 @@ If multiple versions share the same package name, pass `version` to disambiguate
 - Jena TDB2 is a local embedded store, not a distributed graph database.
 - JGraphT is a read-optimized in-memory projection and can lag behind RDF writes.
 - Multiple applications in the graph can make package-name lookups ambiguous.
-- Vulnerability enrichment is not yet persisted into RDF.
+- Stale `risk:affectedBy` links are not yet removed when a previously vulnerable package later returns no findings.
 - Authentication and authorization are not included.
 - Test coverage is still small compared with the amount of source code.
 - The planned Graph-RAG layer is not implemented yet.
@@ -362,14 +417,18 @@ If multiple versions share the same package name, pass `version` to disambiguate
 - [x] CycloneDX JSON parsing and normalization.
 - [x] RDF mapping for applications, package versions, and dependency edges.
 - [x] Jena TDB2 persistence and SPARQL read APIs.
-- [x] Overview, Explore, SPARQL, and Dependency Path UI pages.
+- [x] Overview, Explore, Vulnerability Enrichment, SPARQL, and Dependency Path UI pages.
 - [x] JGraphT-backed shortest-path lookup.
 - [x] OSV query passthrough endpoint.
+- [x] Application-level OSV batch scanning and full advisory loading.
+- [x] Raw application OSV snapshots.
+- [x] RDF persistence for vulnerabilities, CVSS assessments, and fixed package versions.
+- [x] Explore vulnerability and grouped reference views.
 
 ### Planned
 
-- [ ] Persist OSV vulnerability observations into RDF.
-- [ ] Model CVEs, advisories, fixed versions, and affected ranges.
+- [ ] Remove stale package vulnerability links after successful zero-result tracking is available.
+- [ ] Model affected ranges beyond the currently persisted fixed-version resources.
 - [ ] Add provenance and named-graph support for multiple SBOMs.
 - [ ] Add SHACL validation for graph shape constraints.
 - [ ] Add OWL or rule-based inference where it is useful.
@@ -392,10 +451,14 @@ If multiple versions share the same package name, pass `version` to disambiguate
 
 ## Testing
 
-Current automated tests focus on repository and JSON serialization behavior:
+Automated tests cover:
 
 - Spring Boot application context loading.
+- Jena repository and Explorer query behavior.
+- OSV planning, batching, advisory loading, finding assembly, and raw snapshots.
+- Vulnerability, CVSS assessment, and fixed-version RDF mapping.
 - OSV request/response DTO serialization and deserialization.
+- Explore Vulnerabilities and References component behavior.
 
 Recommended commands:
 
@@ -408,6 +471,13 @@ For frontend type-checking:
 ```bash
 cd src/main/frontend
 npm run typecheck
+```
+
+For frontend component tests:
+
+```bash
+cd src/main/frontend
+npm test
 ```
 
 ## Contributing
