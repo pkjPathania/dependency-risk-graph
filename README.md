@@ -21,30 +21,17 @@ The long-term direction is a hybrid dependency-risk and Graph-RAG system, but on
 - Application-level OSV batch scanning with full advisory loading.
 - Raw OSV application snapshots and vulnerability RDF persistence.
 - Explore views for vulnerability metrics, findings, CVSS assessments, fixed versions, and advisory references.
-- Cross-application CVE impact lists and focused D3 dependency-path graphs.
+- Cross-application CVE impact lists and interactive React Flow dependency-path graphs.
 - OSV query passthrough to the public OSV API.
 - React + Material UI frontend bundled into the Spring Boot application.
 
 ## CVE Impact Walkthrough
 
-![Cross-application CVE impact analysis](src/main/resources/samples/vuln-all-CVE-2026-54515.png)
+![Interactive cross-application CVE impact graph for CVE-2024-6763](src/main/resources/samples/img.png)
 
-> **Cross-application impact analysis for CVE-2026-54515:** complete dependency paths from Kafka and Dependency Risk Graph converge on a shared vulnerability node, with affected package versions, remediation versions and advisory evidence.
+> **Cross-application impact analysis for CVE-2024-6763:** dependency paths from Pulsar, OpenSearch, and Iceberg converge on affected Jetty package versions, the shared vulnerability, and a fixed version. The detailed RDF view preserves `DEPENDS_ON`, `INSTANCE_OF`, `AFFECTED_BY`, and `FIXED_IN` relationships.
 
-The full blast-radius view establishes the shared graph structure. Individual exposure rows can then isolate the exact route responsible for one installed package version while fading unrelated paths.
-
-<p align="center">
-  <img src="src/main/resources/samples/vuln-drg-CVE-2026-54515-path-1.png" width="48%" alt="Highlighted dependency-risk-graph exposure path for CVE-2026-54515">
-  <img src="src/main/resources/samples/vuln-kafka-CVE-2026-54515-path-1.png" width="48%" alt="Highlighted Kafka exposure path for CVE-2026-54515">
-</p>
-
-<p align="center">
-  <em>Focused dependency-risk-graph path</em>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <em>Focused Kafka path</em>
-</p>
-
-The affected-application table retains each installed package version separately. Multiple Kafka exposure rows can therefore be selected and inspected independently rather than being collapsed by package name.
+The graph supports node dragging, canvas pan and zoom, fit-to-view, reset layout, CVE centering, and node locking. Simplified mode collapses terminal occurrence/package pairs for readability; Detailed RDF mode displays the occurrence-to-package `INSTANCE_OF` edges explicitly. Selecting a node updates the advisory panel without navigating away from the impact view.
 
 ## Architecture Overview
 
@@ -154,7 +141,8 @@ The current implementation keeps the vocabulary intentionally small. OSV enrichm
 - TypeScript
 - Vite
 - Material UI
-- D3 7 for the focused CVE impact graph
+- React Flow (`@xyflow/react`) for the interactive CVE impact graph
+- ELK.js for initial layered graph layout
 - OSV REST API client via Spring `RestClient`
 
 ## Screens or UI Capabilities
@@ -307,7 +295,7 @@ Selecting a row loads one focused graph containing only:
 
 The backend uses RDF resource IRIs as node IDs. Different installed versions remain separate nodes, while shared dependency resources and graph edges are deduplicated. When several exposures share an edge, the edge retains all relevant exposure IDs. If SPARQL proves an exposure but BFS cannot resolve its ordered path, the exposure remains in the response with `PATH_UNAVAILABLE`.
 
-The D3 graph is directed from applications on the left, through dependencies and vulnerable packages, into the central vulnerability, then to fixed versions on the right. The UI provides zoom, fit, path highlighting, an affected-application table, advisory details, all persisted CVSS vectors, and safe external reference links.
+The React Flow graph is initially arranged by ELK from applications on the left, through dependency occurrences and vulnerable package versions, into the central vulnerability, then to fixed versions on the right. Nodes remain draggable after layout, and the UI provides pan and zoom, fit view, reset layout, CVE centering, movement locking, simplified and detailed RDF modes, exposure filtering, an affected-application table, advisory details, persisted CVSS vectors, and safe external reference links.
 
 ### List selected-application impact
 
@@ -513,7 +501,6 @@ If multiple versions share the same package name, pass `version` to disambiguate
 
 - [ ] Remove stale package vulnerability links after successful zero-result tracking is available.
 - [ ] Model affected ranges beyond the currently persisted fixed-version resources.
-- [ ] Add provenance and named-graph support for multiple SBOMs.
 - [ ] Add SHACL validation for graph shape constraints.
 - [ ] Add OWL or rule-based inference where it is useful.
 - [ ] Add hybrid graph-plus-vector retrieval for Graph-RAG workflows.

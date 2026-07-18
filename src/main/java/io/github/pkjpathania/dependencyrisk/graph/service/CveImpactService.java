@@ -167,12 +167,13 @@ public class CveImpactService {
       edgeIds.add(
           edgeId(result.matchedOccurrenceIri(), "INSTANCE_OF", target.vulnerablePackage.iri()));
       edgeIds.add(edgeId(target.vulnerablePackage.iri(), "AFFECTED_BY", vulnerabilityIri));
+      int dependencyHops = dependencyHopCount(edgeIds);
       return new ExposurePath(
           exposureId,
           target.application,
           target.vulnerablePackage,
-          result.path().size() == 2 ? "DIRECT" : "TRANSITIVE",
-          Math.max(0, result.path().size() - 1),
+          dependencyHops == 1 ? "DIRECT" : "TRANSITIVE",
+          dependencyHops,
           CveImpactStatus.AFFECTED_PATH_RESOLVED.name(),
           path,
           nodeIds,
@@ -205,6 +206,7 @@ public class CveImpactService {
   private ImpactGraph buildGraph(DetailAccumulator detail, List<ExposurePath> exposures) {
     Map<String, ImpactGraphNode> nodes = new LinkedHashMap<>();
     Map<String, EdgeAccumulator> edges = new LinkedHashMap<>();
+    Map<String, NodeRole> nodeRoles = new LinkedHashMap<>();
     Map<String, Long> applicationExposureCounts =
         exposures.stream()
             .collect(
@@ -233,8 +235,12 @@ public class CveImpactService {
                 "affectedApplicationCount", applicationExposureCounts.size(),
                 "affectedPackageVersionCount",
                     exposures.stream().map(exposure -> exposure.vulnerablePackage().iri()).distinct().count())));
+    nodeRoles.put(detail.vulnerabilityIri, NodeRole.VULNERABILITY);
+    detail.fixedVersions.forEach(
+        fixed -> nodeRoles.put(fixed.iri(), NodeRole.FIXED_PACKAGE_VERSION));
 
     for (ExposurePath exposure : exposures) {
+      registerExposureNodeRoles(nodeRoles, exposure, detail.vulnerabilityIri);
       if (exposure.path().isEmpty()) {
         putApplication(nodes, exposure.application(), applicationExposureCounts.getOrDefault(exposure.application().iri(), 0L));
         putPackage(nodes, exposure.vulnerablePackage(), "VULNERABLE_PACKAGE", applicationsByNode.get(exposure.vulnerablePackage().iri()));
@@ -265,21 +271,12 @@ public class CveImpactService {
                               List.copyOf(
                                   applicationsByNode.getOrDefault(node.iri(), Set.of())))));
         }
-        for (int index = 0; index < exposure.path().size() - 2; index++) {
-          mergeEdge(
-              edges,
-              exposure.path().get(index).iri(),
-              "DEPENDS_ON",
-              exposure.path().get(index + 1).iri(),
-              exposure.exposureId());
-        }
       }
-      mergeEdge(
-          edges,
-          exposure.vulnerablePackage().iri(),
-          "AFFECTED_BY",
-          detail.vulnerabilityIri,
-          exposure.exposureId());
+      for (String pathEdgeId : exposure.pathEdgeIds()) {
+        EdgeTuple edge = parseEdgeId(pathEdgeId);
+        validateEdge(edge, nodeRoles);
+        mergeEdge(edges, edge.source(), edge.relationship().name(), edge.target(), exposure.exposureId());
+      }
     }
 
     for (FixedVersionView fixed : detail.fixedVersions) {
@@ -292,7 +289,10 @@ public class CveImpactService {
               fixed.version(),
               "FIXED_VERSION",
               Map.of("purl", StringUtils.defaultString(fixed.purl()))));
-      mergeEdge(edges, detail.vulnerabilityIri, "FIXED_IN", fixed.iri(), null);
+      EdgeTuple fixedEdge =
+          new EdgeTuple(detail.vulnerabilityIri, EdgeRelationship.FIXED_IN, fixed.iri());
+      validateEdge(fixedEdge, nodeRoles);
+      mergeEdge(edges, fixedEdge.source(), fixedEdge.relationship().name(), fixedEdge.target(), null);
     }
 
     return new ImpactGraph(
@@ -341,6 +341,77 @@ public class CveImpactService {
 
   private static String edgeId(String source, String relationship, String target) {
     return source + "\u0000" + relationship + "\u0000" + target;
+  }
+
+  private static EdgeTuple parseEdgeId(String encodedEdgeId) {
+    if (encodedEdgeId == null) {
+      throw new IllegalArgumentException("Path edge ID must not be null");
+    }
+    String[] parts = encodedEdgeId.split("\u0000", -1);
+    if (parts.length != 3
+        || StringUtils.isBlank(parts[0])
+        || StringUtils.isBlank(parts[1])
+        || StringUtils.isBlank(parts[2])) {
+      throw new IllegalArgumentException("Invalid path edge ID: " + encodedEdgeId);
+    }
+    try {
+      return new EdgeTuple(parts[0], EdgeRelationship.valueOf(parts[1]), parts[2]);
+    } catch (IllegalArgumentException exception) {
+      throw new IllegalArgumentException("Unsupported path relationship: " + parts[1], exception);
+    }
+  }
+
+  private static int dependencyHopCount(List<String> pathEdgeIds) {
+    return Math.toIntExact(
+        pathEdgeIds.stream()
+            .map(CveImpactService::parseEdgeId)
+            .filter(edge -> edge.relationship() == EdgeRelationship.DEPENDS_ON)
+            .count());
+  }
+
+  private static void registerExposureNodeRoles(
+      Map<String, NodeRole> nodeRoles, ExposurePath exposure, String vulnerabilityIri) {
+    nodeRoles.put(vulnerabilityIri, NodeRole.VULNERABILITY);
+    nodeRoles.put(exposure.vulnerablePackage().iri(), NodeRole.PACKAGE_VERSION);
+    for (PathNodeView node : exposure.path()) {
+      if (node.iri().equals(vulnerabilityIri)) {
+        nodeRoles.put(node.iri(), NodeRole.VULNERABILITY);
+      } else if (node.iri().equals(exposure.vulnerablePackage().iri())) {
+        nodeRoles.put(node.iri(), NodeRole.PACKAGE_VERSION);
+      } else {
+        nodeRoles.put(node.iri(), NodeRole.OCCURRENCE);
+      }
+    }
+  }
+
+  private static void validateEdge(EdgeTuple edge, Map<String, NodeRole> nodeRoles) {
+    NodeRole source = nodeRoles.get(edge.source());
+    NodeRole target = nodeRoles.get(edge.target());
+    boolean valid =
+        switch (edge.relationship()) {
+          case DEPENDS_ON -> source == NodeRole.OCCURRENCE && target == NodeRole.OCCURRENCE;
+          case INSTANCE_OF ->
+              source == NodeRole.OCCURRENCE && target == NodeRole.PACKAGE_VERSION;
+          case AFFECTED_BY ->
+              source == NodeRole.PACKAGE_VERSION && target == NodeRole.VULNERABILITY;
+          case FIXED_IN ->
+              source == NodeRole.VULNERABILITY
+                  && target == NodeRole.FIXED_PACKAGE_VERSION;
+        };
+    if (!valid) {
+      throw new IllegalStateException(
+          "Invalid "
+              + edge.relationship()
+              + " edge roles: "
+              + edge.source()
+              + " ("
+              + source
+              + ") -> "
+              + edge.target()
+              + " ("
+              + target
+              + ")");
+    }
   }
 
   private static PathNodeView toPathNode(DependencyPathNode node) {
@@ -575,6 +646,22 @@ public class CveImpactService {
       ApplicationView application,
       PackageVersionView vulnerablePackage,
       ImportContext importContext) {}
+
+  private record EdgeTuple(String source, EdgeRelationship relationship, String target) {}
+
+  private enum EdgeRelationship {
+    DEPENDS_ON,
+    INSTANCE_OF,
+    AFFECTED_BY,
+    FIXED_IN
+  }
+
+  private enum NodeRole {
+    OCCURRENCE,
+    PACKAGE_VERSION,
+    FIXED_PACKAGE_VERSION,
+    VULNERABILITY
+  }
 
   private static final class EdgeAccumulator {
     private final String id;

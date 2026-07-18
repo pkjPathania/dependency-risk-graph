@@ -19,9 +19,9 @@ public class DependencyPathController {
 
   @GetMapping("/path")
   public DependencyPathResult path(
-      @RequestParam String importId,
-      @RequestParam String targetPackageVersionIri) {
-    return importContextRepository.findByImportId(importId)
+      @RequestParam String importId, @RequestParam String targetPackageVersionIri) {
+    return importContextRepository
+        .findByImportId(importId)
         .map(context -> pathResolver.resolve(context, targetPackageVersionIri))
         .orElseGet(() -> DependencyPathResult.importNotFound(importId, targetPackageVersionIri));
   }

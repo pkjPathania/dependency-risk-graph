@@ -221,7 +221,7 @@ export interface ImpactGraphEdge {
   id: string;
   source: string;
   target: string;
-  relationship: 'DEPENDS_ON' | 'AFFECTED_BY' | 'FIXED_IN';
+  relationship: 'DEPENDS_ON' | 'INSTANCE_OF' | 'AFFECTED_BY' | 'FIXED_IN';
   exposureIds: string[];
 }
 

@@ -1,6 +1,7 @@
 package io.github.pkjpathania.dependencyrisk.graph.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactDetailResponse;
@@ -19,6 +20,71 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
 class CveImpactServiceTest {
+
+  @Test
+  void graphAggregationPreservesSemanticRelationshipsFromExposureEdgeIds() {
+    Dataset dataset = DatasetFactory.createTxnMem();
+    String occurrence6d5f = "urn:io.github.pkjpathania.dependencyrisk:resource:occurrence:6d5f1111";
+    String occurrenceF639 = "urn:io.github.pkjpathania.dependencyrisk:resource:occurrence:f6392222";
+    String occurrence5c588 = "urn:io.github.pkjpathania.dependencyrisk:resource:occurrence:5c5883333";
+    String packageF886 = "urn:io.github.pkjpathania.dependencyrisk:resource:package:f8864444";
+    String packageF9b8 = "urn:io.github.pkjpathania.dependencyrisk:resource:package:f9b85555";
+    String vulnerability = "urn:io.github.pkjpathania.dependencyrisk:resource:vulnerability:cve-impact";
+    String fixedF90a = "urn:io.github.pkjpathania.dependencyrisk:resource:package-version:f90a6666";
+    dataset.executeWrite(
+        () ->
+            populateAggregationFixture(
+                dataset.getDefaultModel(),
+                occurrence6d5f,
+                occurrenceF639,
+                occurrence5c588,
+                packageF886,
+                packageF9b8,
+                vulnerability,
+                fixedF90a));
+
+    CveImpactDetailResponse detail = service(dataset).detail(vulnerability, "all", null);
+
+    assertEdge(detail, occurrence6d5f, "INSTANCE_OF", packageF886);
+    assertEdge(detail, occurrenceF639, "INSTANCE_OF", packageF9b8);
+    assertEdge(detail, occurrence5c588, "INSTANCE_OF", packageF9b8);
+    assertNoEdge(detail, occurrence6d5f, "DEPENDS_ON", packageF886);
+    assertNoEdge(detail, occurrenceF639, "DEPENDS_ON", packageF9b8);
+    assertNoEdge(detail, occurrence5c588, "DEPENDS_ON", packageF9b8);
+    assertEdge(detail, packageF886, "AFFECTED_BY", vulnerability);
+    assertEdge(detail, packageF9b8, "AFFECTED_BY", vulnerability);
+    assertEdge(detail, vulnerability, "FIXED_IN", fixedF90a);
+    assertTrue(
+        detail.exposures().stream()
+            .allMatch(
+                exposure ->
+                    exposure.dependencyHops()
+                        == exposure.pathEdgeIds().stream()
+                            .filter(id -> id.split("\u0000", -1)[1].equals("DEPENDS_ON"))
+                            .count()));
+    assertTrue(
+        detail.graph().edges().stream()
+            .allMatch(
+                edge ->
+                    edge.id()
+                        .equals(
+                            edge.source()
+                                + "\u0000"
+                                + edge.relationship()
+                                + "\u0000"
+                                + edge.target())));
+    assertTrue(
+        detail.exposures().stream()
+            .flatMap(exposure -> exposure.pathEdgeIds().stream())
+            .allMatch(
+                pathEdgeId ->
+                    detail.graph().edges().stream()
+                        .anyMatch(
+                            edge ->
+                                edge.id().equals(pathEdgeId)
+                                    && edge.relationship()
+                                        .equals(pathEdgeId.split("\u0000", -1)[1]))));
+  }
 
   @Test
   void selectedScopeReturnsOneGroupedVulnerabilityAndOneDirectExposure() {
@@ -94,17 +160,75 @@ class CveImpactServiceTest {
     String vulnerabilityIri = "urn:test:impact:vulnerability";
     dataset.executeWrite(
         () -> populate(dataset.getDefaultModel(), firstApplicationIri, secondApplicationIri, vulnerabilityIri));
+    return new Fixture(service(dataset), firstApplicationIri, vulnerabilityIri);
+  }
+
+  private CveImpactService service(Dataset dataset) {
     JenaGraphRepository repository = new JenaGraphRepository(dataset, new ObjectMapper());
     JenaImportContextRepository contexts = new JenaImportContextRepository(repository);
     JenaPackageOccurrenceRepository occurrences = new JenaPackageOccurrenceRepository(repository);
-    return new Fixture(
-        new CveImpactService(
-            repository,
-            contexts,
-            occurrences,
-            new JenaDependencyPathResolver(repository, occurrences)),
-        firstApplicationIri,
-        vulnerabilityIri);
+    return new CveImpactService(
+        repository,
+        contexts,
+        occurrences,
+        new JenaDependencyPathResolver(repository, occurrences));
+  }
+
+  private void populateAggregationFixture(
+      Model model,
+      String occurrence6d5f,
+      String occurrenceF639,
+      String occurrence5c588,
+      String packageF886,
+      String packageF9b8,
+      String vulnerabilityIri,
+      String fixedF90a) {
+    Resource vulnerability =
+        model.createResource(vulnerabilityIri)
+            .addProperty(RDF.type, RiskVocabulary.VULNERABILITY)
+            .addProperty(RiskVocabulary.OSV_ID, "CVE-2026-AGGREGATION");
+    Resource firstPackage = packageVersion(model, packageF886, "first", "1.0");
+    Resource sharedPackage = packageVersion(model, packageF9b8, "shared", "2.0");
+    Resource fixedPackage = packageVersion(model, fixedF90a, "shared", "2.1");
+    firstPackage.addProperty(RiskVocabulary.AFFECTED_BY, vulnerability);
+    sharedPackage.addProperty(RiskVocabulary.AFFECTED_BY, vulnerability);
+    vulnerability.addProperty(RiskVocabulary.FIXED_IN, fixedPackage);
+    addDirectExposure(model, "aggregation-one", occurrence6d5f, firstPackage);
+    addDirectExposure(model, "aggregation-two", occurrenceF639, sharedPackage);
+    addDirectExposure(model, "aggregation-three", occurrence5c588, sharedPackage);
+  }
+
+  private void addDirectExposure(
+      Model model, String id, String occurrenceIri, Resource packageVersion) {
+    Resource application =
+        application(model, "urn:test:aggregation:application:" + id, id, "1.0");
+    Resource run =
+        importRun(model, application, id, "urn:test:aggregation:root:" + id);
+    Resource occurrence = occurrence(model, occurrenceIri, packageVersion, run);
+    run.getPropertyResourceValue(RiskVocabulary.ROOT_OCCURRENCE)
+        .addProperty(RiskVocabulary.DEPENDS_ON, occurrence);
+  }
+
+  private void assertEdge(
+      CveImpactDetailResponse detail, String source, String relationship, String target) {
+    assertTrue(
+        detail.graph().edges().stream()
+            .anyMatch(
+                edge ->
+                    edge.source().equals(source)
+                        && edge.relationship().equals(relationship)
+                        && edge.target().equals(target)));
+  }
+
+  private void assertNoEdge(
+      CveImpactDetailResponse detail, String source, String relationship, String target) {
+    assertFalse(
+        detail.graph().edges().stream()
+            .anyMatch(
+                edge ->
+                    edge.source().equals(source)
+                        && edge.relationship().equals(relationship)
+                        && edge.target().equals(target)));
   }
 
   private void populate(
