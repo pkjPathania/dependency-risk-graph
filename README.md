@@ -8,7 +8,7 @@ The repository is intentionally split between implemented features and planned c
 
 Software supply-chain analysis usually ends up split across disconnected tools: SBOM ingestion, graph storage, SPARQL, path search, and vulnerability lookups. This project exists to keep the graph authoritative in RDF while also providing a read-optimized in-memory projection for path algorithms and a simple UI for application-centric exploration.
 
-The long-term direction is a hybrid dependency-risk and Graph-RAG system, but only the RDF, SPARQL, JGraphT, and UI pieces that are actually wired into the code are documented here.
+The long-term direction is a hybrid dependency-risk and Graph-RAG system, but only the RDF, SPARQL, deterministic graph traversal, and UI pieces that are actually wired into the code are documented here.
 
 ## Current Capabilities
 
@@ -17,7 +17,7 @@ The long-term direction is a hybrid dependency-risk and Graph-RAG system, but on
 - Persistence to a local Apache Jena TDB2 dataset.
 - Graph metadata and application exploration APIs.
 - SPARQL `SELECT` execution and query formatting.
-- Dependency-path lookup with a JGraphT BFS projection.
+- Deterministic dependency-path traversal over the dependency model.
 - Application-level OSV batch scanning with full advisory loading.
 - Raw OSV application snapshots and vulnerability RDF persistence.
 - Explore views for vulnerability metrics, findings, CVSS assessments, fixed versions, and advisory references.
@@ -58,7 +58,7 @@ flowchart LR
     Explore --> Impact[CVE impact list and detail]
     Jena --> Sparql[SPARQL APIs]
     Jena --> Metadata[Graph metadata API]
-    Jena --> Index[JGraphT projection cache]
+    Jena --> Index[Dependency graph projection cache]
     Index --> Path[Dependency path API]
     Path --> Impact
     Explore --> UI[React + Material UI SPA]
@@ -83,7 +83,7 @@ flowchart LR
 
 - The RDF model is the authoritative graph representation.
 - Jena TDB2 stores the graph in a local embedded dataset.
-- JGraphT is a read-optimized in-memory projection used for shortest-path lookup, not the primary database.
+- A read-optimized in-memory projection supports deterministic shortest-path lookup; it is not the primary database.
 - The frontend is a single-page shell that switches between Overview, Explore, Vulnerability Enrichment, SPARQL, and Dependency Path without React Router.
 
 ## Data Flow
@@ -96,7 +96,7 @@ flowchart LR
 6. The scan maps package-to-vulnerability, CVSS assessment, and fixed-version resources into Jena TDB2.
 7. Explore and SPARQL APIs read the persisted graph data without calling OSV.
 8. CVE Impact groups persisted vulnerabilities first, then loads one focused advisory graph only when selected.
-9. The dependency-path service uses JGraphT BFS to resolve the exact ordered path from every affected application to each vulnerable package version.
+9. The dependency-path service uses deterministic graph traversal to resolve the exact ordered path from every affected application to each vulnerable package version.
 10. The React UI renders the resulting data in the Overview, Explore, Vulnerability Enrichment, SPARQL, and Dependency Path pages.
 
 ## RDF Graph Model
@@ -149,7 +149,6 @@ The current implementation keeps the vocabulary intentionally small. OSV enrichm
 - Java 21
 - Spring Boot 4.1
 - Apache Jena 6.1
-- JGraphT
 - CycloneDX Java libraries
 - React 19
 - TypeScript
@@ -476,8 +475,8 @@ If multiple versions share the same package name, pass `version` to disambiguate
 - Graph metadata and SPARQL queries read directly from the dataset.
 - Application OSV scans replace the configured raw JSON snapshot for that application and add or refresh vulnerability RDF in one repository write transaction.
 - Explore vulnerability, reference, and CVE impact endpoints read only from Jena TDB2 and never invoke OSV.
-- The JGraphT dependency-path projection is cached in memory and built from the repository snapshot on demand.
-- There is no automatic invalidation hook for the JGraphT cache after RDF writes, so a long-running process can become stale for path queries.
+- The dependency-path projection is cached in memory and built from the repository snapshot on demand.
+- There is no automatic invalidation hook for the traversal cache after RDF writes, so a long-running process can become stale for path queries.
 - `POST /api/osv` remains a standalone live-query passthrough; application persistence is performed by `/api/v1/vulnerabilities/scan`.
 
 ## Current Limitations
@@ -486,7 +485,7 @@ If multiple versions share the same package name, pass `version` to disambiguate
 - The RDF vocabulary is intentionally minimal.
 - SPARQL execution currently supports `SELECT` queries only.
 - Jena TDB2 is a local embedded store, not a distributed graph database.
-- JGraphT is a read-optimized in-memory projection and can lag behind RDF writes.
+- The read-optimized dependency projection can lag behind RDF writes.
 - Multiple applications in the graph can make package-name lookups ambiguous.
 - Stale `risk:affectedBy` links are not yet removed when a previously vulnerable package later returns no findings.
 - Advisories remain `UNRATED` when persisted RDF has CVSS vectors but no explicit `risk:severityLevel`; the UI does not infer severity from a vector or advisory prose.
@@ -502,7 +501,7 @@ If multiple versions share the same package name, pass `version` to disambiguate
 - [x] RDF mapping for applications, package versions, and dependency edges.
 - [x] Jena TDB2 persistence and SPARQL read APIs.
 - [x] Overview, Explore, Vulnerability Enrichment, SPARQL, and Dependency Path UI pages.
-- [x] JGraphT-backed shortest-path lookup.
+- [x] Deterministic shortest-path lookup over the dependency model.
 - [x] OSV query passthrough endpoint.
 - [x] Application-level OSV batch scanning and full advisory loading.
 - [x] Raw application OSV snapshots.
@@ -574,6 +573,8 @@ npm test
 - Separate implemented behavior from planned behavior in documentation and code comments.
 - Prefer the existing Spring Boot, Jena, and Material UI patterns already in the repository.
 
-## License Status
+## License
 
-No explicit license file is present in the repository at the time of writing.
+Copyright 2026 Pankaj Pathania.
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
