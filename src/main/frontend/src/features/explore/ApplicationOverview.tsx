@@ -36,13 +36,13 @@ export function ApplicationOverview({ overview, loading }: ApplicationOverviewPr
     },
     {
       label: 'Vulnerable packages',
-      value: formatMetric(overview?.vulnerablePackageCount),
-      caption: 'Not available'
+      value: formatMetric(overview?.vulnerablePackages),
+      caption: 'Reachable packages with vulnerabilities'
     },
     {
       label: 'Critical vulnerabilities',
-      value: formatMetric(overview?.criticalVulnerabilityCount),
-      caption: 'Not available'
+      value: formatMetric(overview?.criticalVulnerabilities),
+      caption: 'Distinct critical vulnerabilities'
     },
     {
       label: 'Last enriched',

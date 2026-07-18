@@ -1,11 +1,21 @@
 import { Alert, Box, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
 import { useEffect, useState, type ReactNode } from 'react';
-import type { ApplicationSummary } from '../api/types';
+import type {
+  ApplicationReferencesResponse,
+  ApplicationSummary,
+  ApplicationVulnerabilitiesResponse
+} from '../api/types';
 import { RestCallProgress } from '../components/RestCallProgress';
 import { ApplicationSelector } from '../features/explore/ApplicationSelector';
 import { ApplicationOverview } from '../features/explore/ApplicationOverview';
 import { DependenciesView } from '../features/explore/DependenciesView';
-import { fetchApplicationDependencies, fetchApplicationOverview, fetchApplicationSummaries } from '../features/explore/exploreApi';
+import {
+  fetchApplicationDependencies,
+  fetchApplicationOverview,
+  fetchApplicationReferences,
+  fetchApplicationSummaries,
+  fetchApplicationVulnerabilities
+} from '../features/explore/exploreApi';
 import type { ExploreTab } from '../features/explore/exploreTypes';
 import { ExploreTabs } from '../features/explore/ExploreTabs';
 import { IriValue } from '../features/explore/IriValue';
@@ -14,14 +24,23 @@ import { VulnerabilitiesView } from '../features/explore/VulnerabilitiesView';
 
 interface ExplorerPageProps {
   initialApplicationIri?: string | null;
+  onOpenVulnerabilityEnrichment: (applicationIri: string) => void;
 }
 
-export function ExplorerPage({ initialApplicationIri }: ExplorerPageProps) {
+export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichment }: ExplorerPageProps) {
   const [summaries, setSummaries] = useState<ApplicationSummary[]>([]);
   const [selectedApplication, setSelectedApplication] = useState<ApplicationSummary | null>(null);
   const [activeTab, setActiveTab] = useState<ExploreTab>('overview');
   const [overview, setOverview] = useState<Awaited<ReturnType<typeof fetchApplicationOverview>> | null>(null);
   const [dependencies, setDependencies] = useState<Awaited<ReturnType<typeof fetchApplicationDependencies>>>([]);
+  const [vulnerabilities, setVulnerabilities] = useState<ApplicationVulnerabilitiesResponse | null>(null);
+  const [vulnerabilitiesLoading, setVulnerabilitiesLoading] = useState(false);
+  const [vulnerabilitiesError, setVulnerabilitiesError] = useState<string | null>(null);
+  const [vulnerabilitiesReloadCounter, setVulnerabilitiesReloadCounter] = useState(0);
+  const [references, setReferences] = useState<ApplicationReferencesResponse | null>(null);
+  const [referencesLoading, setReferencesLoading] = useState(false);
+  const [referencesError, setReferencesError] = useState<string | null>(null);
+  const [referencesReloadCounter, setReferencesReloadCounter] = useState(0);
   const [summariesLoading, setSummariesLoading] = useState(true);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [summariesError, setSummariesError] = useState<string | null>(null);
@@ -123,6 +142,92 @@ export function ExplorerPage({ initialApplicationIri }: ExplorerPageProps) {
     };
   }, [reloadCounter, selectedApplication?.iri]);
 
+  useEffect(() => {
+    setVulnerabilities(null);
+    setVulnerabilitiesError(null);
+  }, [selectedApplication?.iri]);
+
+  useEffect(() => {
+    let active = true;
+    const applicationIri = selectedApplication?.iri?.trim() ?? '';
+    if (activeTab !== 'vulnerabilities' || !applicationIri) {
+      return () => {
+        active = false;
+      };
+    }
+
+    setVulnerabilitiesLoading(true);
+    setVulnerabilitiesError(null);
+
+    async function loadVulnerabilities() {
+      try {
+        const response = await fetchApplicationVulnerabilities(applicationIri);
+        if (active) {
+          setVulnerabilities(response);
+        }
+      } catch (error) {
+        if (active) {
+          console.error(`Failed to load vulnerabilities for ${applicationIri}.`, error);
+          setVulnerabilities(null);
+          setVulnerabilitiesError(
+            error instanceof Error ? error.message : 'Unable to load application vulnerabilities.'
+          );
+        }
+      } finally {
+        if (active) {
+          setVulnerabilitiesLoading(false);
+        }
+      }
+    }
+
+    void loadVulnerabilities();
+    return () => {
+      active = false;
+    };
+  }, [activeTab, selectedApplication?.iri, vulnerabilitiesReloadCounter]);
+
+  useEffect(() => {
+    setReferences(null);
+    setReferencesError(null);
+  }, [selectedApplication?.iri]);
+
+  useEffect(() => {
+    let active = true;
+    const applicationIri = selectedApplication?.iri?.trim() ?? '';
+    if (activeTab !== 'references' || !applicationIri) {
+      return () => {
+        active = false;
+      };
+    }
+
+    setReferencesLoading(true);
+    setReferencesError(null);
+
+    async function loadReferences() {
+      try {
+        const response = await fetchApplicationReferences(applicationIri);
+        if (active) {
+          setReferences(response);
+        }
+      } catch (error) {
+        if (active) {
+          console.error(`Failed to load advisory references for ${applicationIri}.`, error);
+          setReferences(null);
+          setReferencesError('Unable to load advisory references.');
+        }
+      } finally {
+        if (active) {
+          setReferencesLoading(false);
+        }
+      }
+    }
+
+    void loadReferences();
+    return () => {
+      active = false;
+    };
+  }, [activeTab, referencesReloadCounter, selectedApplication?.iri]);
+
   function handleApplicationSelect(applicationIri: string) {
     const nextApplication = selectableSummaries.find((summary) => summary.iri === applicationIri) ?? null;
     setSelectedApplication(nextApplication);
@@ -214,8 +319,24 @@ export function ExplorerPage({ initialApplicationIri }: ExplorerPageProps) {
                   />
                 ) : null}
 
-                {activeTab === 'vulnerabilities' ? <VulnerabilitiesView /> : null}
-                {activeTab === 'references' ? <ReferencesView /> : null}
+                {activeTab === 'vulnerabilities' ? (
+                  <VulnerabilitiesView
+                    response={vulnerabilities}
+                    loading={vulnerabilitiesLoading || (!vulnerabilities && !vulnerabilitiesError)}
+                    error={vulnerabilitiesError}
+                    onRefresh={() => setVulnerabilitiesReloadCounter((current) => current + 1)}
+                    onOpenEnrichment={() => onOpenVulnerabilityEnrichment(selectedApplicationIri)}
+                  />
+                ) : null}
+                {activeTab === 'references' ? (
+                  <ReferencesView
+                    response={references}
+                    loading={referencesLoading || (!references && !referencesError)}
+                    error={referencesError}
+                    onRefresh={() => setReferencesReloadCounter((current) => current + 1)}
+                    onOpenEnrichment={() => onOpenVulnerabilityEnrichment(selectedApplicationIri)}
+                  />
+                ) : null}
               </Box>
             )}
           </Stack>

@@ -60,8 +60,8 @@ function buildApplicationOverview(
     uniquePackageCount,
     graphNodeCount: traversal.reachableIds.size,
     graphEdgeCount: traversal.edgeIds.size,
-    vulnerablePackageCount: null,
-    criticalVulnerabilityCount: null,
+    vulnerablePackages: 0,
+    criticalVulnerabilities: 0,
     lastEnrichedAt: readLiteral(rootEntry, 'drg:lastEnrichedAt') ?? null
   };
 }

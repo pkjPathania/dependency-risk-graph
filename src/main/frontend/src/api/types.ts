@@ -46,8 +46,8 @@ export interface ApplicationOverview {
   uniquePackageCount?: number | null;
   graphNodeCount?: number | null;
   graphEdgeCount?: number | null;
-  vulnerablePackageCount?: number | null;
-  criticalVulnerabilityCount?: number | null;
+  vulnerablePackages: number;
+  criticalVulnerabilities: number;
   lastEnrichedAt?: string | null;
 }
 
@@ -62,6 +62,64 @@ export interface DependencySummary {
   incomingDependencyCount?: number | null;
   vulnerabilityCount?: number | null;
   highestSeverity?: string | null;
+}
+
+export interface CvssAssessmentView {
+  type: string | null;
+  version: string | null;
+  vector: string;
+}
+
+export interface FixedVersionView {
+  packageName: string | null;
+  version: string;
+  purl: string | null;
+}
+
+export interface ApplicationVulnerabilityItem {
+  packageIri: string;
+  packageName: string;
+  installedVersion: string | null;
+  installedPurl: string | null;
+  dependencyType: string;
+  vulnerabilityIri: string;
+  osvId: string;
+  aliases: string[];
+  summary: string | null;
+  details: string | null;
+  severityLevel: string | null;
+  publishedAt: string | null;
+  modifiedAt: string | null;
+  cvssAssessments: CvssAssessmentView[];
+  fixedVersions: FixedVersionView[];
+  referenceUrls: string[];
+}
+
+export interface ApplicationVulnerabilitiesResponse {
+  applicationIri: string;
+  total: number;
+  items: ApplicationVulnerabilityItem[];
+}
+
+export interface AffectedPackageReference {
+  packageIri: string;
+  packageName: string;
+  installedVersion: string;
+}
+
+export interface AdvisoryReferenceItem {
+  vulnerabilityIri: string;
+  osvId: string;
+  aliases: string[];
+  summary: string | null;
+  affectedPackages: AffectedPackageReference[];
+  referenceUrls: string[];
+}
+
+export interface ApplicationReferencesResponse {
+  applicationIri: string;
+  total: number;
+  items: AdvisoryReferenceItem[];
 }
 
 export interface SparqlSelectResponse {

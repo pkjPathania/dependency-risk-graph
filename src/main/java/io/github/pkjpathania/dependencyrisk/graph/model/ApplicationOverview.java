@@ -8,11 +8,11 @@ public record ApplicationOverview(
     long uniquePackageCount,
     long graphNodeCount,
     long graphEdgeCount,
-    Long vulnerablePackageCount,
-    Long criticalVulnerabilityCount,
+    long vulnerablePackages,
+    long criticalVulnerabilities,
     Instant lastEnrichedAt) {
 
   public static ApplicationOverview empty() {
-    return new ApplicationOverview(0L, 0L, 0L, 0L, 0L, null, null, null);
+    return new ApplicationOverview(0L, 0L, 0L, 0L, 0L, 0L, 0L, null);
   }
 }

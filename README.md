@@ -234,6 +234,64 @@ WHERE {
 ORDER BY LCASE(?name)
 ```
 
+### Verify OSV vulnerability enrichment
+
+Run these queries after an application vulnerability scan.
+
+```sparql
+PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?package ?packageName ?installedVersion ?osvId ?alias
+WHERE {
+  ?package a risk:PackageVersion ;
+           rdfs:label ?packageName ;
+           risk:version ?installedVersion ;
+           risk:affectedBy ?vulnerability .
+
+  ?vulnerability a risk:Vulnerability ;
+                 risk:osvId ?osvId .
+
+  OPTIONAL { ?vulnerability risk:alias ?alias . }
+}
+ORDER BY ?packageName ?osvId
+```
+
+```sparql
+PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+
+SELECT ?osvId ?cvssType ?cvssVersion ?vector
+WHERE {
+  ?vulnerability risk:osvId ?osvId ;
+                 risk:hasSeverity ?assessment .
+
+  ?assessment a risk:CvssAssessment ;
+              risk:cvssType ?cvssType ;
+              risk:vector ?vector .
+
+  OPTIONAL { ?assessment risk:cvssVersion ?cvssVersion . }
+}
+ORDER BY ?osvId ?cvssVersion
+```
+
+```sparql
+PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?osvId ?packageName ?fixedVersion ?fixedPurl
+WHERE {
+  ?vulnerability risk:osvId ?osvId ;
+                 risk:fixedIn ?fixedPackage .
+
+  ?fixedPackage a risk:PackageVersion ;
+                rdfs:label ?packageName ;
+                risk:version ?fixedVersion .
+
+  OPTIONAL { ?fixedPackage risk:purl ?fixedPurl . }
+}
+ORDER BY ?osvId ?packageName ?fixedVersion
+```
+
 ### List direct dependencies for one application
 
 Replace the application IRI in the `VALUES` block with a real application resource from the graph.

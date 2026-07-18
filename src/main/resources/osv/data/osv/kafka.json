@@ -1,7 +1,7 @@
 {
   "applicationIri" : "urn:io.github.pkjpathania.dependencyrisk:resource:application:kafka:4.4.0-snapshot",
   "applicationName" : "kafka",
-  "scannedAt" : "2026-07-18T08:34:37.056610Z",
+  "scannedAt" : "2026-07-18T11:05:03.605945Z",
   "packages" : [ {
     "packageIri" : "urn:io.github.pkjpathania.dependencyrisk:resource:package:ch.qos.logback:logback-core:1.5.18:library",
     "name" : "logback-core",

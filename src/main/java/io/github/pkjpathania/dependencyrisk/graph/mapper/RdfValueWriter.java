@@ -1,7 +1,7 @@
 package io.github.pkjpathania.dependencyrisk.graph.mapper;
 
 import java.time.Instant;
-import java.util.Set;
+import java.util.Collection;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.datatypes.xsd.XSDDatatype;
 import org.apache.jena.rdf.model.Model;
@@ -9,15 +9,20 @@ import org.apache.jena.rdf.model.Property;
 import org.apache.jena.rdf.model.Resource;
 import org.springframework.util.CollectionUtils;
 
-public class RdfValueWriter {
+public final class RdfValueWriter {
+
+  private RdfValueWriter() {}
+
   public static void replaceLiteral(
       Model model, Resource subject, Property property, String value) {
     model.removeAll(subject, property, null);
-    if (StringUtils.isNotBlank(value)) model.add(subject, property, value.trim());
+    if (StringUtils.isNotBlank(value)) {
+      model.add(subject, property, value.trim());
+    }
   }
 
   public static void replaceLiterals(
-      Model model, Resource subject, Property property, Set<String> values) {
+      Model model, Resource subject, Property property, Collection<String> values) {
     model.removeAll(subject, property, null);
     if (CollectionUtils.isEmpty(values)) return;
 

@@ -68,6 +68,7 @@ public final class RiskVocabulary {
 
   public static final Property SEVERITY_LEVEL = property("severityLevel");
 
+
   private RiskVocabulary() {}
 
   public static String getUri() {

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import org.apache.jena.query.Dataset;
@@ -61,6 +62,11 @@ public class JenaGraphRepository {
 
   public void saveAll(Model model) {
     dataset.executeWrite(() -> dataset.getDefaultModel().add(model));
+  }
+
+  public void write(Consumer<Model> operation) {
+    Objects.requireNonNull(operation, "operation must not be null");
+    dataset.executeWrite(() -> operation.accept(dataset.getDefaultModel()));
   }
 
   public Model getModel() {

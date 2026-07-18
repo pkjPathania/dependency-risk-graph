@@ -1,7 +1,9 @@
 package io.github.pkjpathania.dependencyrisk.graph.controller;
 
 import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationOverview;
+import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationReferencesResponse;
 import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationSummary;
+import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationVulnerabilitiesResponse;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencySummary;
 import io.github.pkjpathania.dependencyrisk.graph.service.ExplorerService;
 import io.github.pkjpathania.dependencyrisk.graph.service.SparqlService;
@@ -35,5 +37,17 @@ public class ExploreController {
   public List<DependencySummary> dependencies(
       @RequestParam("applicationIri") String applicationIri) {
     return explorerService.dependencySummary(applicationIri);
+  }
+
+  @GetMapping("/vulnerabilities")
+  public ApplicationVulnerabilitiesResponse vulnerabilities(
+      @RequestParam("applicationIri") String applicationIri) {
+    return explorerService.getVulnerabilities(applicationIri);
+  }
+
+  @GetMapping("/references")
+  public ApplicationReferencesResponse references(
+      @RequestParam("applicationIri") String applicationIri) {
+    return explorerService.getReferences(applicationIri);
   }
 }

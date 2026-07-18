@@ -1,7 +1,7 @@
 {
   "applicationIri" : "urn:io.github.pkjpathania.dependencyrisk:resource:application:dependency-risk-graph:0.0.1-snapshot",
   "applicationName" : "dependency-risk-graph",
-  "scannedAt" : "2026-07-18T08:40:42.829980Z",
+  "scannedAt" : "2026-07-18T11:56:01.345954Z",
   "packages" : [ {
     "packageIri" : "urn:io.github.pkjpathania.dependencyrisk:resource:package:com.fasterxml.jackson.core:jackson-databind:2.21.4:library",
     "name" : "jackson-databind",

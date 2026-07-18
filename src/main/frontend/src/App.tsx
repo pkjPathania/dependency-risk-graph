@@ -18,14 +18,24 @@ export default function App() {
     setSelectedPageId('explorer');
   }
 
+  function handleOpenVulnerabilityEnrichment(applicationIri: string) {
+    setExploreApplicationIri(applicationIri);
+    setSelectedPageId('vulnerabilityEnrichment');
+  }
+
   function renderPage() {
     switch (selectedPageId) {
       case 'dashboard':
         return <DashboardPage onExploreApplication={handleExploreApplication} />;
       case 'explorer':
-        return <ExplorerPage initialApplicationIri={exploreApplicationIri} />;
+        return (
+          <ExplorerPage
+            initialApplicationIri={exploreApplicationIri}
+            onOpenVulnerabilityEnrichment={handleOpenVulnerabilityEnrichment}
+          />
+        );
       case 'vulnerabilityEnrichment':
-        return <VulnerabilityEnrichmentPage />;
+        return <VulnerabilityEnrichmentPage initialApplicationIri={exploreApplicationIri} />;
       case 'sparql':
         return <SparqlQueryPage query={sparqlQuery} onQueryChange={setSparqlQuery} />;
       case 'dependencyPath':

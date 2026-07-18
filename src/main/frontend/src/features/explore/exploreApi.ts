@@ -1,4 +1,10 @@
-import type { ApplicationOverview, ApplicationSummary, DependencySummary } from '../../api/types';
+import type {
+  ApplicationOverview,
+  ApplicationReferencesResponse,
+  ApplicationSummary,
+  ApplicationVulnerabilitiesResponse,
+  DependencySummary
+} from '../../api/types';
 import { readApiErrorMessage } from '../../api/httpError';
 
 const EXPLORE_BASE_URL = '/api/v1/explore';
@@ -28,6 +34,30 @@ export async function fetchApplicationDependencies(applicationIri: string): Prom
   );
 
   return (await response.json()) as DependencySummary[];
+}
+
+export async function fetchApplicationVulnerabilities(
+  applicationIri: string
+): Promise<ApplicationVulnerabilitiesResponse> {
+  const response = await fetchExploreResource(
+    '/vulnerabilities',
+    applicationIri,
+    'Failed to load application vulnerabilities'
+  );
+
+  return (await response.json()) as ApplicationVulnerabilitiesResponse;
+}
+
+export async function fetchApplicationReferences(
+  applicationIri: string
+): Promise<ApplicationReferencesResponse> {
+  const response = await fetchExploreResource(
+    '/references',
+    applicationIri,
+    'Unable to load advisory references.'
+  );
+
+  return (await response.json()) as ApplicationReferencesResponse;
 }
 
 async function fetchExploreResource(path: string, applicationIri: string, fallbackMessage: string): Promise<Response> {
