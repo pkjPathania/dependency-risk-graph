@@ -15,6 +15,12 @@ server:
 dependency-risk:
   osv:
     enabled: true
-    batch-size: 100
+    batch-size: 50
     advisory-fetch-threads: 8
     output-directory: src/main/resources/osv
+    max-attempts: 3
+    connect-timeout: 10s
+    read-timeout: 45s
+    retry:
+      initial-delay: 1s
+      max-delay: 10s

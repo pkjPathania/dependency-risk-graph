@@ -269,6 +269,17 @@ export interface ApiErrorResponse {
 
 export interface ApplicationVulnerabilityScanRequest {
   applicationIri: string;
+  importId?: string;
+}
+
+export type VulnerabilityScanStatus = 'COMPLETED' | 'PARTIAL' | 'FAILED';
+
+export interface OsvFailedPackage {
+  purl: string;
+  batchNumber: number;
+  code: string;
+  message: string;
+  retryable: boolean;
 }
 
 export interface ApplicationVulnerabilityRow {
@@ -291,16 +302,24 @@ export interface ApplicationVulnerabilityRow {
 
 export interface ApplicationVulnerabilityScanResponse {
   applicationIri: string;
+  importId: string;
+  activeImportId: string;
+  rootOccurrenceIri: string;
+  status: VulnerabilityScanStatus;
   applicationName: string;
   applicationVersion: string | null;
   scannedAt: string;
   packagesDiscovered: number;
   packagesQueried: number;
   packagesSkipped: number;
+  successfulPackages: number;
   vulnerablePackages: number;
   uniqueVulnerabilities: number;
   failedPackages: number;
   advisoryFetchFailures: number;
+  failedBatchNumbers: number[];
+  failures: OsvFailedPackage[];
+  warnings: string[];
   durationMs: number;
   findings: ApplicationVulnerabilityRow[];
 }
