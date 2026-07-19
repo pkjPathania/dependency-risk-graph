@@ -140,8 +140,7 @@ export function DashboardPage({ onExploreApplication }: DashboardPageProps) {
     setRdfStatusMessage(null);
 
     try {
-      const summary = await uploadSbomAsRdf(file);
-      const metadata = await fetchGraphMetadata();
+      const metadata = await uploadSbomAsRdf(file);
       if (!mountedRef.current) {
         return;
       }
@@ -150,7 +149,7 @@ export function DashboardPage({ onExploreApplication }: DashboardPageProps) {
       await loadApplicationRows();
       setSuccessMessage(`Uploaded ${escapePercent(file.name)} successfully.`);
       setRdfStatusMessage(
-        `SBOM import ${summary.importId} mapped ${summary.componentCount} components and ${summary.dependencyEdgeCount} explicit dependency edges (${summary.graphQuality}).`
+        `JSON-LD assembly completed. The graph now contains ${metadata.summary.applicationCount} applications, ${metadata.summary.packageCount} packages, and ${metadata.summary.dependencyEdgeCount} dependency edges.`
       );
     } catch (error) {
       if (!mountedRef.current) {

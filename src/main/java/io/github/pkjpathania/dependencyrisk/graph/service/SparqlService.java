@@ -33,13 +33,11 @@ public class SparqlService {
     String query =
 """
   PREFIX  risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
-  PREFIX  rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
   SELECT  ?application ?name ?version ?purl
   WHERE
-    { ?application  a  risk:Application
+    { ?application  a  risk:ApplicationOccurrence
       OPTIONAL
-        { ?application  rdfs:label  ?name }
+        { ?application  risk:name  ?name }
       OPTIONAL
         { ?application  risk:version  ?version }
       OPTIONAL

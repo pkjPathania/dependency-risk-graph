@@ -88,11 +88,11 @@ public class JenaGraphRepository {
               new GraphSummary(
                   model.size(),
                   model
-                      .listResourcesWithProperty(RDF.type, RiskVocabulary.APPLICATION)
+                      .listResourcesWithProperty(RDF.type, RiskVocabulary.APPLICATION_OCCURRENCE)
                       .toList()
                       .size(),
                   model
-                      .listResourcesWithProperty(RDF.type, RiskVocabulary.PACKAGE_VERSION)
+                      .listResourcesWithProperty(RDF.type, RiskVocabulary.PACKAGE_OCCURRENCE)
                       .toList()
                       .size(),
                   model
@@ -245,11 +245,14 @@ public class JenaGraphRepository {
   }
 
   private DependencyNode toMetadata(Model model, Resource resource) {
-    String label = literalValue(resource, RDFS.label);
+    String label = literalValue(resource, RiskVocabulary.NAME);
+    if (label == null) {
+      label = literalValue(resource, RDFS.label);
+    }
     String version = literalValue(resource, RiskVocabulary.VERSION);
     String purl = literalValue(resource, RiskVocabulary.PURL);
     NodeType type =
-        model.contains(resource, RDF.type, RiskVocabulary.APPLICATION)
+        model.contains(resource, RDF.type, RiskVocabulary.APPLICATION_OCCURRENCE)
             ? NodeType.APPLICATION
             : model.contains(resource, RDF.type, RiskVocabulary.SERVICE)
                 ? NodeType.SERVICE

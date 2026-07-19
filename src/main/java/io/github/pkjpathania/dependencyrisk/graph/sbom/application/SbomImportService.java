@@ -1,6 +1,5 @@
 package io.github.pkjpathania.dependencyrisk.graph.sbom.application;
 
-import io.github.pkjpathania.dependencyrisk.graph.parser.assembler.CycloneDxJsonAssembler;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.CycloneDxReadResult;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.RdfImportContext;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.RdfMappingResult;
@@ -26,19 +25,16 @@ public final class SbomImportService implements ImportSbomUseCase {
   private final CycloneDxRdfMapper rdfMapper;
   private final RdfGraphStore graphStore;
   private final ImportIdGenerator importIdGenerator;
-  private final CycloneDxJsonAssembler assembler;
 
   public SbomImportService(
       CycloneDxBomReader bomReader,
       CycloneDxRdfMapper rdfMapper,
       RdfGraphStore graphStore,
-      ImportIdGenerator importIdGenerator,
-      CycloneDxJsonAssembler assembler) {
+      ImportIdGenerator importIdGenerator) {
     this.bomReader = bomReader;
     this.rdfMapper = rdfMapper;
     this.graphStore = graphStore;
     this.importIdGenerator = importIdGenerator;
-    this.assembler = assembler;
   }
 
   @Override

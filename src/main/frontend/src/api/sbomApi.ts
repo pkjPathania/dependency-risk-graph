@@ -1,10 +1,10 @@
-import type { GraphMetadata, SbomImportResult } from './types';
+import type { GraphMetadata } from './types';
 import { readApiErrorMessage } from './httpError';
 
 const SBOM_RDF_UPLOAD_URL = '/api/v1/sboms/rdf';
 const GRAPH_METADATA_URL = '/api/v1/metadata';
 
-export async function uploadSbomAsRdf(file: File): Promise<SbomImportResult> {
+export async function uploadSbomAsRdf(file: File): Promise<GraphMetadata> {
   const formData = new FormData();
   formData.append('file', file);
 
@@ -18,7 +18,7 @@ export async function uploadSbomAsRdf(file: File): Promise<SbomImportResult> {
     throw new Error(message);
   }
 
-  return (await response.json()) as SbomImportResult;
+  return (await response.json()) as GraphMetadata;
 }
 
 export async function fetchGraphMetadata(): Promise<GraphMetadata> {
