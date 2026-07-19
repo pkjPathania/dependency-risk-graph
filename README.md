@@ -90,7 +90,7 @@ flowchart LR
 
 The current mapper uses a minimal vocabulary under:
 
-`urn:io.github.pkjpathania.dependencyrisk:schema:`
+`urn:io-github-pkjpathania:dependency-risk-graph:schema:`
 
 Implemented RDF concepts and properties include:
 
@@ -343,7 +343,7 @@ curl -s -X POST http://localhost:8080/api/v1/sboms \
 ### List applications
 
 ```sparql
-PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?application ?name ?version
@@ -362,7 +362,7 @@ ORDER BY LCASE(?name)
 Run these queries after an application vulnerability scan.
 
 ```sparql
-PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?package ?packageName ?installedVersion ?osvId ?alias
@@ -381,7 +381,7 @@ ORDER BY ?packageName ?osvId
 ```
 
 ```sparql
-PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
 
 SELECT ?osvId ?cvssType ?cvssVersion ?vector
 WHERE {
@@ -398,7 +398,7 @@ ORDER BY ?osvId ?cvssVersion
 ```
 
 ```sparql
-PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?osvId ?packageName ?fixedVersion ?fixedPurl
@@ -420,7 +420,7 @@ ORDER BY ?osvId ?packageName ?fixedVersion
 Replace the application IRI in the `VALUES` block with a real application resource from the graph.
 
 ```sparql
-PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 SELECT ?dependency ?name ?version ?purl

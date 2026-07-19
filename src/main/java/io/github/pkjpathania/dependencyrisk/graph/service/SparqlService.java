@@ -32,7 +32,7 @@ public class SparqlService {
   public List<ApplicationSummary> getSummaries() {
     String query =
 """
-  PREFIX  risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+  PREFIX  risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
   PREFIX  rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
   SELECT  ?application ?name ?version ?purl

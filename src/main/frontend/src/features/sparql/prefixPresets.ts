@@ -10,7 +10,7 @@ export const SPARQL_PREFIX_PRESETS: SparqlPrefixPreset[] = [
   {
     id: 'risk',
     label: 'risk',
-    prefixes: ['PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>']
+    prefixes: ['PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>']
   },
   {
     id: 'rdfs',
@@ -26,7 +26,7 @@ export const SPARQL_PREFIX_PRESETS: SparqlPrefixPreset[] = [
     id: 'everything',
     label: 'everything',
     prefixes: [
-      'PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>',
+      'PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>',
       'PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>',
       'PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>',
       'PREFIX owl: <http://www.w3.org/2002/07/owl#>',

@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public final class JenaDependencyPathResolver implements DependencyPathResolver {
   private static final String PREFIX =
-      "PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>\n"
+      "PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>\n"
           + "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\n"
           + "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n";
   private final JenaGraphRepository repository;

@@ -24,3 +24,29 @@ dependency-risk:
     retry:
       initial-delay: 1s
       max-delay: 10s
+  json-ld:
+    context:
+      risk: "urn:io-github-pkjpathania:dependency-risk-graph:schema:"
+
+      name: "risk:name"
+      group: "risk:group"
+      version: "risk:version"
+      purl: "risk:purl"
+      bomRef: "risk:bomRef"
+      componentType: "risk:componentType"
+
+      rootOccurrence:
+        "[@id]": "risk:rootOccurrence"
+        "[@type]": "@id"
+
+      belongsToImport:
+        "[@id]": "risk:belongsToImport"
+        "[@type]": "@id"
+
+      dependsOn:
+        "[@id]": "risk:dependsOn"
+        "[@type]": "@id"
+
+      instanceOf:
+        "[@id]": "risk:instanceOf"
+        "[@type]": "@id"

@@ -13,6 +13,7 @@ import org.cyclonedx.parsers.Parser;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 @Component
 public final class DefaultCycloneDxBomReader implements CycloneDxBomReader {
@@ -33,7 +34,8 @@ public final class DefaultCycloneDxBomReader implements CycloneDxBomReader {
     try {
       Parser parser = BomParserFactory.createParser(content);
       List<ParseException> validationErrors =
-          parser.validate(content, schemaVersion.libraryVersion());
+          parser.validate(
+              contentForValidation(content, schemaVersion), schemaVersion.libraryVersion());
       if (!validationErrors.isEmpty()) {
         String details =
             validationErrors.stream()
@@ -52,6 +54,20 @@ public final class DefaultCycloneDxBomReader implements CycloneDxBomReader {
           "Unable to validate or parse CycloneDX " + header.specVersion() + " document",
           exception);
     }
+  }
+
+  private byte[] contentForValidation(byte[] content, CycloneDxSchemaVersion schemaVersion) {
+    if (schemaVersion
+        .declaredVersion()
+        .equals(schemaVersion.libraryVersion().getVersionString())) {
+      return content;
+    }
+    JsonNode root = objectMapper.readTree(content);
+    if (!(root instanceof ObjectNode objectRoot)) {
+      throw new InvalidCycloneDxBomException("CycloneDX JSON document must be an object");
+    }
+    objectRoot.put("specVersion", schemaVersion.libraryVersion().getVersionString());
+    return objectMapper.writeValueAsBytes(objectRoot);
   }
 
   private Header readHeader(byte[] content) {

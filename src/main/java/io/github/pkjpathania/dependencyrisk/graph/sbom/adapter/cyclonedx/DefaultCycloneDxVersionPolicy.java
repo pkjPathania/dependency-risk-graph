@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public final class DefaultCycloneDxVersionPolicy implements CycloneDxVersionPolicy {
   private static final List<String> SUPPORTED =
-      List.of("1.2", "1.3", "1.4", "1.5", "1.6");
+      List.of("1.2", "1.3", "1.4", "1.5", "1.6", "1.7");
 
   private final String installedLibraryVersion;
 
@@ -22,8 +22,16 @@ public final class DefaultCycloneDxVersionPolicy implements CycloneDxVersionPoli
 
   @Override
   public CycloneDxSchemaVersion resolve(String declaredVersion) {
-    Version version = Version.fromVersionString(declaredVersion);
-    if (version == null || !version.getFormats().contains(Format.JSON) || !isSupported(declaredVersion)) {
+    // CycloneDX Core Java 12.x can parse the parts of 1.7 used by the importer, but its latest
+    // bundled JSON schema is still 1.6. Use that schema for 1.7 compatibility validation until
+    // the library publishes native 1.7 support.
+    Version version =
+        "1.7".equals(declaredVersion)
+            ? Version.VERSION_16
+            : Version.fromVersionString(declaredVersion);
+    if (version == null
+        || !version.getFormats().contains(Format.JSON)
+        || !isSupported(declaredVersion)) {
       throw new UnsupportedCycloneDxVersionException(
           "Unsupported CycloneDX specification version '"
               + declaredVersion

@@ -26,6 +26,29 @@ class DefaultCycloneDxBomReaderTest {
   }
 
   @Test
+  void readsCycloneDx17UsingCompatibilitySchema() {
+    String json = validBom().replace("\"1.6\"", "\"1.7\"");
+
+    var result = reader.read(json.getBytes(StandardCharsets.UTF_8));
+
+    assertEquals("1.7", result.declaredSpecVersion());
+    assertEquals("root", result.bom().getMetadata().getComponent().getBomRef());
+  }
+
+  @Test
+  void validatesCycloneDx17UsingCompatibilitySchema() {
+    String invalid =
+        validBom().replace("\"1.6\"", "\"1.7\"").replace("\"name\":\"target\",", "");
+
+    InvalidCycloneDxBomException exception =
+        assertThrows(
+            InvalidCycloneDxBomException.class,
+            () -> reader.read(invalid.getBytes(StandardCharsets.UTF_8)));
+
+    assertTrue(exception.getMessage().contains("CycloneDX 1.7 validation failed"));
+  }
+
+  @Test
   void rejectsInvalidBomFormat() {
     String json = validBom().replace("\"CycloneDX\"", "\"SPDX\"");
     InvalidCycloneDxBomException exception =
@@ -46,13 +69,13 @@ class DefaultCycloneDxBomReaderTest {
 
   @Test
   void rejectsUnsupportedSpecVersionWithInstalledLibraryVersion() {
-    String json = validBom().replace("\"1.6\"", "\"1.7\"");
+    String json = validBom().replace("\"1.6\"", "\"1.8\"");
     UnsupportedCycloneDxVersionException exception =
         assertThrows(
             UnsupportedCycloneDxVersionException.class,
             () -> reader.read(json.getBytes(StandardCharsets.UTF_8)));
     assertTrue(exception.getMessage().contains("12.2.0"));
-    assertTrue(exception.getMessage().contains("1.2, 1.3, 1.4, 1.5, 1.6"));
+    assertTrue(exception.getMessage().contains("1.2, 1.3, 1.4, 1.5, 1.6, 1.7"));
   }
 
   @Test

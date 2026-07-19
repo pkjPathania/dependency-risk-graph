@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.jena.query.Dataset;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryExecution;
@@ -47,6 +48,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Repository
 @RequiredArgsConstructor
+@Slf4j
 public class JenaGraphRepository {
   private final Dataset dataset;
   private final ObjectMapper objectMapper;

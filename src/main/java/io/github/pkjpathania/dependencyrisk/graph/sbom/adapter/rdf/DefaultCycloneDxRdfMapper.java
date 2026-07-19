@@ -8,8 +8,10 @@ import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.SbomImportDiagnost
 import io.github.pkjpathania.dependencyrisk.graph.sbom.exception.CycloneDxMappingException;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.port.CycloneDxRdfMapper;
 import io.github.pkjpathania.dependencyrisk.graph.vocabulary.RiskVocabulary;
+import io.github.pkjpathania.dependencyrisk.util.GenUtil;
 import java.util.List;
 import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
@@ -22,9 +24,9 @@ import org.cyclonedx.model.Service;
 import org.cyclonedx.model.vulnerability.Vulnerability;
 
 @org.springframework.stereotype.Component
+@Slf4j
 public final class DefaultCycloneDxRdfMapper implements CycloneDxRdfMapper {
-  private static final String RESOURCE_NS =
-      "urn:io.github.pkjpathania.dependencyrisk:resource:";
+  private static final String RESOURCE_NS = "urn:io.github.pkjpathania.dependencyrisk:resource:";
 
   private final CycloneDxGraphAnalyzer analyzer;
   private final RdfResourceIdentityStrategy identityStrategy;
@@ -57,10 +59,11 @@ public final class DefaultCycloneDxRdfMapper implements CycloneDxRdfMapper {
   @Override
   public RdfMappingResult map(Bom bom, RdfImportContext importContext) {
     try {
+
+      String pretty = GenUtil.prettyPrint(bom);
       Model model = ModelFactory.createDefaultModel();
       model.setNsPrefix("risk", RiskVocabulary.getUri());
-      SbomImportDiagnostics analyzed =
-          analyzer.analyze(bom, importContext.declaredSpecVersion());
+      SbomImportDiagnostics analyzed = analyzer.analyze(bom, importContext.declaredSpecVersion());
       ImportedBomIdentity identity =
           new ImportedBomIdentity(
               importContext.importId(),
@@ -77,8 +80,7 @@ public final class DefaultCycloneDxRdfMapper implements CycloneDxRdfMapper {
       initializeImport(context, document);
 
       // Phase 1: register every referencable object before creating relationships.
-      Component root =
-          bom.getMetadata() == null ? null : bom.getMetadata().getComponent();
+      Component root = bom.getMetadata() == null ? null : bom.getMetadata().getComponent();
       if (root != null) {
         Resource rootResource = context.registerMetadataComponent(root);
         metadataComponentMapper.map(root, rootResource, context.application());
@@ -90,7 +92,8 @@ public final class DefaultCycloneDxRdfMapper implements CycloneDxRdfMapper {
             context
                 .findPackageByBomRef(root.getBomRef())
                 .filter(packageResource -> packageResource.hasProperty(RiskVocabulary.PURL))
-                .map(packageResource -> packageResource.getProperty(RiskVocabulary.PURL).getString())
+                .map(
+                    packageResource -> packageResource.getProperty(RiskVocabulary.PURL).getString())
                 .orElseGet(
                     () ->
                         StringUtils.defaultIfBlank(
@@ -125,8 +128,7 @@ public final class DefaultCycloneDxRdfMapper implements CycloneDxRdfMapper {
                       .ifPresent(
                           resource ->
                               resource.addLiteral(
-                                  RiskVocabulary.DEPENDENCY_INFORMATION_STATUS,
-                                  status.name())));
+                                  RiskVocabulary.DEPENDENCY_INFORMATION_STATUS, status.name())));
       addImportMetrics(importResource, diagnostics);
       return new RdfMappingResult(model, diagnostics, identity);
     } catch (RuntimeException exception) {
@@ -168,14 +170,12 @@ public final class DefaultCycloneDxRdfMapper implements CycloneDxRdfMapper {
     importRun.addLiteral(RiskVocabulary.GRAPH_QUALITY, diagnostics.graphQuality().name());
     importRun.addLiteral(RiskVocabulary.ISSUE_COUNT, diagnostics.issues().size());
     importRun.addLiteral(RiskVocabulary.COMPONENT_COUNT, diagnostics.componentCount());
-    importRun.addLiteral(
-        RiskVocabulary.DEPENDENCY_EDGE_COUNT, diagnostics.dependencyEdgeCount());
+    importRun.addLiteral(RiskVocabulary.DEPENDENCY_EDGE_COUNT, diagnostics.dependencyEdgeCount());
   }
 
   private List<Component> flattenedTopLevelComponents(Bom bom) {
     List<Component> all = analyzer.allComponents(bom);
-    Component root =
-        bom.getMetadata() == null ? null : bom.getMetadata().getComponent();
+    Component root = bom.getMetadata() == null ? null : bom.getMetadata().getComponent();
     return root == null ? all : all.subList(1, all.size());
   }
 

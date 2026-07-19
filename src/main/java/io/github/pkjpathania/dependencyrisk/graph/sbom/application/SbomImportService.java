@@ -1,5 +1,6 @@
 package io.github.pkjpathania.dependencyrisk.graph.sbom.application;
 
+import io.github.pkjpathania.dependencyrisk.graph.parser.assembler.CycloneDxJsonAssembler;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.CycloneDxReadResult;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.RdfImportContext;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.RdfMappingResult;
@@ -9,13 +10,13 @@ import io.github.pkjpathania.dependencyrisk.graph.sbom.domain.SbomImportResult;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.port.CycloneDxBomReader;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.port.CycloneDxRdfMapper;
 import io.github.pkjpathania.dependencyrisk.graph.sbom.port.RdfGraphStore;
+import io.github.pkjpathania.dependencyrisk.graph.vocabulary.RiskVocabulary;
 import io.github.pkjpathania.dependencyrisk.util.GenUtil;
 import java.time.Duration;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
-import org.cyclonedx.model.Component;
 import org.apache.jena.rdf.model.Resource;
-import io.github.pkjpathania.dependencyrisk.graph.vocabulary.RiskVocabulary;
+import org.cyclonedx.model.Component;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,16 +26,19 @@ public final class SbomImportService implements ImportSbomUseCase {
   private final CycloneDxRdfMapper rdfMapper;
   private final RdfGraphStore graphStore;
   private final ImportIdGenerator importIdGenerator;
+  private final CycloneDxJsonAssembler assembler;
 
   public SbomImportService(
       CycloneDxBomReader bomReader,
       CycloneDxRdfMapper rdfMapper,
       RdfGraphStore graphStore,
-      ImportIdGenerator importIdGenerator) {
+      ImportIdGenerator importIdGenerator,
+      CycloneDxJsonAssembler assembler) {
     this.bomReader = bomReader;
     this.rdfMapper = rdfMapper;
     this.graphStore = graphStore;
     this.importIdGenerator = importIdGenerator;
+    this.assembler = assembler;
   }
 
   @Override
@@ -71,7 +75,9 @@ public final class SbomImportService implements ImportSbomUseCase {
         importId,
         importId,
         importRun(mapping, importId).getURI(),
-        importRun(mapping, importId).getPropertyResourceValue(RiskVocabulary.ROOT_OCCURRENCE).getURI(),
+        importRun(mapping, importId)
+            .getPropertyResourceValue(RiskVocabulary.ROOT_OCCURRENCE)
+            .getURI(),
         root == null ? null : root.getName(),
         root == null ? null : root.getVersion(),
         readResult.declaredSpecVersion(),
@@ -82,8 +88,11 @@ public final class SbomImportService implements ImportSbomUseCase {
   }
 
   private Resource importRun(RdfMappingResult mapping, String importId) {
-    return mapping.model().listResourcesWithProperty(RiskVocabulary.IMPORT_ID, importId)
+    return mapping
+        .model()
+        .listResourcesWithProperty(RiskVocabulary.IMPORT_ID, importId)
         .nextOptional()
-        .orElseThrow(() -> new IllegalStateException("Mapped RDF has no ImportRun for " + importId));
+        .orElseThrow(
+            () -> new IllegalStateException("Mapped RDF has no ImportRun for " + importId));
   }
 }

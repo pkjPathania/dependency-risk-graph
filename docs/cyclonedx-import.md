@@ -4,7 +4,10 @@ The importer uses CycloneDX Core Java 12.2.0. `DefaultCycloneDxBomReader` reads 
 `bomFormat` and `specVersion` as a lightweight header, validates the document against its
 declared CycloneDX JSON schema, and then returns the official
 `org.cyclonedx.model.Bom`. The current version policy accepts CycloneDX JSON 1.2 through
-1.6. A future version is rejected instead of being parsed as the newest known schema.
+1.7. Because CycloneDX Core Java 12.2.0 does not yet bundle the 1.7 schema, 1.7 documents
+are validated against the 1.6-compatible structure the importer maps and the original 1.7
+document is then parsed. A future version is rejected instead of being parsed as the newest
+known schema.
 
 ## Identity and dependency semantics
 

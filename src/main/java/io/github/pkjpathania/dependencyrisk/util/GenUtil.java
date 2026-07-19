@@ -1,5 +1,6 @@
 package io.github.pkjpathania.dependencyrisk.util;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -26,5 +27,9 @@ public class GenUtil {
 
   public static String toJson(Object o) {
     return OM.writeValueAsString(o);
+  }
+
+  public static String prettyPrint(Object value) {
+    return OM.writerWithDefaultPrettyPrinter().writeValueAsString(value);
   }
 }

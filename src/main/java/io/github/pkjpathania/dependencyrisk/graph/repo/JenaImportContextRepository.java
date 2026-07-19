@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public final class JenaImportContextRepository implements ImportContextRepository {
   private static final String PREFIX =
-      "PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>\n";
+      "PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>\n";
   private final JenaGraphRepository repository;
 
   @Override

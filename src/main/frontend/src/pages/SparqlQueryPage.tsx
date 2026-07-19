@@ -36,7 +36,7 @@ const EXAMPLE_QUERIES = [
   },
   {
     label: 'Applications',
-    query: `PREFIX  risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+    query: `PREFIX  risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
 
 SELECT  ?application ?name ?version ?purl
 WHERE
@@ -51,7 +51,7 @@ WHERE
   },
   {
     label: 'Dependency edges',
-    query: `PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>
+    query: `PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
 
 SELECT ?source ?target
 WHERE {
@@ -186,7 +186,7 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
                   minRows={18}
                   fullWidth
                   spellCheck={false}
-                  placeholder="PREFIX risk: <urn:io.github.pkjpathania.dependencyrisk:schema:>"
+                  placeholder="PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>"
                   inputProps={{
                     style: {
                       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',

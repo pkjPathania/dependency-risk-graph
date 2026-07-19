@@ -6,7 +6,7 @@ import org.apache.jena.rdf.model.ResourceFactory;
 
 public final class RiskVocabulary {
 
-  private static final String URI = "urn:io.github.pkjpathania.dependencyrisk:schema:";
+  private static final String URI = "urn:io-github-pkjpathania:dependency-risk-graph:schema:";
 
   // Classes
 
@@ -69,6 +69,8 @@ public final class RiskVocabulary {
   public static final Property IMPORT_ID = property("importId");
 
   public static final Property ROOT_OCCURRENCE = property("rootOccurrence");
+
+  public static final Property TOP_LEVEL_OCCURRENCE = property("topLevelOccurrence");
 
   public static final Property BELONGS_TO_IMPORT = property("belongsToImport");
 
@@ -160,7 +162,6 @@ public final class RiskVocabulary {
   public static final Property BASE_SCORE = property("baseScore");
 
   public static final Property SEVERITY_LEVEL = property("severityLevel");
-
 
   private RiskVocabulary() {}
 
