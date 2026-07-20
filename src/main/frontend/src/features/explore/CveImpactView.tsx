@@ -34,6 +34,7 @@ import type {
   CveImpactScope,
   ImpactGraphNode
 } from '../../api/types';
+import { severityColors, type Severity } from '../../types/severity';
 import { fetchCveImpactDetail } from './exploreApi';
 import { CveImpactGraph } from './CveImpactGraph';
 import { ExploreEmptyState } from './ExploreEmptyState';
@@ -293,8 +294,14 @@ function ScopeSelect({ scope, onChange }: { scope: CveImpactScope; onChange: (sc
 
 function SeverityChip({ value }: { value: string | null }) {
   const severity = value?.trim().toUpperCase() || 'UNRATED';
-  const color = severity === 'CRITICAL' ? 'error' : severity === 'HIGH' ? 'warning' : severity === 'MODERATE' ? 'info' : severity === 'LOW' ? 'success' : 'default';
-  return <Chip size="small" label={severity} color={color} variant={severity === 'UNRATED' ? 'outlined' : 'filled'} />;
+  const tone = severityColors[toSeverityTone(severity)];
+  return <Chip size="small" label={severity} variant="outlined" sx={{ bgcolor: tone.light, color: tone.dark, borderColor: tone.main }} />;
+}
+
+function toSeverityTone(value: string): Severity {
+  if (value === 'CRITICAL' || value === 'HIGH' || value === 'LOW') return value;
+  if (value === 'MEDIUM' || value === 'MODERATE') return 'MEDIUM';
+  return 'UNKNOWN';
 }
 
 function ExternalReference({ value }: { value: string }) {

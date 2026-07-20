@@ -1,6 +1,7 @@
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import { Box, Card, CardContent, Chip, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import type { DependencyPathNode } from '../api/types';
+import { designTokens } from '../theme/designTokens';
 
 interface DependencyPathNodeCardProps {
   node: DependencyPathNode;
@@ -31,8 +32,8 @@ export function DependencyPathNodeCard({ node }: DependencyPathNodeCardProps) {
       sx={{
         width: '100%',
         borderLeft: '4px solid',
-        borderLeftColor: isApplication ? 'primary.main' : 'info.main',
-        backgroundColor: isApplication ? '#f8fbff' : '#f7fbfd',
+        borderLeftColor: isApplication ? designTokens.colors.navigation : designTokens.security.low,
+        backgroundColor: isApplication ? designTokens.colors.surfaceMuted : designTokens.colors.surface,
         borderRadius: 1.5
       }}
     >

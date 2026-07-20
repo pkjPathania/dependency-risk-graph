@@ -1,5 +1,6 @@
 import { MarkerType, type Edge, type Node } from '@xyflow/react';
 import type { ImpactGraph, ImpactGraphEdge, ImpactGraphNode } from '../../api/types';
+import { designTokens } from '../../theme/designTokens';
 
 export type ImpactGraphMode = 'simplified' | 'detailed';
 export type ImpactFlowNodeType = 'application' | 'dependency' | 'vulnerablePackage' | 'vulnerability' | 'fixedVersion';
@@ -148,10 +149,10 @@ function nodeType(type: ImpactGraphNode['nodeType']): ImpactFlowNodeType {
 }
 
 function edgeVisual(relationship: ImpactGraphEdge['relationship']) {
-  if (relationship === 'INSTANCE_OF') return { color: '#64748b', width: 1.8, dash: '7 5' };
-  if (relationship === 'AFFECTED_BY') return { color: '#d32f2f', width: 2.6, dash: undefined };
-  if (relationship === 'FIXED_IN') return { color: '#2e7d32', width: 2.6, dash: undefined };
-  return { color: '#2563eb', width: 2, dash: undefined };
+  if (relationship === 'INSTANCE_OF') return { color: designTokens.security.unknown, width: 1.8, dash: '7 5' };
+  if (relationship === 'AFFECTED_BY') return { color: designTokens.security.critical, width: 2.6, dash: undefined };
+  if (relationship === 'FIXED_IN') return { color: designTokens.security.safe, width: 2.6, dash: undefined };
+  return { color: designTokens.security.low, width: 2, dash: undefined };
 }
 
 function edgeId(source: string, relationship: ImpactGraphEdge['relationship'], target: string): string {

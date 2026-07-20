@@ -40,7 +40,7 @@
     <tag/>
     <url/>
   </scm>
-    <properties>
+  <properties>
     <java.version>21</java.version>
     <cyclonedx.version>12.2.0</cyclonedx.version>
     <commons-lang.version>3.20.0</commons-lang.version>
@@ -49,6 +49,7 @@
     <jena.version>6.1.0</jena.version>
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
     <jgrapht-core.version>1.5.3</jgrapht-core.version>
+    <langchain4j.version>1.17.2</langchain4j.version>
   </properties>
 
   <dependencies>
@@ -233,7 +234,9 @@
               <outputDirectory>${project.build.outputDirectory}</outputDirectory>
               <resources>
                 <resource>
-                  <directory>/private/tmp/dependency-risk-graph-frontend/generated-resources/frontend</directory>
+                  <directory>
+                    /private/tmp/dependency-risk-graph-frontend/generated-resources/frontend
+                  </directory>
                   <includes>
                     <include>static/**</include>
                   </includes>

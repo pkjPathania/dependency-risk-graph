@@ -5,7 +5,8 @@ export type NavigationId =
   | 'explorer'
   | 'vulnerabilityEnrichment'
   | 'sparql'
-  | 'dependencyPath';
+  | 'dependencyPath'
+  | 'aiWorkbench';
 
 export interface NavigationItem {
   id: NavigationId;
@@ -21,5 +22,6 @@ export const navigationItems: NavigationItem[] = [
     label: 'Vulnerability Enrichment'
   },
   { id: 'sparql', label: 'SPARQL' },
-  { id: 'dependencyPath', label: 'Dependency Path' }
+  { id: 'dependencyPath', label: 'Dependency Path' },
+  { id: 'aiWorkbench', label: 'AI Workbench' }
 ];

@@ -1,3 +1,5 @@
+import { designTokens } from '../theme/designTokens';
+
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
 
 export const severityColors: Record<
@@ -9,28 +11,28 @@ export const severityColors: Record<
   }
 > = {
   CRITICAL: {
-    main: '#d92d20',
-    light: '#fef3f2',
-    dark: '#912018'
+    main: designTokens.security.critical,
+    light: designTokens.securitySurface.critical,
+    dark: designTokens.securityDark.critical
   },
   HIGH: {
-    main: '#dc6803',
-    light: '#fff4e5',
-    dark: '#9a3412'
+    main: designTokens.security.high,
+    light: designTokens.securitySurface.high,
+    dark: designTokens.securityDark.high
   },
   MEDIUM: {
-    main: '#f59e0b',
-    light: '#fffbeb',
-    dark: '#b45309'
+    main: designTokens.security.medium,
+    light: designTokens.securitySurface.medium,
+    dark: designTokens.securityDark.medium
   },
   LOW: {
-    main: '#079455',
-    light: '#ecfdf3',
-    dark: '#05603a'
+    main: designTokens.security.low,
+    light: designTokens.securitySurface.low,
+    dark: designTokens.securityDark.low
   },
   UNKNOWN: {
-    main: '#667085',
-    light: '#f2f4f7',
-    dark: '#475467'
+    main: designTokens.security.unknown,
+    light: designTokens.securitySurface.unknown,
+    dark: designTokens.securityDark.unknown
   }
 };

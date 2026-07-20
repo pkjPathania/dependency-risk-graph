@@ -6,6 +6,7 @@ import { ExplorerPage } from './pages/ExplorerPage';
 import { VulnerabilityEnrichmentPage } from './pages/VulnerabilityEnrichmentPage';
 import { SparqlQueryPage } from './pages/SparqlQueryPage';
 import { DependencyPathPage } from './pages/DependencyPathPage';
+import { AiWorkbenchPage } from './pages/AiWorkbenchPage';
 import { DEFAULT_SPARQL_QUERY } from './features/sparql/prefixPresets';
 
 export default function App() {
@@ -40,6 +41,8 @@ export default function App() {
         return <SparqlQueryPage query={sparqlQuery} onQueryChange={setSparqlQuery} />;
       case 'dependencyPath':
         return <DependencyPathPage />;
+      case 'aiWorkbench':
+        return <AiWorkbenchPage />;
       default:
         return <DashboardPage onExploreApplication={handleExploreApplication} />;
     }

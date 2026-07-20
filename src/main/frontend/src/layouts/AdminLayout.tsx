@@ -4,12 +4,12 @@ import {
   Tab,
   Tabs,
   Toolbar,
-  Stack,
   useTheme
 } from '@mui/material';
 import type { ReactNode } from 'react';
+import { DependencyRiskGraphBrand } from '../components/branding/DependencyRiskGraphBrand';
 import { navigationItems, type NavigationId } from '../navigation/navigationItems';
-import logoImage from '../logo/img.png';
+import { designTokens } from '../theme/designTokens';
 
 interface AdminLayoutProps {
   selectedPageId: NavigationId;
@@ -25,16 +25,16 @@ export function AdminLayout({
   const theme = useTheme();
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: designTokens.colors.canvas }}>
       <AppBar
         position="sticky"
         color="default"
         sx={{
           zIndex: theme.zIndex.appBar,
           backdropFilter: 'blur(12px)',
-          backgroundColor: 'rgba(255, 255, 255, 0.84)',
+          backgroundColor: designTokens.colors.navigation,
           borderBottom: '1px solid',
-          borderColor: 'divider',
+          borderColor: designTokens.colors.navigationSelected,
           boxShadow: 'none'
         }}
       >
@@ -48,21 +48,7 @@ export function AdminLayout({
             flexWrap: 'wrap'
           }}
           >
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, flexWrap: 'wrap' }}>
-            <Box
-              component="img"
-              src={logoImage}
-              alt="Dependency Risk Graph"
-              sx={{
-                display: 'block',
-                width: { xs: 210, sm: 260, md: 300 },
-                maxWidth: '100%',
-                height: 'auto',
-                flexShrink: 0
-              }}
-            >
-            </Box>
-          </Stack>
+          <DependencyRiskGraphBrand onClick={() => onNavigationSelect('dashboard')} />
 
           <Box
             component="nav"
@@ -84,7 +70,7 @@ export function AdminLayout({
                 '& .MuiTabs-indicator': {
                   height: 3,
                   borderRadius: 999,
-                  backgroundColor: theme.palette.primary.dark
+                  backgroundColor: designTokens.colors.accent
                 }
               }}
             >
@@ -103,9 +89,10 @@ export function AdminLayout({
                     borderRadius: 999,
                     textTransform: 'none',
                     fontWeight: 700,
-                    color: 'text.primary',
+                    color: designTokens.colors.navigationTextMuted,
                     '&.Mui-selected': {
-                      color: 'primary.dark'
+                      color: designTokens.colors.white,
+                      backgroundColor: designTokens.colors.navigationSelected
                     }
                   }}
                 />
@@ -120,7 +107,8 @@ export function AdminLayout({
         sx={{
           pt: 3,
           px: { xs: 1.5, sm: 2.5, md: 3 },
-          pb: 3
+          pb: 3,
+          bgcolor: designTokens.colors.appShell
         }}
       >
         {children}

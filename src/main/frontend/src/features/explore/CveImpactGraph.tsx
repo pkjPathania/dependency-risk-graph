@@ -26,6 +26,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ImpactGraph, ImpactGraphNode } from '../../api/types';
+import { designTokens } from '../../theme/designTokens';
 import { layoutImpactGraph } from './cveImpactElkLayout';
 import {
   projectImpactGraph,
@@ -99,7 +100,23 @@ function CveImpactFlow({ graph, selectedExposureId, onSelectExposure, onSelectNo
     <Paper
       variant="outlined"
       aria-label="CVE impact graph"
-      sx={{ position: 'relative', overflow: 'hidden', bgcolor: 'background.default', height: { xs: 460, lg: 520 }, minHeight: 460, width: '100%' }}
+      sx={{
+        position: 'relative',
+        overflow: 'hidden',
+        bgcolor: designTokens.colors.surfaceMuted,
+        height: { xs: 460, lg: 520 },
+        minHeight: 460,
+        width: '100%',
+        '& .react-flow__controls-button': {
+          bgcolor: designTokens.colors.surface,
+          color: designTokens.colors.textPrimary,
+          borderColor: designTokens.colors.border
+        },
+        '& .react-flow__minimap': {
+          bgcolor: designTokens.colors.surface,
+          border: `1px solid ${designTokens.colors.border}`
+        }
+      }}
     >
       <Box sx={{ height: '100%', minHeight: 460, width: '100%' }}>
         <ReactFlow<ImpactFlowNode, ImpactFlowEdge>
@@ -122,7 +139,7 @@ function CveImpactFlow({ graph, selectedExposureId, onSelectExposure, onSelectNo
           maxZoom={2.5}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color={designTokens.colors.border} />
           <Controls position="bottom-right" showInteractive={false} />
           <MiniMap pannable zoomable nodeColor={miniMapColor} />
           <Panel position="top-right">
@@ -187,7 +204,7 @@ function ImpactNodeCard({ data, selected, tone, kind, target = false, source = f
   return (
     <Paper
       elevation={selected ? 8 : 2}
-      sx={{ width: 220, minHeight: 92, p: 1.25, border: 2, borderColor: selected ? 'text.primary' : colors.border, bgcolor: colors.background, borderRadius: tone === 'error' ? 3 : 2 }}
+      sx={{ width: 220, minHeight: 92, p: 1.25, border: 2, borderColor: selected ? designTokens.colors.accent : colors.border, bgcolor: colors.background, borderRadius: tone === 'error' ? 3 : 2 }}
     >
       {target ? <Handle type="target" position={Position.Left} style={{ background: colors.border }} /> : null}
       <Typography variant="overline" lineHeight={1} fontWeight={900} color="text.secondary">{kind}</Typography>
@@ -210,10 +227,10 @@ function SemanticEdge(props: EdgeProps<ImpactFlowEdge>) {
 
 function GraphLegend({ showIdentity }: { showIdentity: boolean }) {
   return <Paper variant="outlined" sx={{ p: 1 }}><Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-    <Legend label="DEPENDS_ON" color="#2563eb" />
-    {showIdentity ? <Legend label="INSTANCE_OF" color="#64748b" dashed /> : null}
-    <Legend label="AFFECTED_BY" color="#d32f2f" />
-    <Legend label="FIXED_IN" color="#2e7d32" />
+    <Legend label="DEPENDS_ON" color={designTokens.security.low} />
+    {showIdentity ? <Legend label="INSTANCE_OF" color={designTokens.security.unknown} dashed /> : null}
+    <Legend label="AFFECTED_BY" color={designTokens.security.critical} />
+    <Legend label="FIXED_IN" color={designTokens.security.safe} />
   </Stack></Paper>;
 }
 
@@ -222,17 +239,17 @@ function Legend({ label, color, dashed = false }: { label: string; color: string
 }
 
 function nodeColors(tone: 'primary' | 'warning' | 'error' | 'success' | 'neutral') {
-  if (tone === 'primary') return { border: 'primary.main', background: 'primary.light' };
-  if (tone === 'warning') return { border: 'warning.main', background: 'warning.light' };
-  if (tone === 'error') return { border: 'error.main', background: 'error.light' };
-  if (tone === 'success') return { border: 'success.main', background: 'success.light' };
-  return { border: 'divider', background: 'background.paper' };
+  if (tone === 'primary') return { border: designTokens.colors.navigation, background: designTokens.colors.surface };
+  if (tone === 'warning') return { border: designTokens.security.high, background: designTokens.securitySurface.high };
+  if (tone === 'error') return { border: designTokens.security.critical, background: designTokens.securitySurface.critical };
+  if (tone === 'success') return { border: designTokens.security.safe, background: designTokens.securitySurface.safe };
+  return { border: designTokens.colors.border, background: designTokens.colors.surface };
 }
 
 function miniMapColor(node: ImpactFlowNode): string {
-  if (node.type === 'vulnerability') return '#d32f2f';
-  if (node.type === 'fixedVersion') return '#2e7d32';
-  if (node.type === 'vulnerablePackage') return '#ed6c02';
-  if (node.type === 'application') return '#1976d2';
-  return '#64748b';
+  if (node.type === 'vulnerability') return designTokens.security.critical;
+  if (node.type === 'fixedVersion') return designTokens.security.safe;
+  if (node.type === 'vulnerablePackage') return designTokens.security.high;
+  if (node.type === 'application') return designTokens.colors.navigation;
+  return designTokens.security.unknown;
 }

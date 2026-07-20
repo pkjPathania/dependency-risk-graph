@@ -13,6 +13,8 @@ import {
   Typography
 } from '@mui/material';
 import { useId, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react';
+import { alpha } from '@mui/material/styles';
+import { designTokens } from '../../theme/designTokens';
 
 interface SbomUploadPanelProps {
   onUpload: (file: File) => Promise<void>;
@@ -73,7 +75,7 @@ export function SbomUploadPanel({
       sx={{
         height: '100%',
         overflow: 'hidden',
-        background: 'linear-gradient(145deg, #ffffff 0%, #f7faff 100%)'
+        background: `linear-gradient(145deg, ${designTokens.colors.surface} 0%, ${designTokens.colors.surfaceMuted} 100%)`
       }}
     >
       {loading ? <LinearProgress aria-label="Uploading SBOM" /> : null}
@@ -105,9 +107,13 @@ export function SbomUploadPanel({
                   p: 2.5,
                   textAlign: 'center',
                   border: '1.5px dashed',
-                  borderColor: isDragging ? 'primary.main' : selectedFile ? 'success.main' : 'divider',
+                  borderColor: isDragging ? designTokens.colors.accent : selectedFile ? 'success.main' : 'divider',
                   borderRadius: 2,
-                  bgcolor: isDragging ? 'primary.light' : selectedFile ? 'rgba(7, 148, 85, 0.04)' : '#fff',
+                  bgcolor: isDragging
+                    ? designTokens.colors.surfaceMuted
+                    : selectedFile
+                      ? alpha(designTokens.security.safe, 0.08)
+                      : designTokens.colors.white,
                   transition: 'background-color 160ms ease, border-color 160ms ease'
                 }}
               >
@@ -119,8 +125,10 @@ export function SbomUploadPanel({
                       width: 48,
                       height: 48,
                       borderRadius: '14px',
-                      color: selectedFile ? 'success.main' : 'primary.main',
-                      bgcolor: selectedFile ? 'rgba(7, 148, 85, 0.1)' : 'primary.light'
+                      color: selectedFile ? 'success.main' : designTokens.colors.navigation,
+                      bgcolor: selectedFile
+                        ? alpha(designTokens.security.safe, 0.16)
+                        : designTokens.colors.surfaceMuted
                     }}
                   >
                     {selectedFile ? <CheckCircleOutlineRoundedIcon /> : <UploadFileRoundedIcon />}

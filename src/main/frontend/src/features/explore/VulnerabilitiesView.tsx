@@ -32,6 +32,7 @@ import type {
   ApplicationVulnerabilityItem,
   FixedVersionView
 } from '../../api/types';
+import { severityColors, type Severity } from '../../types/severity';
 import { ExploreEmptyState } from './ExploreEmptyState';
 
 interface VulnerabilitiesViewProps {
@@ -282,12 +283,14 @@ function EllipsizedValue({ value }: { value: string | null }) {
 
 function SeverityChip({ value }: { value: string | null }) {
   const severity = normalizedSeverity(value);
-  const color =
-    severity === 'CRITICAL' ? 'error' :
-      severity === 'HIGH' ? 'warning' :
-        severity === 'MODERATE' ? 'info' :
-          severity === 'LOW' ? 'success' : 'default';
-  return <Chip size="small" label={severity} color={color} variant={severity === 'UNRATED' ? 'outlined' : 'filled'} />;
+  const tone = severityColors[toSeverityTone(severity)];
+  return <Chip size="small" label={severity} variant="outlined" sx={{ bgcolor: tone.light, color: tone.dark, borderColor: tone.main }} />;
+}
+
+function toSeverityTone(value: string): Severity {
+  if (value === 'CRITICAL' || value === 'HIGH' || value === 'LOW') return value;
+  if (value === 'MEDIUM' || value === 'MODERATE') return 'MEDIUM';
+  return 'UNKNOWN';
 }
 
 function CvssChips({ item }: { item: ApplicationVulnerabilityItem }) {
