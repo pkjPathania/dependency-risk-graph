@@ -9,9 +9,6 @@ import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import io.github.pkjpathania.dependencyrisk.vulnerability.exception.OsvDisabledException;
 import io.github.pkjpathania.dependencyrisk.vulnerability.exception.OsvSnapshotWriteException;
-import io.github.pkjpathania.dependencyrisk.graph.sbom.exception.CycloneDxMappingException;
-import io.github.pkjpathania.dependencyrisk.graph.sbom.exception.InvalidCycloneDxBomException;
-import io.github.pkjpathania.dependencyrisk.graph.sbom.exception.SbomPersistenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -52,29 +49,6 @@ public class GlobalExceptionHandler {
     return buildResponse(
         HttpStatus.BAD_REQUEST,
         "Bad Request",
-        exception.getMessage(),
-        detailsFor(exception),
-        request);
-  }
-
-  @ExceptionHandler(InvalidCycloneDxBomException.class)
-  public ResponseEntity<ApiErrorResponse> handleInvalidCycloneDx(
-      InvalidCycloneDxBomException exception, HttpServletRequest request) {
-    return buildResponse(
-        HttpStatus.BAD_REQUEST,
-        "Invalid CycloneDX BOM",
-        exception.getMessage(),
-        detailsFor(exception),
-        request);
-  }
-
-  @ExceptionHandler({CycloneDxMappingException.class, SbomPersistenceException.class})
-  public ResponseEntity<ApiErrorResponse> handleSbomImportFailure(
-      RuntimeException exception, HttpServletRequest request) {
-    log.error("SBOM import failed for {}", request.getRequestURI(), exception);
-    return buildResponse(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        "SBOM Import Failed",
         exception.getMessage(),
         detailsFor(exception),
         request);

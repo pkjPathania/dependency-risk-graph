@@ -1,7 +1,7 @@
 import type { GraphMetadata } from './types';
 import { readApiErrorMessage } from './httpError';
 
-const SBOM_RDF_UPLOAD_URL = '/api/v1/sboms/rdf';
+const SBOM_RDF_UPLOAD_URL = '/rdf/new';
 const GRAPH_METADATA_URL = '/api/v1/metadata';
 
 export async function uploadSbomAsRdf(file: File): Promise<GraphMetadata> {
@@ -30,8 +30,4 @@ export async function fetchGraphMetadata(): Promise<GraphMetadata> {
   }
 
   return (await response.json()) as GraphMetadata;
-}
-
-export function escapePercent(value: string): string {
-  return value.replaceAll('%', '%25');
 }

@@ -1,7 +1,7 @@
 import { Alert, Box, Button, Card, CardContent, Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ApplicationSummary, GraphMetadata } from '../api/types';
-import { fetchGraphMetadata, uploadSbomAsRdf, escapePercent } from '../api/sbomApi';
+import { fetchGraphMetadata, uploadSbomAsRdf } from '../api/sbomApi';
 import { RestCallProgress } from '../components/RestCallProgress';
 import { ExploreDataTable } from '../features/explore/ExploreDataTable';
 import { OverviewMetricCard } from '../features/explore/OverviewMetricCard';
@@ -147,7 +147,7 @@ export function DashboardPage({ onExploreApplication }: DashboardPageProps) {
 
       setGraphMetadata(metadata);
       await loadApplicationRows();
-      setSuccessMessage(`Uploaded ${escapePercent(file.name)} successfully.`);
+      setSuccessMessage(`Uploaded ${file.name} successfully.`);
       setRdfStatusMessage(
         `JSON-LD assembly completed. The graph now contains ${metadata.summary.applicationCount} applications, ${metadata.summary.packageCount} packages, and ${metadata.summary.dependencyEdgeCount} dependency edges.`
       );
@@ -167,40 +167,59 @@ export function DashboardPage({ onExploreApplication }: DashboardPageProps) {
   const isBusy = isLoadingMetadata || isUploading || applicationsLoading;
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2.5}>
       <RestCallProgress visible={isBusy} />
 
-      <SbomUploadPanel
-        onUpload={handleUpload}
-        loading={isUploading}
-        backendError={backendError}
-        successMessage={successMessage}
-        rdfStatusMessage={rdfStatusMessage}
-      />
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 2,
+          alignItems: 'stretch',
+          gridTemplateColumns: { xs: '1fr', lg: 'minmax(360px, 0.9fr) minmax(520px, 1.4fr)' }
+        }}
+      >
+        <SbomUploadPanel
+          onUpload={handleUpload}
+          loading={isUploading}
+          backendError={backendError}
+          successMessage={successMessage}
+          rdfStatusMessage={rdfStatusMessage}
+        />
+
+        <Card variant="outlined" sx={{ height: '100%' }}>
+          <CardContent sx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } } }}>
+            <Typography variant="h6" sx={{ fontWeight: 750, mb: 0.5 }}>
+              Graph snapshot
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Live totals from the RDF knowledge graph.
+            </Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 1.25,
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }
+              }}
+            >
+              {metrics.map((metric, index) => (
+                <Box
+                  key={metric.label}
+                  sx={index === metrics.length - 1 ? { gridColumn: { sm: '1 / -1' } } : undefined}
+                >
+                  <OverviewMetricCard
+                    label={metric.label}
+                    value={metric.value}
+                    caption={metric.caption}
+                    loading={isLoadingMetadata}
+                  />
+                </Box>
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
 
       {applicationsError ? <Alert severity="error">{applicationsError}</Alert> : null}
-
-      <Card variant="outlined">
-        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-          <Box
-            sx={{
-              display: 'grid',
-              gap: 1,
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(5, minmax(0, 1fr))' }
-            }}
-          >
-            {metrics.map((metric) => (
-              <OverviewMetricCard
-                key={metric.label}
-                label={metric.label}
-                value={metric.value}
-                caption={metric.caption}
-                loading={isLoadingMetadata}
-              />
-            ))}
-          </Box>
-        </CardContent>
-      </Card>
 
       <ExploreDataTable
         title="Applications"

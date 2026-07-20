@@ -1,16 +1,18 @@
-import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
+import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
 import {
   Alert,
   Box,
   Button,
   Card,
   CardContent,
+  Chip,
+  LinearProgress,
   Stack,
-  TextField,
   Typography
 } from '@mui/material';
-import { useId, useMemo, useState, type FormEvent } from 'react';
-import { RestCallProgress } from '../../components/RestCallProgress';
+import { useId, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react';
 
 interface SbomUploadPanelProps {
   onUpload: (file: File) => Promise<void>;
@@ -30,8 +32,23 @@ export function SbomUploadPanel({
   const fileInputId = useId();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const fileName = useMemo(() => selectedFile?.name ?? 'No file selected', [selectedFile]);
+  function selectFile(file: File | null) {
+    setSelectedFile(file);
+    setValidationError(null);
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    selectFile(event.target.files?.[0] ?? null);
+    event.target.value = '';
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    selectFile(event.dataTransfer.files?.[0] ?? null);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,70 +68,121 @@ export function SbomUploadPanel({
   }
 
   return (
-    <Card variant="outlined">
-      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-        <Stack spacing={1.25}>
-          <RestCallProgress visible={loading} />
-          <Box sx={{ display: 'grid', gap: 0.2 }}>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, fontSize: '0.68rem' }}
-            >
-              Upload SBOM
+    <Card
+      variant="outlined"
+      sx={{
+        height: '100%',
+        overflow: 'hidden',
+        background: 'linear-gradient(145deg, #ffffff 0%, #f7faff 100%)'
+      }}
+    >
+      {loading ? <LinearProgress aria-label="Uploading SBOM" /> : null}
+      <CardContent sx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } } }}>
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 750 }}>
+              Ingest a software bill of materials
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Add a CycloneDX JSON document to build or extend the dependency graph.
             </Typography>
           </Box>
 
           <Box component="form" onSubmit={handleSubmit}>
-            <Stack spacing={1}>
-              <TextField
-                id={fileInputId}
-                label="CycloneDX JSON file"
-                type="file"
-                inputProps={{ accept: '.json,application/json' }}
-                onChange={(event) => {
-                  const file = (event.target as HTMLInputElement).files?.[0] ?? null;
-                  setSelectedFile(file);
-                  setValidationError(null);
+            <Stack spacing={1.5}>
+              <Box
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setIsDragging(true);
                 }}
-                helperText={fileName}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                sx={{
+                  display: 'grid',
+                  placeItems: 'center',
+                  minHeight: 170,
+                  p: 2.5,
+                  textAlign: 'center',
+                  border: '1.5px dashed',
+                  borderColor: isDragging ? 'primary.main' : selectedFile ? 'success.main' : 'divider',
+                  borderRadius: 2,
+                  bgcolor: isDragging ? 'primary.light' : selectedFile ? 'rgba(7, 148, 85, 0.04)' : '#fff',
+                  transition: 'background-color 160ms ease, border-color 160ms ease'
+                }}
+              >
+                <Stack spacing={1.25} alignItems="center">
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      placeItems: 'center',
+                      width: 48,
+                      height: 48,
+                      borderRadius: '14px',
+                      color: selectedFile ? 'success.main' : 'primary.main',
+                      bgcolor: selectedFile ? 'rgba(7, 148, 85, 0.1)' : 'primary.light'
+                    }}
+                  >
+                    {selectedFile ? <CheckCircleOutlineRoundedIcon /> : <UploadFileRoundedIcon />}
+                  </Box>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 750 }}>
+                      {selectedFile ? 'SBOM ready to upload' : 'Drop your CycloneDX file here'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      JSON format · one file at a time
+                    </Typography>
+                  </Box>
+                  <Button
+                    component="label"
+                    htmlFor={fileInputId}
+                    variant="outlined"
+                    size="small"
+                    disabled={loading}
+                  >
+                    {selectedFile ? 'Choose another file' : 'Browse files'}
+                  </Button>
+                </Stack>
+              </Box>
+              <Box
+                component="input"
+                id={fileInputId}
+                type="file"
+                accept=".json,application/json"
+                onChange={handleFileChange}
+                sx={{ display: 'none' }}
               />
-              <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+
+              {selectedFile ? (
+                <Chip
+                  icon={<DescriptionOutlinedIcon />}
+                  label={`${selectedFile.name} · ${formatFileSize(selectedFile.size)}`}
+                  onDelete={loading ? undefined : () => selectFile(null)}
+                  sx={{ alignSelf: 'flex-start', maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden' } }}
+                />
+              ) : null}
+
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
                 <Button
                   type="submit"
                   variant="contained"
-                  startIcon={<UploadFileOutlinedIcon />}
-                  disabled={loading}
+                  startIcon={<UploadFileRoundedIcon />}
+                  disabled={loading || !selectedFile}
+                  sx={{ px: 2.5 }}
                 >
-                  {loading ? 'Uploading...' : 'Upload SBOM'}
+                  {loading ? 'Building graph…' : 'Ingest SBOM'}
                 </Button>
-                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 700 }}>
-                  Submit as multipart form data
+                <Typography variant="caption" color="text.secondary">
+                  Securely sent as multipart form data
                 </Typography>
               </Stack>
             </Stack>
           </Box>
 
-          {validationError ? (
-            <Alert severity="warning" sx={{ whiteSpace: 'pre-wrap' }}>
-              {validationError}
-            </Alert>
-          ) : null}
-          {backendError ? (
-            <Alert severity="error" sx={{ whiteSpace: 'pre-wrap' }}>
-              {backendError}
-            </Alert>
-          ) : null}
-          {successMessage ? (
-            <Alert severity="success" sx={{ whiteSpace: 'pre-wrap' }}>
-              {successMessage}
-            </Alert>
-          ) : null}
-          {rdfStatusMessage ? (
-            <Alert severity="info" sx={{ whiteSpace: 'pre-wrap' }}>
-              {rdfStatusMessage}
-            </Alert>
-          ) : null}
+          {validationError ? <Alert severity="warning">{validationError}</Alert> : null}
+          {backendError ? <Alert severity="error">{backendError}</Alert> : null}
+          {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
+          {rdfStatusMessage ? <Alert severity="info">{rdfStatusMessage}</Alert> : null}
         </Stack>
       </CardContent>
     </Card>
@@ -124,4 +192,16 @@ export function SbomUploadPanel({
 function looksLikeJson(file: File): boolean {
   const fileName = file.name.toLowerCase();
   return fileName.endsWith('.json') || file.type === 'application/json' || file.type === '';
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
