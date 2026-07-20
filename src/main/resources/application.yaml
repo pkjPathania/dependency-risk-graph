@@ -50,3 +50,163 @@ server:
 #      instanceOf:
 #        "[@id]": "risk:instanceOf"
 #        "[@type]": "@id"
+
+
+dependency-risk:
+  osv:
+    enabled: true
+    batch-size: 50
+    advisory-fetch-threads: 8
+    output-directory: src/main/resources/osv
+    max-attempts: 3
+    connect-timeout: 10s
+    read-timeout: 45s
+    retry:
+      initial-delay: 1s
+      max-delay: 10s
+
+  json-ld:
+    cyclone-dx-context:
+      context:
+        risk: "urn:io-github-pkjpathania:dependency-risk-graph:schema:"
+
+        Application: "risk:Application"
+        PackageVersion: "risk:PackageVersion"
+
+        name: "risk:name"
+        group: "risk:group"
+        version: "risk:version"
+        purl: "risk:purl"
+        bomRef: "risk:bomRef"
+        componentType: "risk:componentType"
+
+        rootOccurrence:
+          "[@id]": "risk:rootOccurrence"
+          "[@type]": "@id"
+
+        belongsToImport:
+          "[@id]": "risk:belongsToImport"
+          "[@type]": "@id"
+
+        dependsOn:
+          "[@id]": "risk:dependsOn"
+          "[@type]": "@id"
+
+        instanceOf:
+          "[@id]": "risk:instanceOf"
+          "[@type]": "@id"
+
+    osv-context:
+      context:
+        risk: "urn:io-github-pkjpathania:dependency-risk-graph:schema:"
+        xsd: "http://www.w3.org/2001/XMLSchema#"
+
+        # Classes
+        Vulnerability: "risk:Vulnerability"
+        VulnerabilityReference: "risk:VulnerabilityReference"
+        SeverityAssessment: "risk:SeverityAssessment"
+        AffectedPackage: "risk:AffectedPackage"
+        VersionRange: "risk:VersionRange"
+        RangeEvent: "risk:RangeEvent"
+        PackageVersion: "risk:PackageVersion"
+
+        # Package → vulnerability
+        affectedBy:
+          "[@id]": "risk:affectedBy"
+          "[@type]": "@id"
+
+        # Vulnerability scalar data
+        osvId: "risk:osvId"
+        summary: "risk:summary"
+        details: "risk:details"
+        alias: "risk:alias"
+        relatedId: "risk:relatedId"
+        upstreamId: "risk:upstreamId"
+        schemaVersion: "risk:schemaVersion"
+
+        publishedAt:
+          "[@id]": "risk:publishedAt"
+          "[@type]": "xsd:dateTime"
+
+        modifiedAt:
+          "[@id]": "risk:modifiedAt"
+          "[@type]": "xsd:dateTime"
+
+        withdrawnAt:
+          "[@id]": "risk:withdrawnAt"
+          "[@type]": "xsd:dateTime"
+
+        # References
+        hasReference:
+          "[@id]": "risk:hasReference"
+          "[@type]": "@id"
+
+        referenceType: "risk:referenceType"
+
+        referenceUrl:
+          "[@id]": "risk:referenceUrl"
+          "[@type]": "@id"
+
+        # Severity
+        hasSeverity:
+          "[@id]": "risk:hasSeverity"
+          "[@type]": "@id"
+
+        severityType: "risk:severityType"
+        severityScore: "risk:severityScore"
+
+        # Affected package information
+        hasAffectedPackage:
+          "[@id]": "risk:hasAffectedPackage"
+          "[@type]": "@id"
+
+        affectedPackageName: "risk:affectedPackageName"
+        affectedPackagePurl: "risk:affectedPackagePurl"
+        ecosystem: "risk:ecosystem"
+        affectedVersion: "risk:affectedVersion"
+
+        # Version ranges
+        hasRange:
+          "[@id]": "risk:hasRange"
+          "[@type]": "@id"
+
+        rangeType: "risk:rangeType"
+
+        repositoryUrl:
+          "[@id]": "risk:repositoryUrl"
+          "[@type]": "@id"
+
+        # Range events
+        hasEvent:
+          "[@id]": "risk:hasEvent"
+          "[@type]": "@id"
+
+        introducedVersion: "risk:introducedVersion"
+        fixedVersion: "risk:fixedVersion"
+        lastAffectedVersion: "risk:lastAffectedVersion"
+        limitVersion: "risk:limitVersion"
+
+        # Remediation
+        fixedIn:
+          "[@id]": "risk:fixedIn"
+          "[@type]": "@id"
+
+        # Database-specific metadata
+        databaseSeverity: "risk:databaseSeverity"
+        cweId: "risk:cweId"
+
+        nvdPublishedAt:
+          "[@id]": "risk:nvdPublishedAt"
+          "[@type]": "xsd:dateTime"
+
+        githubReviewedAt:
+          "[@id]": "risk:githubReviewedAt"
+          "[@type]": "xsd:dateTime"
+
+        githubReviewed:
+          "[@id]": "risk:githubReviewed"
+          "[@type]": "xsd:boolean"
+
+        sourceUrl:
+          "[@id]": "risk:sourceUrl"
+          "[@type]": "@id"

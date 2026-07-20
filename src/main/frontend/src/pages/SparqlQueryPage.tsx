@@ -40,7 +40,7 @@ const EXAMPLE_QUERIES = [
 
 SELECT  ?application ?name ?version ?purl
 WHERE
-  { ?application  a  risk:Application
+  { ?application  a  risk:ApplicationOccurrence
     OPTIONAL
       { ?application  risk:name  ?name }
     OPTIONAL

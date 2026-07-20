@@ -288,3 +288,9 @@ export interface ApplicationVulnerabilityScanResponse {
   durationMs: number;
   findings: ApplicationVulnerabilityRow[];
 }
+
+export interface OsvStoreResult {
+  parsed: number;
+  added: number;
+  total: number;
+}

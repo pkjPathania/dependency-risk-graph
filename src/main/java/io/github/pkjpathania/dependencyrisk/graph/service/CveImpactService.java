@@ -8,6 +8,9 @@ import io.github.pkjpathania.dependencyrisk.graph.model.CvssAssessmentView;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyPathNode;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyPathResult;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyPathStatus;
+import io.github.pkjpathania.dependencyrisk.graph.model.DependencyGraphSnapshot;
+import io.github.pkjpathania.dependencyrisk.graph.model.DependencyNode;
+import io.github.pkjpathania.dependencyrisk.graph.model.DependencyVertex;
 import io.github.pkjpathania.dependencyrisk.graph.model.ImportContext;
 import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactStatus;
 import io.github.pkjpathania.dependencyrisk.graph.model.ExposurePath;
@@ -36,6 +39,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.query.ParameterizedSparqlString;
 import org.apache.jena.query.QuerySolution;
+import org.jgrapht.GraphPath;
+import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -143,6 +148,11 @@ public class CveImpactService {
     String exposureId = target.application.iri() + "\u0000" + target.vulnerablePackage.iri();
     try {
       ImportContext importContext = target.importContext();
+      if (importContext == null
+          || StringUtils.isAnyBlank(
+              importContext.importId(), importContext.importRunIri(), importContext.rootOccurrenceIri())) {
+        return resolveOccurrenceExposure(exposureId, target, vulnerabilityIri);
+      }
       DependencyPathResult result =
           dependencyPathResolver.resolve(importContext, target.vulnerablePackage.iri());
       if (result.status() != DependencyPathStatus.PATH_RESOLVED) {
@@ -187,6 +197,51 @@ public class CveImpactService {
           exception.getMessage());
       return unavailableExposure(exposureId, target, vulnerabilityIri);
     }
+  }
+
+  private ExposurePath resolveOccurrenceExposure(
+      String exposureId, ExposureTarget target, String vulnerabilityIri) {
+    DependencyGraphSnapshot snapshot = repository.build();
+    GraphPath<DependencyVertex, ?> graphPath =
+        DijkstraShortestPath.findPathBetween(
+            snapshot.graph(),
+            new DependencyVertex(target.application.iri()),
+            new DependencyVertex(target.vulnerablePackage.iri()));
+    if (graphPath == null) {
+      return unavailableExposure(exposureId, target, vulnerabilityIri);
+    }
+
+    List<DependencyVertex> vertices = graphPath.getVertexList();
+    List<PathNodeView> path = new ArrayList<>();
+    for (DependencyVertex vertex : vertices) {
+      DependencyNode metadata = snapshot.metadata().get(vertex);
+      path.add(
+          new PathNodeView(
+              vertex.iri(),
+              metadata == null ? vertex.iri() : metadata.label(),
+              metadata == null ? null : metadata.version(),
+              metadata == null ? null : metadata.purl(),
+              vertex.iri().equals(target.application.iri()) ? "APPLICATION" : "PACKAGE_OCCURRENCE"));
+    }
+    path.add(new PathNodeView(vulnerabilityIri, null, null, null, "VULNERABILITY"));
+
+    List<String> edgeIds = new ArrayList<>();
+    for (int index = 0; index < vertices.size() - 1; index++) {
+      edgeIds.add(edgeId(vertices.get(index).iri(), "DEPENDS_ON", vertices.get(index + 1).iri()));
+    }
+    edgeIds.add(edgeId(target.vulnerablePackage.iri(), "AFFECTED_BY", vulnerabilityIri));
+
+    int dependencyHops = graphPath.getLength();
+    return new ExposurePath(
+        exposureId,
+        target.application,
+        target.vulnerablePackage,
+        dependencyHops == 1 ? "DIRECT" : "TRANSITIVE",
+        dependencyHops,
+        CveImpactStatus.AFFECTED_PATH_RESOLVED.name(),
+        path,
+        path.stream().map(PathNodeView::iri).toList(),
+        edgeIds);
   }
 
   private ExposurePath unavailableExposure(
@@ -389,7 +444,9 @@ public class CveImpactService {
     NodeRole target = nodeRoles.get(edge.target());
     boolean valid =
         switch (edge.relationship()) {
-          case DEPENDS_ON -> source == NodeRole.OCCURRENCE && target == NodeRole.OCCURRENCE;
+          case DEPENDS_ON ->
+              source == NodeRole.OCCURRENCE
+                  && (target == NodeRole.OCCURRENCE || target == NodeRole.PACKAGE_VERSION);
           case INSTANCE_OF ->
               source == NodeRole.OCCURRENCE && target == NodeRole.PACKAGE_VERSION;
           case AFFECTED_BY ->
@@ -451,7 +508,7 @@ public class CveImpactService {
     add(item.applicationNames, literalValue(solution, "applicationName"));
     add(item.packageIris, resourceIri(solution, "package"));
     add(item.packageNames, literalValue(solution, "packageName"));
-    add(item.referenceUrls, literalValue(solution, "referenceUrl"));
+    add(item.referenceUrls, nodeValue(solution, "referenceUrl"));
   }
 
   private Scope validateScope(String value, String applicationIri) {
@@ -487,6 +544,15 @@ public class CveImpactService {
     return solution.contains(variable) && solution.get(variable).isLiteral()
         ? StringUtils.trimToNull(solution.getLiteral(variable).getString())
         : null;
+  }
+
+  private static String nodeValue(QuerySolution solution, String variable) {
+    if (!solution.contains(variable) || solution.get(variable) == null) {
+      return null;
+    }
+    return solution.get(variable).isLiteral()
+        ? StringUtils.trimToNull(solution.getLiteral(variable).getString())
+        : StringUtils.trimToNull(solution.get(variable).toString());
   }
 
   private static Instant instantValue(QuerySolution solution, String variable) {
@@ -597,7 +663,7 @@ public class CveImpactService {
       publishedAt = first(publishedAt, instantValue(solution, "publishedAt"));
       modifiedAt = first(modifiedAt, instantValue(solution, "modifiedAt"));
       add(aliases, literalValue(solution, "alias"));
-      add(referenceUrls, literalValue(solution, "referenceUrl"));
+      add(referenceUrls, nodeValue(solution, "referenceUrl"));
       String vector = literalValue(solution, "vector");
       if (vector != null) {
         cvssAssessments.add(
@@ -688,13 +754,23 @@ public class CveImpactService {
           ?vulnerability ?osvId ?alias ?summary ?severityLevel
           ?application ?applicationName ?importRun ?rootOccurrence ?occurrence ?package ?packageName ?installedVersion ?referenceUrl
       WHERE {
-          ?application a risk:Application ; rdfs:label ?applicationName ; risk:activeImport ?importRun .
           #SCOPE#
-          ?importRun risk:rootOccurrence ?rootOccurrence .
-          ?rootOccurrence risk:belongsToImport ?importRun .
-          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
-          ?package a risk:PackageVersion ; rdfs:label ?packageName ;
-                   risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
+          {
+              ?application a risk:ApplicationOccurrence ; risk:name ?applicationName ;
+                           risk:dependsOn+ ?package .
+              ?package risk:name ?packageName ; risk:affectedBy ?vulnerability .
+              OPTIONAL { ?package risk:version ?installedVersion . }
+          }
+          UNION
+          {
+              ?application a risk:Application ; rdfs:label ?applicationName ;
+                           risk:activeImport ?importRun .
+              ?importRun risk:rootOccurrence ?rootOccurrence .
+              ?rootOccurrence risk:belongsToImport ?importRun .
+              ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
+              ?package a risk:PackageVersion ; rdfs:label ?packageName ;
+                       risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
+          }
           ?vulnerability a risk:Vulnerability ; risk:osvId ?osvId .
           OPTIONAL { ?vulnerability risk:alias ?alias . }
           OPTIONAL { ?vulnerability risk:summary ?summary . }
@@ -704,7 +780,11 @@ public class CveImpactService {
               ?severityAssessment risk:severityLevel ?assessmentSeverity .
           }
           BIND(COALESCE(?vulnerabilitySeverity, ?assessmentSeverity) AS ?severityLevel)
-          OPTIONAL { ?vulnerability risk:referenceUrl ?referenceUrl . }
+          OPTIONAL {
+              { ?vulnerability risk:hasReference/risk:referenceUrl ?referenceUrl . }
+              UNION
+              { ?vulnerability risk:referenceUrl ?referenceUrl . }
+          }
       }
       ORDER BY LCASE(STR(?osvId)) LCASE(STR(?applicationName)) LCASE(STR(?packageName))
       """;
@@ -715,14 +795,25 @@ public class CveImpactService {
                       ?importRun ?importId ?rootOccurrence ?package ?packageName ?installedVersion ?installedPurl
       WHERE {
           VALUES ?vulnerability { ?vulnerabilityValue }
-          ?application a risk:Application ; rdfs:label ?applicationName ; risk:activeImport ?importRun .
           #SCOPE#
-          OPTIONAL { ?application risk:version ?applicationVersion . }
-          ?importRun risk:importId ?importId ; risk:rootOccurrence ?rootOccurrence .
-          ?rootOccurrence risk:belongsToImport ?importRun .
-          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
-          ?package a risk:PackageVersion ; rdfs:label ?packageName ;
-                   risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
+          {
+              ?application a risk:ApplicationOccurrence ; risk:name ?applicationName ;
+                           risk:dependsOn+ ?package .
+              ?package risk:name ?packageName ; risk:affectedBy ?vulnerability .
+              OPTIONAL { ?application risk:version ?applicationVersion . }
+              OPTIONAL { ?package risk:version ?installedVersion . }
+          }
+          UNION
+          {
+              ?application a risk:Application ; rdfs:label ?applicationName ;
+                           risk:activeImport ?importRun .
+              OPTIONAL { ?application risk:version ?applicationVersion . }
+              ?importRun risk:importId ?importId ; risk:rootOccurrence ?rootOccurrence .
+              ?rootOccurrence risk:belongsToImport ?importRun .
+              ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
+              ?package a risk:PackageVersion ; rdfs:label ?packageName ;
+                       risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
+          }
           OPTIONAL { ?package risk:purl ?installedPurl . }
       }
       ORDER BY LCASE(STR(?applicationName)) LCASE(STR(?packageName)) STR(?installedVersion)
@@ -747,18 +838,39 @@ public class CveImpactService {
           BIND(COALESCE(?vulnerabilitySeverity, ?assessmentSeverity) AS ?severityLevel)
           OPTIONAL { ?vulnerability risk:publishedAt ?publishedAt . }
           OPTIONAL { ?vulnerability risk:modifiedAt ?modifiedAt . }
-          OPTIONAL { ?vulnerability risk:referenceUrl ?referenceUrl . }
           OPTIONAL {
-              ?vulnerability risk:hasSeverity ?assessment .
-              ?assessment a risk:CvssAssessment ; risk:vector ?vector .
-              OPTIONAL { ?assessment risk:cvssType ?cvssType . }
-              OPTIONAL { ?assessment risk:cvssVersion ?cvssVersion . }
+              { ?vulnerability risk:hasReference/risk:referenceUrl ?referenceUrl . }
+              UNION
+              { ?vulnerability risk:referenceUrl ?referenceUrl . }
           }
           OPTIONAL {
-              ?vulnerability risk:fixedIn ?fixedPackage .
-              ?fixedPackage a risk:PackageVersion ; risk:version ?fixedVersion .
-              OPTIONAL { ?fixedPackage rdfs:label ?fixedPackageName . }
-              OPTIONAL { ?fixedPackage risk:purl ?fixedPurl . }
+              ?vulnerability risk:hasSeverity ?assessment .
+              {
+                  ?assessment a risk:SeverityAssessment ; risk:severityScore ?vector .
+                  OPTIONAL { ?assessment risk:severityType ?cvssType . }
+              }
+              UNION
+              {
+                  ?assessment a risk:CvssAssessment ; risk:vector ?vector .
+                  OPTIONAL { ?assessment risk:cvssType ?cvssType . }
+                  OPTIONAL { ?assessment risk:cvssVersion ?cvssVersion . }
+              }
+          }
+          OPTIONAL {
+              {
+                  ?vulnerability risk:hasAffectedPackage ?affectedPackage .
+                  ?affectedPackage risk:hasRange/risk:hasEvent ?fixedPackage .
+                  ?fixedPackage risk:fixedVersion ?fixedVersion .
+                  OPTIONAL { ?affectedPackage risk:affectedPackageName ?fixedPackageName . }
+                  OPTIONAL { ?affectedPackage risk:affectedPackagePurl ?fixedPurl . }
+              }
+              UNION
+              {
+                  ?vulnerability risk:fixedIn ?fixedPackage .
+                  ?fixedPackage a risk:PackageVersion ; risk:version ?fixedVersion .
+                  OPTIONAL { ?fixedPackage rdfs:label ?fixedPackageName . }
+                  OPTIONAL { ?fixedPackage risk:purl ?fixedPurl . }
+              }
           }
       }
       """;

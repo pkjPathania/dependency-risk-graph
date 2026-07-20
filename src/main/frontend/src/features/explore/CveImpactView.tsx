@@ -25,10 +25,9 @@ import {
   TableRow,
   Tabs,
   TextField,
-  Tooltip,
   Typography
 } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type {
   CveImpactDetailResponse,
   CveImpactListResponse,
@@ -257,13 +256,17 @@ function ImpactDetail({
           {detail.exposures.map((exposure) => <TableRow key={exposure.exposureId} selected={selectedExposureId === exposure.exposureId}>
             <TableCell>{exposure.application.name}</TableCell><TableCell>{exposure.vulnerablePackage.name}</TableCell>
             <TableCell>{exposure.vulnerablePackage.version || '—'}</TableCell><TableCell><Chip size="small" variant="outlined" label={exposure.dependencyType} /></TableCell>
-            <TableCell align="right">{exposure.pathStatus === 'AVAILABLE' ? exposure.dependencyHops : '—'}</TableCell>
-            <TableCell align="right"><Button size="small" disabled={exposure.pathStatus !== 'AVAILABLE'} onClick={() => setSelectedExposureId(exposure.exposureId)}>View path</Button></TableCell>
+            <TableCell align="right">{isResolvedPath(exposure.pathStatus) ? exposure.dependencyHops : '—'}</TableCell>
+            <TableCell align="right"><Button size="small" disabled={!isResolvedPath(exposure.pathStatus)} onClick={() => setSelectedExposureId(exposure.exposureId)}>View path</Button></TableCell>
           </TableRow>)}
         </TableBody></Table></TableContainer>
       </Paper>
     </Stack>
   );
+}
+
+function isResolvedPath(status: string): boolean {
+  return status === 'AFFECTED_PATH_RESOLVED' || status === 'AVAILABLE';
 }
 
 function ImpactDetailsPanel({ detail, selectedNode, tab, onTabChange }: { detail: CveImpactDetailResponse; selectedNode: ImpactGraphNode | null; tab: number; onTabChange: (value: number) => void }) {
@@ -272,7 +275,8 @@ function ImpactDetailsPanel({ detail, selectedNode, tab, onTabChange }: { detail
     <Tabs value={tab} onChange={(_, value: number) => onTabChange(value)} variant="fullWidth"><Tab label="Details" /><Tab label="CVSS" /><Tab label="References" /></Tabs>
     <Divider sx={{ mb: 1.5 }} />
     {tab === 0 ? <Stack spacing={1.5}>
-      <Detail label="Summary" value={detail.vulnerability.summary} /><Detail label="Advisory details" value={detail.vulnerability.details} pre />
+      <Detail label="Summary" value={detail.vulnerability.summary} />
+      <AdvisoryDetails value={detail.vulnerability.details} />
       <Detail label="Severity" value={detail.vulnerability.severityLevel || 'UNRATED'} /><Detail label="Published" value={formatDate(detail.vulnerability.publishedAt)} />
       <Detail label="Modified" value={formatDate(detail.vulnerability.modifiedAt)} />
       <Detail label="Affected package versions" value={distinctPackageVersions(detail).join('\n')} pre />
@@ -297,10 +301,56 @@ function ExternalReference({ value }: { value: string }) {
   try {
     const url = new URL(value);
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Unsupported URL');
-    return <Tooltip title={value} placement="left"><Link href={value} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'flex', gap: 0.5, alignItems: 'center', overflowWrap: 'anywhere' }}>{referenceLabel(value)}<LaunchOutlinedIcon fontSize="inherit" /></Link></Tooltip>;
+    return <Paper variant="outlined" sx={{ p: 1 }}>
+      <Link href={value} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'flex', gap: 0.5, alignItems: 'center', fontWeight: 800 }}>
+        {referenceLabel(value)}<LaunchOutlinedIcon fontSize="inherit" />
+      </Link>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, overflowWrap: 'anywhere' }}>{value}</Typography>
+    </Paper>;
   } catch {
     return <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>{value}</Typography>;
   }
+}
+
+function AdvisoryDetails({ value }: { value: string | null }) {
+  if (!value?.trim()) return <Detail label="Advisory details" value={null} />;
+  return <Box>
+    <Typography variant="overline" fontWeight={900}>Advisory details</Typography>
+    <Stack spacing={0.75} sx={{ mt: 0.25 }}>
+      {value.split(/\r?\n/).map((line, index) => {
+        const heading = line.match(/^(#{1,6})\s+(.+)$/);
+        if (heading) {
+          return <Typography key={index} variant={heading[1].length <= 2 ? 'subtitle1' : 'subtitle2'} fontWeight={900} sx={{ pt: index ? 0.75 : 0 }}>
+            {renderInlineContent(heading[2])}
+          </Typography>;
+        }
+        const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+        if (bullet) {
+          return <Stack key={index} direction="row" spacing={0.75} alignItems="flex-start">
+            <Typography component="span" aria-hidden>•</Typography>
+            <Typography variant="body2" sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>{renderInlineContent(bullet[1])}</Typography>
+          </Stack>;
+        }
+        if (!line.trim()) return <Box key={index} sx={{ height: 4 }} />;
+        return <Typography key={index} variant="body2" sx={{ overflowWrap: 'anywhere' }}>{renderInlineContent(line)}</Typography>;
+      })}
+    </Stack>
+  </Box>;
+}
+
+function renderInlineContent(value: string): ReactNode[] {
+  const content: ReactNode[] = [];
+  const pattern = /\[([^\]]+)]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<]+)/g;
+  let cursor = 0;
+  for (const match of value.matchAll(pattern)) {
+    const offset = match.index ?? 0;
+    if (offset > cursor) content.push(value.slice(cursor, offset));
+    const url = match[2] ?? match[3];
+    content.push(<Link key={`${offset}:${url}`} href={url} target="_blank" rel="noopener noreferrer" sx={{ overflowWrap: 'anywhere' }}>{match[1] ?? url}</Link>);
+    cursor = offset + match[0].length;
+  }
+  if (cursor < value.length) content.push(value.slice(cursor));
+  return content;
 }
 
 function Detail({ label, value, pre = false }: { label: string; value: string | null; pre?: boolean }) {

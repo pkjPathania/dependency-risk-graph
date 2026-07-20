@@ -10,6 +10,7 @@ import io.github.pkjpathania.dependencyrisk.graph.model.GraphSummary;
 import io.github.pkjpathania.dependencyrisk.graph.model.SparqlSelectResponse;
 import io.github.pkjpathania.dependencyrisk.graph.util.SparqlUtil;
 import io.github.pkjpathania.dependencyrisk.graph.vocabulary.RiskVocabulary;
+import io.github.pkjpathania.dependencyrisk.vulnerability.model.OsvStoreResult;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -38,6 +39,7 @@ import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFFormat;
+import org.apache.jena.system.Txn;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
 import org.jgrapht.Graph;
@@ -289,5 +291,23 @@ public class JenaGraphRepository {
     }
 
     return node.asLiteral().getBoolean();
+  }
+
+  public OsvStoreResult store(Model incomingModel) {
+    long parsedTriples = incomingModel.size();
+
+    return Txn.calculateWrite(
+        dataset,
+        () -> {
+          Model defaultModel = dataset.getDefaultModel();
+
+          long before = defaultModel.size();
+
+          defaultModel.add(incomingModel);
+
+          long after = defaultModel.size();
+
+          return new OsvStoreResult(parsedTriples, after - before, after);
+        });
   }
 }

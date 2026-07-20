@@ -52,10 +52,24 @@ describe('CveImpactView', () => {
     await userEvent.click(screen.getByText('CVE-2026-1000'));
     await screen.findByLabelText('CVE impact graph');
     await userEvent.click(screen.getByRole('tab', { name: 'References' }));
-    const link = screen.getByRole('link', { name: 'https://nvd.nist.gov/vuln/detail/CVE-2026-1000' });
+    const link = screen.getByRole('link', { name: 'NVD' });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByText('https://nvd.nist.gov/vuln/detail/CVE-2026-1000')).toBeInTheDocument();
     expect(screen.getByText('not a url')).toBeInTheDocument();
+  });
+
+  it('renders advisory markdown headings and URLs as UI content', async () => {
+    renderView();
+    await userEvent.click(screen.getByText('CVE-2026-1000'));
+    await screen.findByLabelText('CVE impact graph');
+
+    expect(screen.getByText('Impact')).toBeInTheDocument();
+    expect(screen.queryByText('## Impact')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'upstream advisory' })).toHaveAttribute(
+      'href',
+      'https://example.test/advisory'
+    );
   });
 
   it('shows the enrichment action for an empty response', async () => {
@@ -106,7 +120,7 @@ function listItem(overrides: Partial<CveImpactListResponse['items'][number]> = {
 function detailResponse(): CveImpactDetailResponse {
   const vulnerability = {
     iri: 'urn:test:vulnerability', preferredIdentifier: 'CVE-2026-1000', osvId: 'GHSA-IMPACT', aliases: ['CVE-2026-1000'],
-    summary: 'Shared vulnerability', details: 'Details', severityLevel: 'HIGH', publishedAt: null, modifiedAt: null,
+    summary: 'Shared vulnerability', details: '## Impact\nSee [upstream advisory](https://example.test/advisory)', severityLevel: 'HIGH', publishedAt: null, modifiedAt: null,
     affectedApplicationCount: 2, affectedPackageVersionCount: 2
   };
   const exposures = ['Orders', 'Analytics'].map((name, index) => ({

@@ -1,6 +1,6 @@
 package io.github.pkjpathania.dependencyrisk.graph.parser.assembler;
 
-import io.github.pkjpathania.dependencyrisk.graph.parser.config.JsonLdProperties;
+import io.github.pkjpathania.dependencyrisk.graph.parser.config.CycloneDxGraphProperties;
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.jena.rdf.model.Model;
@@ -20,7 +20,7 @@ public class CycloneDxJsonAssembler extends CycloneDxJsonLdAssembler {
   private final JenaGraphRepository repository;
 
   public CycloneDxJsonAssembler(
-      JenaGraphRepository repository, ObjectMapper objectMapper, JsonLdProperties properties) {
+      JenaGraphRepository repository, ObjectMapper objectMapper, CycloneDxGraphProperties properties) {
     super(objectMapper, properties);
     this.repository = repository;
   }

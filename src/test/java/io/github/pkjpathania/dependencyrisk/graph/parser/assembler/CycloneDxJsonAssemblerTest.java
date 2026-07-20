@@ -2,7 +2,7 @@ package io.github.pkjpathania.dependencyrisk.graph.parser.assembler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.github.pkjpathania.dependencyrisk.graph.parser.config.JsonLdProperties;
+import io.github.pkjpathania.dependencyrisk.graph.parser.config.CycloneDxGraphProperties;
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
 import io.github.pkjpathania.dependencyrisk.graph.service.SparqlService;
 import java.nio.charset.StandardCharsets;
@@ -18,8 +18,8 @@ class CycloneDxJsonAssemblerTest {
     ObjectMapper objectMapper = new ObjectMapper();
     JenaGraphRepository repository =
         new JenaGraphRepository(DatasetFactory.createTxnMem(), objectMapper);
-    JsonLdProperties properties =
-        new JsonLdProperties(
+    CycloneDxGraphProperties properties =
+        new CycloneDxGraphProperties(
             Map.of(
                 "risk", "urn:io-github-pkjpathania:dependency-risk-graph:schema:",
                 "name", "risk:name",

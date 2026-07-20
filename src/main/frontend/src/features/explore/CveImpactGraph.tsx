@@ -73,7 +73,7 @@ function CveImpactFlow({ graph, selectedExposureId, onSelectExposure, onSelectNo
       if (!active) return;
       setNodes(layout.nodes);
       setEdges(layout.edges);
-      requestAnimationFrame(() => void fitView({ padding: 0.16, duration: 300 }));
+      requestAnimationFrame(() => void fitView({ padding: 0.2, maxZoom: 1, duration: 300 }));
     });
     return () => { active = false; };
   }, [fitView, initialGraph, layoutRequest, setEdges, setNodes]);
@@ -99,9 +99,9 @@ function CveImpactFlow({ graph, selectedExposureId, onSelectExposure, onSelectNo
     <Paper
       variant="outlined"
       aria-label="CVE impact graph"
-      sx={{ position: 'relative', overflow: 'hidden', bgcolor: 'background.default', height: { xs: 600, lg: 680 }, minHeight: 600, width: '100%' }}
+      sx={{ position: 'relative', overflow: 'hidden', bgcolor: 'background.default', height: { xs: 460, lg: 520 }, minHeight: 460, width: '100%' }}
     >
-      <Box sx={{ height: '100%', minHeight: 600, width: '100%' }}>
+      <Box sx={{ height: '100%', minHeight: 460, width: '100%' }}>
         <ReactFlow<ImpactFlowNode, ImpactFlowEdge>
           nodes={nodes}
           edges={edges}
@@ -117,6 +117,7 @@ function CveImpactFlow({ graph, selectedExposureId, onSelectExposure, onSelectNo
           zoomOnScroll
           zoomOnPinch
           fitView
+          fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
           minZoom={0.1}
           maxZoom={2.5}
           proOptions={{ hideAttribution: true }}
@@ -137,7 +138,7 @@ function CveImpactFlow({ graph, selectedExposureId, onSelectExposure, onSelectNo
                 <ToggleButton value="simplified">Simplified</ToggleButton>
                 <ToggleButton value="detailed">Detailed RDF</ToggleButton>
               </ToggleButtonGroup>
-              <Tooltip title="Fit view"><Button className="nodrag" size="small" variant="outlined" startIcon={<CenterFocusStrongOutlinedIcon />} onClick={() => void fitView({ padding: 0.16, duration: 300 })}>Fit view</Button></Tooltip>
+              <Tooltip title="Fit view"><Button className="nodrag" size="small" variant="outlined" startIcon={<CenterFocusStrongOutlinedIcon />} onClick={() => void fitView({ padding: 0.2, maxZoom: 1, duration: 300 })}>Fit view</Button></Tooltip>
               <Tooltip title="Reset layout"><Button className="nodrag" size="small" variant="outlined" startIcon={<RestartAltOutlinedIcon />} onClick={() => setLayoutRequest((request) => request + 1)}>Reset layout</Button></Tooltip>
               <Tooltip title="Centre on CVE"><Button className="nodrag" size="small" variant="outlined" onClick={centreOnCve}>Centre on CVE</Button></Tooltip>
               <Tooltip title={locked ? 'Unlock node movement' : 'Lock node movement'}>

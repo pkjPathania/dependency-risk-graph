@@ -1,213 +1,443 @@
 # Dependency Risk Graph
 
-Dependency Risk Graph is a Java-first software-supply-chain knowledge-graph prototype. It ingests CycloneDX JSON SBOMs, maps dependency information into RDF, persists the graph with Apache Jena TDB2, and exposes a React + Material UI interface for exploring applications, dependencies, SPARQL results, and dependency paths.
+Dependency Risk Graph is a Java-first software supply-chain knowledge graph. It imports CycloneDX JSON SBOMs as RDF, enriches the imported package occurrences with complete OSV advisories, stores both datasets in Apache Jena TDB2, and provides a React interface for application, dependency, vulnerability, reference, CVE-impact, and SPARQL exploration.
 
-The repository is intentionally split between implemented features and planned capabilities. The current codebase is a working technical prototype, not a finished Graph-RAG platform.
+The graph is the source of truth. Ingestion and enrichment write RDF; the Explore and SPARQL APIs read the persisted model without making hidden OSV calls.
 
-## Why This Project Exists
+![Dependency Risk Graph overview](docs/sample/overview.png)
 
-Software supply-chain analysis usually ends up split across disconnected tools: SBOM ingestion, graph storage, SPARQL, path search, and vulnerability lookups. This project exists to keep the graph authoritative in RDF while also providing a read-optimized in-memory projection for path algorithms and a simple UI for application-centric exploration.
+## What the Application Does
 
-The long-term direction is a hybrid dependency-risk and Graph-RAG system, but only the RDF, SPARQL, deterministic graph traversal, and UI pieces that are actually wired into the code are documented here.
+- Accepts a CycloneDX JSON SBOM as multipart form data at `POST /rdf/new`.
+- Preserves CycloneDX component `bom-ref` values as RDF resource identities.
+- Stores application and package occurrences plus declared `risk:dependsOn` edges.
+- Finds application dependencies from the persisted occurrence graph.
+- Queries OSV in batches and loads the complete advisory for every returned OSV ID.
+- Assembles OSV responses into a separate JSON-LD graph and adds it to Jena.
+- Links each scanned package occurrence to vulnerabilities with `risk:affectedBy`.
+- Stores advisory aliases, details, timestamps, references, severity vectors, affected packages, version ranges, and range events.
+- Provides an application-level enrichment API and a read-only single-PURL lookup API.
+- Exposes application-centric Explore tabs for overview, dependencies, vulnerabilities, references, and CVE impact.
+- Provides unrestricted read-only SPARQL `SELECT` execution through the UI/API.
+- Renders application-to-vulnerability paths with React Flow and ELK.
 
-## Current Capabilities
-
-- CycloneDX JSON SBOM ingestion and normalization.
-- RDF mapping of applications, package versions, and dependency edges.
-- Persistence to a local Apache Jena TDB2 dataset.
-- Graph metadata and application exploration APIs.
-- SPARQL `SELECT` execution and query formatting.
-- Deterministic dependency-path traversal over the dependency model.
-- Application-level OSV batch scanning with full advisory loading.
-- Raw OSV application snapshots and vulnerability RDF persistence.
-- Explore views for vulnerability metrics, findings, CVSS assessments, fixed versions, and advisory references.
-- Cross-application CVE impact lists and interactive React Flow dependency-path graphs.
-- OSV query passthrough to the public OSV API.
-- React + Material UI frontend bundled into the Spring Boot application.
-
-## CVE Impact Walkthrough
-
-![Interactive cross-application CVE impact graph for CVE-2024-6763](src/main/resources/samples/img.png)
-
-> **Cross-application impact analysis for CVE-2024-6763:** dependency paths from Pulsar, OpenSearch, and Iceberg converge on affected Jetty package versions, the shared vulnerability, and a fixed version. The detailed RDF view preserves `DEPENDS_ON`, `INSTANCE_OF`, `AFFECTED_BY`, and `FIXED_IN` relationships.
-
-The graph supports node dragging, canvas pan and zoom, fit-to-view, reset layout, CVE centering, and node locking. Simplified mode collapses terminal occurrence/package pairs for readability; Detailed RDF mode displays the occurrence-to-package `INSTANCE_OF` edges explicitly. Selecting a node updates the advisory panel without navigating away from the impact view.
-
-## Architecture Overview
+## Current Architecture
 
 ```mermaid
 flowchart LR
-    SBOM[CycloneDX JSON SBOM] --> Ingest[SBOM ingestion service]
-    Ingest --> Mapper[RDF mapper]
-    Mapper --> RDF[RDF model]
-    RDF --> Jena[Apache Jena TDB2 dataset]
-    Jena --> Explore[Explore APIs]
-    Explore --> Impact[CVE impact list and detail]
-    Jena --> Sparql[SPARQL APIs]
-    Jena --> Metadata[Graph metadata API]
-    Jena --> Index[Dependency graph projection cache]
-    Index --> Path[Dependency path API]
-    Path --> Impact
-    Explore --> UI[React + Material UI SPA]
-    Impact --> UI
-    Sparql --> UI
-    Metadata --> UI
-    Path --> UI
-    OSV[Public OSV API] --> Osv[OSV scan and query APIs]
-    Osv --> Snapshot[Raw application JSON snapshot]
-    Osv --> VulnMap[Vulnerability RDF mapper]
-    VulnMap --> Jena
-    Osv --> UI
+    subgraph Write[Write pipelines]
+        SBOM[CycloneDX JSON] -->|POST /rdf/new| CDX[CycloneDX assemblers]
+        CDX --> CDXJSONLD[CycloneDX JSON-LD]
+        CDXJSONLD --> RDFParser[Jena JSON-LD parser]
+
+        APP[Application IRI] -->|GET /api/v1/vulnerabilities/enrich| PLAN[Dependency scan plan]
+        PLAN --> BATCH[OSV /querybatch]
+        BATCH --> DETAIL[OSV advisory detail calls]
+        DETAIL --> OSVJSONLD[OSV JSON-LD assemblers]
+        OSVJSONLD --> RDFParser
+    end
+
+    RDFParser --> TDB[(Apache Jena TDB2)]
+
+    subgraph Read[Read pipelines]
+        TDB --> EXPLORE[Explore services]
+        TDB --> SPARQL[SPARQL service]
+        TDB --> META[Graph metadata]
+        TDB --> PATH[Dependency-path projection]
+    end
+
+    EXPLORE --> API[Spring MVC APIs]
+    SPARQL --> API
+    META --> API
+    PATH --> API
+    API --> UI[React + Material UI]
+    UI --> FLOW[React Flow + ELK CVE graph]
 ```
 
-### Example security answer
+### Design principles
 
-> **Question:** Where is CVE-2026-54515 present, and what remediation evidence is available?
->
-> **Answer:** The persisted graph identifies exposure paths from both Kafka and Dependency Risk Graph into the shared advisory through distinct `jackson-databind` package-version resources. The focused graph preserves each installed version and its ordered dependency path, while the advisory panel provides the OSV/GHSA evidence, CVSS vector, references, and fixed versions including `2.18.9`, `2.21.5`, `2.22.1`, and `3.1.4`.
+1. **RDF is authoritative.** Explore does not maintain a second vulnerability database.
+2. **Writes are explicit.** Selecting an application in Explore does not invoke OSV. The user starts enrichment from the Vulnerability Enrichment screen or API.
+3. **CycloneDX and OSV have separate JSON-LD contexts.** Each source is assembled according to its own shape before Jena parses it.
+4. **Occurrences retain source identity.** The new importer uses CycloneDX `bom-ref` values directly rather than mapping them back into a separate canonical package layer.
+5. **OSV data stays normalized.** References, severities, affected packages, ranges, and events are RDF resources connected to one vulnerability resource.
+6. **Reads are application-scoped.** Explore begins at an `ApplicationOccurrence` and follows `risk:dependsOn+` to its reachable packages.
+7. **Single-PURL lookup is non-persistent.** `/enrich/purl` returns complete OSV DTO responses but does not patch RDF.
 
-### How the pieces fit together
+## End-to-End Data Flow
 
-- The RDF model is the authoritative graph representation.
-- Jena TDB2 stores the graph in a local embedded dataset.
-- A read-optimized in-memory projection supports deterministic shortest-path lookup; it is not the primary database.
-- The frontend is a single-page shell that switches between Overview, Explore, Vulnerability Enrichment, SPARQL, and Dependency Path without React Router.
+### 1. CycloneDX ingestion
 
-## Data Flow
+```text
+MultipartFile
+  -> CycloneDX parser
+  -> metadata/component/dependency assemblers
+  -> CycloneDX JSON-LD
+  -> Jena Model
+  -> default TDB2 graph
+```
 
-1. A CycloneDX JSON file is uploaded through the SBOM API.
-2. The parser normalizes the SBOM into applications, components, and dependency edges.
-3. The RDF mapper converts the normalized model into RDF triples.
-4. The RDF triples are added to the local Jena TDB2 dataset.
-5. An optional application OSV scan batches versioned package PURLs, loads each distinct advisory, and writes a raw JSON snapshot.
-6. The scan maps package-to-vulnerability, CVSS assessment, and fixed-version resources into Jena TDB2.
-7. Explore and SPARQL APIs read the persisted graph data without calling OSV.
-8. CVE Impact groups persisted vulnerabilities first, then loads one focused advisory graph only when selected.
-9. The dependency-path service uses deterministic graph traversal to resolve the exact ordered path from every affected application to each vulnerable package version.
-10. The React UI renders the resulting data in the Overview, Explore, Vulnerability Enrichment, SPARQL, and Dependency Path pages.
+`CycloneDxMetadataAssembler` creates the root `risk:ApplicationOccurrence`. `CycloneDxComponentAssembler` creates supported application and library occurrences. `CycloneDxDependencyAssembler` writes only dependency relationships declared in the SBOM.
 
-## RDF Graph Model
+The importer does not infer dependencies from Maven coordinates, component order, directory layout, or PURL similarity.
 
-The current mapper uses a minimal vocabulary under:
+### 2. Application OSV enrichment
 
-`urn:io-github-pkjpathania:dependency-risk-graph:schema:`
+```text
+Application IRI
+  -> ExplorerService.dependencySummary(applicationIri)
+  -> versioned PURL scan plan
+  -> OSV batch query
+  -> distinct advisory detail loading
+  -> Enriched(packageIri, complete OSV responses)
+  -> OSV JSON-LD
+  -> Jena Model
+  -> default TDB2 graph
+```
 
-Implemented RDF concepts and properties include:
+The package identifier in `Enriched` is the imported package occurrence IRI. The enrichment pipeline adds `risk:affectedBy` to that resource. It does not translate the result back into a legacy package-version/import-run model.
 
-- `risk:Application`
-- `risk:PackageVersion`
-- `risk:Vulnerability`
-- `risk:CvssAssessment`
+`GET /api/v1/vulnerabilities/enrich` returns:
+
+```json
+{
+  "parsed": 1200,
+  "added": 1175,
+  "total": 86200
+}
+```
+
+- `parsed`: triples parsed from the generated OSV JSON-LD document.
+- `added`: triples that were not already present in the dataset.
+- `total`: triples in the default graph after the write.
+
+### 3. Explore and CVE impact
+
+Explore reads the combined graph:
+
+```text
+ApplicationOccurrence
+  -> dependsOn+
+Package occurrence
+  -> affectedBy
+Vulnerability
+  -> hasReference / hasSeverity / hasAffectedPackage
+```
+
+The CVE Impact detail endpoint resolves the dependency path from the selected application occurrence to each affected package occurrence, appends the vulnerability, and returns a graph DTO for React Flow. Shared nodes and edges are deduplicated while exposure IDs preserve which application/package path each edge belongs to.
+
+## RDF Model
+
+The vocabulary namespace is:
+
+```text
+urn:io-github-pkjpathania:dependency-risk-graph:schema:
+```
+
+### CycloneDX occurrence graph
+
+```mermaid
+flowchart LR
+    A[ApplicationOccurrence] -->|risk:dependsOn| B[PackageOccurrence]
+    B -->|risk:dependsOn| C[PackageOccurrence]
+    A -->|risk:name/version/purl/bomRef| AM[Scalar metadata]
+    B -->|risk:name/version/purl/bomRef| BM[Scalar metadata]
+```
+
+Core classes and properties:
+
+- `risk:ApplicationOccurrence`
+- `risk:PackageOccurrence`
 - `risk:dependsOn`
+- `risk:name`
+- `risk:group`
 - `risk:version`
 - `risk:purl`
-- `risk:osvId`
-- `risk:affectedBy`
-- `risk:alias`
-- `risk:summary`
-- `risk:details`
-- `risk:publishedAt`
-- `risk:modifiedAt`
-- `risk:withdrawnAt`
-- `risk:referenceUrl`
-- `risk:fixedIn`
-- `risk:hasSeverity`
-- `risk:cvssType`
-- `risk:cvssVersion`
-- `risk:vector`
-- `risk:severityLevel`
-- `risk:source`
+- `risk:bomRef`
+- `risk:componentType`
 
-The mapper currently materializes the following RDF shape:
+### OSV enrichment graph
 
-- Applications are typed as `risk:Application` and labeled with `rdfs:label`.
-- Package versions are typed as `risk:PackageVersion` and labeled with `rdfs:label`.
-- Package versions can carry `risk:version` and `risk:purl`.
-- Dependency edges are expressed with `risk:dependsOn`.
-- Installed packages link to deterministic vulnerability resources through `risk:affectedBy`.
-- Vulnerabilities link to deterministic CVSS assessment resources through `risk:hasSeverity`.
-- Vulnerabilities link to deterministic fixed package-version resources through `risk:fixedIn`.
-- Resource IRIs are generated as URNs, not raw PURLs.
+```mermaid
+flowchart LR
+    P[Imported package occurrence] -->|risk:affectedBy| V[Vulnerability]
+    V -->|risk:hasReference| R[VulnerabilityReference]
+    V -->|risk:hasSeverity| S[SeverityAssessment]
+    V -->|risk:hasAffectedPackage| AP[AffectedPackage]
+    AP -->|risk:hasRange| VR[VersionRange]
+    VR -->|risk:hasEvent| E[RangeEvent]
+```
 
-The current implementation keeps the vocabulary intentionally small. OSV enrichment persists advisory attributes, aliases, reference URLs, CVSS vectors, and fixed package versions. It does not calculate numeric CVSS scores or infer additional RDF statements.
+Important OSV properties:
 
-## Technology Stack
+- Vulnerability: `risk:osvId`, `risk:alias`, `risk:summary`, `risk:details`, `risk:publishedAt`, `risk:modifiedAt`, `risk:withdrawnAt`
+- References: `risk:hasReference`, `risk:referenceType`, `risk:referenceUrl`
+- Severity: `risk:hasSeverity`, `risk:severityType`, `risk:severityScore`
+- Affected packages: `risk:hasAffectedPackage`, `risk:affectedPackageName`, `risk:affectedPackagePurl`, `risk:ecosystem`, `risk:affectedVersion`
+- Ranges: `risk:hasRange`, `risk:rangeType`, `risk:repositoryUrl`
+- Events: `risk:hasEvent`, `risk:introducedVersion`, `risk:fixedVersion`, `risk:lastAffectedVersion`, `risk:limitVersion`
 
-- Java 21
-- Spring Boot 4.1
-- Apache Jena 6.1
-- CycloneDX Java libraries
-- React 19
-- TypeScript
-- Vite
-- Material UI
-- React Flow (`@xyflow/react`) for the interactive CVE impact graph
-- ELK.js for initial layered graph layout
-- OSV REST API client via Spring `RestClient`
+Resource IRIs for vulnerabilities and their child resources are deterministic, allowing repeated enrichment to add only previously unseen triples.
 
-## Screens or UI Capabilities
+## User Interface
 
-The UI currently exposes five main pages:
+The frontend is a React 19 single-page application bundled into the Spring Boot JAR. Navigation is managed by the application shell rather than a client-side URL router.
 
-- Overview
-  - Graph metrics
-  - SBOM upload
-  - Application list with an Explore action
-- Explore
-  - Application selector
-  - Application summary cards, including vulnerable-package and critical-vulnerability metrics
-  - Dependencies table with search, count, and refresh controls
-  - Vulnerabilities table with search, filters, count, refresh, pagination, severity, CVSS, fixed versions, and advisory details
-  - Grouped advisory references with search, category filtering, count, refresh, pagination, and affected package versions
-  - CVE Impact list and focused graph with selected/all-application scope, complete exposure paths, remediation versions, and advisory details
-- Vulnerability Enrichment
-  - Application selection and explicit OSV scan action
-  - Scan metrics and package-level findings
-- SPARQL
-  - Query editor
-  - Prefix helpers
-  - Format and run actions
-  - Results table
-- Dependency Path
-  - Package name and version search
-  - Shortest-path rendering
+### Overview and ingestion
 
-The app uses an internal navigation shell rather than a route-based client router.
+Upload one CycloneDX JSON file, inspect live graph totals, and open an imported application in Explore.
 
-## Build and Run Instructions
+![Overview and CycloneDX ingestion](docs/sample/overview.png)
 
-### Full build
+### Application overview
+
+The Overview tab summarizes direct and transitive dependencies, graph size, vulnerable packages, and vulnerability metrics for the selected application.
+
+![Explore application overview](docs/sample/explore-overview.png)
+
+### Dependencies
+
+Dependencies are read by following `risk:dependsOn+` from the selected application. Direct dependencies are distinguished from transitive dependencies.
+
+![Explore dependencies](docs/sample/explore-dependencies.png)
+
+### Vulnerabilities and advisory detail
+
+The Vulnerabilities tab joins imported occurrences to OSV resources. It displays the installed package, dependency type, advisory identity, severity data, CVSS vector type, fixed range events, publication time, complete advisory content, and reference links.
+
+![Explore vulnerabilities](docs/sample/explore-vluns.png)
+
+![Vulnerability advisory details](docs/sample/expore-vlun-detail.png)
+
+### References
+
+References are stored as dedicated RDF resources. The UI groups them by advisory and displays affected installed packages.
+
+![Explore vulnerability references](docs/sample/explore-vluns-ref.png)
+
+### CVE impact
+
+The initial CVE Impact view groups one vulnerability across selected or all applications.
+
+![Cross-application CVE impact list](docs/sample/cve-impact.png)
+
+Selecting an advisory opens the focused application-to-package-to-vulnerability diagram. The diagram supports pan, zoom, fit view, layout reset, simplified/detailed modes, node selection, and exposure filtering.
+
+![CVE impact dependency graph](docs/sample/explore-cve-impacted-applications.png)
+
+The adjacent detail panel renders OSV advisory content, CVSS data, and complete reference URLs without leaving the dependency diagram.
+
+![CVE impact graph and advisory detail panel](docs/sample/explore-cve-jetty-all-direct.png)
+
+### SPARQL
+
+The SPARQL screen provides prefix presets, example queries, formatting, `SELECT` execution, results, and clipboard export.
+
+![SPARQL query editor](docs/sample/sparql.png)
+
+## API Reference
+
+### Primary new flow
+
+| Method | Path | Purpose | Response |
+| --- | --- | --- | --- |
+| `POST` | `/rdf/new` | Import and persist a multipart CycloneDX JSON file (`file`). | `GraphMetadata` |
+| `GET` | `/api/v1/vulnerabilities/enrich?applicationIri=...` | Batch-query OSV, load complete advisories, assemble OSV JSON-LD, and persist it. | `OsvStoreResult` |
+| `GET` | `/api/v1/vulnerabilities/enrich/purl?purl=...` | Return complete OSV advisory DTOs for one PURL without writing RDF. | `PurlEnrichment` |
+
+### Graph and Explore APIs
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/metadata` | Return graph counts and the JSON-LD representation of the current graph. |
+| `GET` | `/api/v1/explore/applications` | List imported applications. |
+| `GET` | `/api/v1/explore/overview?applicationIri=...` | Return application graph metrics. |
+| `GET` | `/api/v1/explore/dependencies?applicationIri=...` | List reachable dependency occurrences. |
+| `GET` | `/api/v1/explore/vulnerabilities?applicationIri=...` | Return package-level vulnerability rows. |
+| `GET` | `/api/v1/explore/references?applicationIri=...` | Return references grouped by advisory. |
+| `GET` | `/api/v1/explore/cve-impact?scope=selected&applicationIri=...` | Group vulnerabilities for one application. |
+| `GET` | `/api/v1/explore/cve-impact?scope=all` | Group vulnerabilities across all applications. |
+| `GET` | `/api/v1/explore/cve-impact/detail?vulnerabilityIri=...&scope=...` | Return advisory details, exposures, remediation data, and the focused impact graph. |
+
+### SPARQL and supporting APIs
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/sparql/format` | Format a plain-text SPARQL query. |
+| `POST` | `/api/v1/sparql/exec` | Execute a SPARQL `SELECT` query. |
+| `GET` | `/api/v1/sparql/summaries` | List application summaries. |
+| `POST` | `/api/osv` | Pass one package query directly to OSV without graph persistence. |
+| `POST` | `/api/v1/vulnerabilities/scan` | Compatibility scan pipeline returning the structured scan response. |
+| `GET` | `/api/dependencies/path?importId=...&targetPackageVersionIri=...` | Resolve a path for the older import-scoped graph model. |
+
+## Quick Start
+
+### Requirements
+
+- JDK 21 or newer
+- Internet access during the first Maven build and for live OSV enrichment
+- No separate Node installation is required for the Maven build; the frontend plugin installs the configured Node version
+
+### Build
 
 ```bash
 ./mvnw clean package
 ```
 
-This is the most reliable full build command. From the Maven configuration, it also:
+The Maven lifecycle installs frontend dependencies, creates the Vite production bundle, copies it into the application resources, compiles Java, runs tests, and builds the executable JAR.
 
-- installs Node.js through `frontend-maven-plugin`
-- runs `npm ci` in `src/main/frontend`
-- runs the frontend production build
-- copies the generated frontend assets into the Spring Boot build output
-
-### Run the application
-
-After a successful build:
+### Run
 
 ```bash
 java -jar target/dependency-risk-graph-0.0.1-SNAPSHOT.jar
 ```
 
-You can also use Maven to launch the Spring Boot application:
+Or:
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-The backend listens on `http://localhost:8080`.
+Open `http://localhost:8080`.
 
-## Development-Mode Instructions
+### Import an SBOM
 
-### Frontend only
+```bash
+curl -sS -X POST http://localhost:8080/rdf/new \
+  -F 'file=@/path/to/application.cdx.json'
+```
+
+The default multipart limit is 20 MB.
+
+### Enrich an application
+
+Use the application IRI returned by the application list or SPARQL query:
+
+```bash
+curl -sS -G http://localhost:8080/api/v1/vulnerabilities/enrich \
+  --data-urlencode 'applicationIri=pkg:maven/org.example/application@1.0.0'
+```
+
+### Find complete advisories for one PURL
+
+```bash
+curl -sS -G http://localhost:8080/api/v1/vulnerabilities/enrich/purl \
+  --data-urlencode 'purl=pkg:maven/org.apache.commons/commons-lang3@3.18.0'
+```
+
+This endpoint returns the PURL and complete OSV advisory responses. It does not modify the RDF graph.
+
+## SPARQL Examples
+
+### Applications
+
+```sparql
+PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
+
+SELECT ?application ?name ?version ?purl
+WHERE {
+  ?application a risk:ApplicationOccurrence .
+  OPTIONAL { ?application risk:name ?name . }
+  OPTIONAL { ?application risk:version ?version . }
+  OPTIONAL { ?application risk:purl ?purl . }
+}
+ORDER BY LCASE(STR(?name))
+```
+
+### Dependencies for one application
+
+```sparql
+PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
+
+SELECT DISTINCT ?package ?name ?version ?purl ?direct
+WHERE {
+  VALUES ?application { <APPLICATION_IRI> }
+  ?application risk:dependsOn+ ?package .
+  OPTIONAL { ?package risk:name ?name . }
+  OPTIONAL { ?package risk:version ?version . }
+  OPTIONAL { ?package risk:purl ?purl . }
+  BIND(EXISTS { ?application risk:dependsOn ?package } AS ?direct)
+}
+ORDER BY DESC(?direct) LCASE(STR(?name))
+```
+
+### Enriched vulnerabilities and references
+
+```sparql
+PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
+
+SELECT ?packageName ?packageVersion ?osvId ?alias ?referenceUrl
+WHERE {
+  VALUES ?application { <APPLICATION_IRI> }
+  ?application risk:dependsOn+ ?package .
+  ?package risk:name ?packageName ;
+           risk:affectedBy ?vulnerability .
+  OPTIONAL { ?package risk:version ?packageVersion . }
+  ?vulnerability a risk:Vulnerability ; risk:osvId ?osvId .
+  OPTIONAL { ?vulnerability risk:alias ?alias . }
+  OPTIONAL {
+    ?vulnerability risk:hasReference/risk:referenceUrl ?referenceUrl .
+  }
+}
+ORDER BY LCASE(STR(?packageName)) LCASE(STR(?osvId))
+```
+
+### Severity vectors and fixed range events
+
+```sparql
+PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
+
+SELECT ?osvId ?severityType ?severityScore ?fixedVersion
+WHERE {
+  ?vulnerability a risk:Vulnerability ; risk:osvId ?osvId .
+  OPTIONAL {
+    ?vulnerability risk:hasSeverity ?severity .
+    ?severity risk:severityType ?severityType ;
+              risk:severityScore ?severityScore .
+  }
+  OPTIONAL {
+    ?vulnerability risk:hasAffectedPackage/risk:hasRange/risk:hasEvent ?event .
+    ?event risk:fixedVersion ?fixedVersion .
+  }
+}
+ORDER BY LCASE(STR(?osvId)) STR(?fixedVersion)
+```
+
+## Configuration
+
+Primary settings are in `src/main/resources/application.yaml`:
+
+```yaml
+spring:
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+dependency-risk:
+  osv:
+    enabled: true
+    batch-size: 50
+    advisory-fetch-threads: 8
+    output-directory: src/main/resources/osv
+    max-attempts: 3
+    connect-timeout: 10s
+    read-timeout: 45s
+```
+
+The TDB2 location defaults to `./data/tdb2` and can be overridden with:
+
+```yaml
+dependency-risk:
+  graph-db:
+    path: /path/to/tdb2
+```
+
+The same configuration file contains the CycloneDX and OSV JSON-LD contexts. When adding a new RDF property, update the relevant context and its assembler together.
+
+## Development
+
+### Frontend with hot reload
 
 ```bash
 cd src/main/frontend
@@ -215,350 +445,73 @@ npm ci
 npm run dev
 ```
 
-The Vite dev server runs on `http://localhost:5173` by default and proxies `/api` requests to `http://localhost:8080`.
+Vite runs on `http://localhost:5173` and proxies API requests to the Spring Boot server on port 8080.
 
-### Backend only
-
-```bash
-./mvnw spring-boot:run
-```
-
-Use this alongside the Vite dev server if you want live frontend development with the real backend.
-
-## API Reference
-
-| Method | Path | Purpose | Important parameters | Response type |
-| --- | --- | --- | --- | --- |
-| `POST` | `/api/v1/sboms` | Parse a CycloneDX JSON SBOM into the normalized model. | Multipart `file` part. | `NormalizedSbom` |
-| `POST` | `/api/v1/sboms/rdf` | Parse a CycloneDX JSON SBOM and add the mapped RDF model to the dataset. | Multipart `file` part. | `GraphSummary` |
-| `GET` | `/api/v1/metadata` | Read the current RDF graph summary and JSON-LD payload. | None. | `GraphMetadata` |
-| `GET` | `/api/v1/explore/applications` | List application summaries for the Explore page. | None. | `List<ApplicationSummary>` |
-| `GET` | `/api/v1/explore/overview` | Return application-level graph metrics. | `applicationIri` query parameter. | `ApplicationOverview` |
-| `GET` | `/api/v1/explore/dependencies` | Return dependency rows for the selected application. | `applicationIri` query parameter. | `List<DependencySummary>` |
-| `GET` | `/api/v1/explore/vulnerabilities` | Read structured package vulnerability data from RDF. | `applicationIri` query parameter. | `ApplicationVulnerabilitiesResponse` |
-| `GET` | `/api/v1/explore/references` | Read advisory references from RDF, grouped by vulnerability. | `applicationIri` query parameter. | `ApplicationReferencesResponse` |
-| `GET` | `/api/v1/explore/cve-impact` | Return vulnerabilities grouped for selected-application or cross-application impact analysis. | `scope`; `applicationIri` for selected scope. | `CveImpactListResponse` |
-| `GET` | `/api/v1/explore/cve-impact/detail` | Return one advisory with complete BFS exposure paths and its normalized impact graph. | `vulnerabilityIri`, `scope`; `applicationIri` for selected scope. | `CveImpactDetailResponse` |
-| `POST` | `/api/v1/vulnerabilities/scan` | Scan one application through OSV, write its raw snapshot, and persist vulnerability RDF. | JSON body containing `applicationIri`. | `ApplicationVulnerabilityScanResponse` |
-| `GET` | `/api/v1/sparql/summaries` | List application summaries for the SPARQL page. | None. | `List<ApplicationSummary>` |
-| `POST` | `/api/v1/sparql/format` | Format raw SPARQL text. | Plain-text request body. | `String` in `application/sparql-query` format |
-| `POST` | `/api/v1/sparql/exec` | Execute a SPARQL `SELECT` query. | Plain-text request body. | `SparqlSelectResponse` |
-| `GET` | `/api/dependencies/path` | Find the shortest dependency chain to a package version. | `packageName`, optional `version`. | `DependencyPathResult` |
-| `POST` | `/api/osv` | Proxy an OSV package query to the public OSV service. | JSON body with `package.purl`. | `OsvQueryResponse` |
-
-## OSV Vulnerability Enrichment
-
-OSV enrichment is enabled in `src/main/resources/application.yaml`:
-
-```yaml
-dependency-risk:
-  osv:
-    enabled: true
-    batch-size: 100
-    advisory-fetch-threads: 8
-    output-directory: src/main/resources/osv
-```
-
-The application must already exist in the RDF graph. Invoke a scan with its application IRI:
-
-```bash
-curl -s -X POST http://localhost:8080/api/v1/vulnerabilities/scan \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "applicationIri": "urn:io.github.pkjpathania.dependencyrisk:resource:application:kafka:4.4.0-snapshot"
-  }'
-```
-
-The same operation is available in the **Vulnerability Enrichment** screen. Scans are explicit; opening Explore does not trigger OSV calls. After a successful scan, Explore reads the newly persisted RDF through its overview, vulnerability, reference, and CVE impact endpoints.
-
-Only packages with versioned PURLs are queryable. Missing or unversioned PURLs are reported as skipped. Batch and advisory failures are isolated where possible so one failed request does not abort the complete application scan.
-
-Raw snapshots are written to `<output-directory>/data/osv/{sanitized-application-name}.json`. Each successful write replaces the previous snapshot for that application.
-
-## CVE Impact Analysis
-
-Explore → **CVE Impact** reads only from Jena TDB2. It never invokes OSV and therefore requires vulnerability enrichment to have completed previously.
-
-The initial view returns one row per vulnerability RDF resource rather than one row per package or reference. It supports two scopes:
-
-- **Selected application** limits results and paths to the application selected in Explore. This is the default.
-- **All applications** shows the cross-application blast radius for each shared vulnerability.
-
-The grouped list includes the preferred CVE alias, OSV ID, summary, severity, affected application count, affected package-version count, and distinct reference count. Search covers advisory identifiers, summaries, package names, and application names.
-
-Selecting a row loads one focused graph containing only:
-
-- affected applications
-- complete BFS dependency paths to vulnerable package versions
-- one shared vulnerability node
-- connected fixed package versions
-
-The backend uses RDF resource IRIs as node IDs. Different installed versions remain separate nodes, while shared dependency resources and graph edges are deduplicated. When several exposures share an edge, the edge retains all relevant exposure IDs. If SPARQL proves an exposure but BFS cannot resolve its ordered path, the exposure remains in the response with `PATH_UNAVAILABLE`.
-
-The React Flow graph is initially arranged by ELK from applications on the left, through dependency occurrences and vulnerable package versions, into the central vulnerability, then to fixed versions on the right. Nodes remain draggable after layout, and the UI provides pan and zoom, fit view, reset layout, CVE centering, movement locking, simplified and detailed RDF modes, exposure filtering, an affected-application table, advisory details, persisted CVSS vectors, and safe external reference links.
-
-### List selected-application impact
-
-```bash
-curl -sG http://localhost:8080/api/v1/explore/cve-impact \
-  --data-urlencode 'scope=selected' \
-  --data-urlencode 'applicationIri=urn:io.github.pkjpathania.dependencyrisk:resource:application:kafka:4.4.0-snapshot'
-```
-
-### List cross-application impact
-
-```bash
-curl -sG http://localhost:8080/api/v1/explore/cve-impact \
-  --data-urlencode 'scope=all'
-```
-
-### Load one focused impact graph
-
-Use the vulnerability resource IRI returned by the list endpoint, not a CVE alias:
-
-```bash
-curl -sG http://localhost:8080/api/v1/explore/cve-impact/detail \
-  --data-urlencode 'scope=all' \
-  --data-urlencode 'vulnerabilityIri=urn:io.github.pkjpathania.dependencyrisk:resource:vulnerability:GHSA-example'
-```
-
-## Example CycloneDX Upload
-
-The RDF route is the one that updates the graph:
-
-```bash
-curl -s -X POST http://localhost:8080/api/v1/sboms/rdf \
-  -F "file=@sample-sbom.json"
-```
-
-If you only want the normalized SBOM payload:
-
-```bash
-curl -s -X POST http://localhost:8080/api/v1/sboms \
-  -F "file=@sample-sbom.json"
-```
-
-## Example SPARQL Queries
-
-### List applications
-
-```sparql
-PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-SELECT ?application ?name ?version
-WHERE {
-  ?application a risk:Application ;
-               rdfs:label ?name .
-  OPTIONAL {
-    ?application risk:version ?version .
-  }
-}
-ORDER BY LCASE(?name)
-```
-
-### Verify OSV vulnerability enrichment
-
-Run these queries after an application vulnerability scan.
-
-```sparql
-PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-SELECT ?package ?packageName ?installedVersion ?osvId ?alias
-WHERE {
-  ?package a risk:PackageVersion ;
-           rdfs:label ?packageName ;
-           risk:version ?installedVersion ;
-           risk:affectedBy ?vulnerability .
-
-  ?vulnerability a risk:Vulnerability ;
-                 risk:osvId ?osvId .
-
-  OPTIONAL { ?vulnerability risk:alias ?alias . }
-}
-ORDER BY ?packageName ?osvId
-```
-
-```sparql
-PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
-
-SELECT ?osvId ?cvssType ?cvssVersion ?vector
-WHERE {
-  ?vulnerability risk:osvId ?osvId ;
-                 risk:hasSeverity ?assessment .
-
-  ?assessment a risk:CvssAssessment ;
-              risk:cvssType ?cvssType ;
-              risk:vector ?vector .
-
-  OPTIONAL { ?assessment risk:cvssVersion ?cvssVersion . }
-}
-ORDER BY ?osvId ?cvssVersion
-```
-
-```sparql
-PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-SELECT ?osvId ?packageName ?fixedVersion ?fixedPurl
-WHERE {
-  ?vulnerability risk:osvId ?osvId ;
-                 risk:fixedIn ?fixedPackage .
-
-  ?fixedPackage a risk:PackageVersion ;
-                rdfs:label ?packageName ;
-                risk:version ?fixedVersion .
-
-  OPTIONAL { ?fixedPackage risk:purl ?fixedPurl . }
-}
-ORDER BY ?osvId ?packageName ?fixedVersion
-```
-
-### List direct dependencies for one application
-
-Replace the application IRI in the `VALUES` block with a real application resource from the graph.
-
-```sparql
-PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-SELECT ?dependency ?name ?version ?purl
-WHERE {
-  VALUES ?application {
-    <urn:io.github.pkjpathania.dependencyrisk:resource:application:kafka:4.4.0-snapshot>
-  }
-
-  ?application a risk:Application ;
-               risk:dependsOn ?dependency .
-
-  ?dependency a risk:PackageVersion ;
-              rdfs:label ?name .
-
-  OPTIONAL {
-    ?dependency risk:version ?version .
-  }
-
-  OPTIONAL {
-    ?dependency risk:purl ?purl .
-  }
-}
-ORDER BY LCASE(?name)
-```
-
-## Dependency-Path Example
-
-The dependency-path API expects a package name and optional version:
-
-```bash
-curl -s "http://localhost:8080/api/dependencies/path?packageName=spring-core&version=7.0.8"
-```
-
-If multiple versions share the same package name, pass `version` to disambiguate the lookup.
-
-## Persistence and Runtime Behavior
-
-- The Jena dataset is stored locally under `data/tdb2`.
-- `POST /api/v1/sboms/rdf` adds the mapped RDF model to the default Jena dataset; it does not clear existing triples first.
-- Graph metadata and SPARQL queries read directly from the dataset.
-- Application OSV scans replace the configured raw JSON snapshot for that application and add or refresh vulnerability RDF in one repository write transaction.
-- Explore vulnerability, reference, and CVE impact endpoints read only from Jena TDB2 and never invoke OSV.
-- The dependency-path projection is cached in memory and built from the repository snapshot on demand.
-- There is no automatic invalidation hook for the traversal cache after RDF writes, so a long-running process can become stale for path queries.
-- `POST /api/osv` remains a standalone live-query passthrough; application persistence is performed by `/api/v1/vulnerabilities/scan`.
-
-## Current Limitations
-
-- CycloneDX JSON is the only supported ingestion format.
-- The RDF vocabulary is intentionally minimal.
-- SPARQL execution currently supports `SELECT` queries only.
-- Jena TDB2 is a local embedded store, not a distributed graph database.
-- The read-optimized dependency projection can lag behind RDF writes.
-- Multiple applications in the graph can make package-name lookups ambiguous.
-- Stale `risk:affectedBy` links are not yet removed when a previously vulnerable package later returns no findings.
-- Advisories remain `UNRATED` when persisted RDF has CVSS vectors but no explicit `risk:severityLevel`; the UI does not infer severity from a vector or advisory prose.
-- Authentication and authorization are not included.
-- Test coverage is still small compared with the amount of source code.
-- The planned Graph-RAG layer is not implemented yet.
-
-## Roadmap
-
-### Implemented
-
-- [x] CycloneDX JSON parsing and normalization.
-- [x] RDF mapping for applications, package versions, and dependency edges.
-- [x] Jena TDB2 persistence and SPARQL read APIs.
-- [x] Overview, Explore, Vulnerability Enrichment, SPARQL, and Dependency Path UI pages.
-- [x] Deterministic shortest-path lookup over the dependency model.
-- [x] OSV query passthrough endpoint.
-- [x] Application-level OSV batch scanning and full advisory loading.
-- [x] Raw application OSV snapshots.
-- [x] RDF persistence for vulnerabilities, CVSS assessments, and fixed package versions.
-- [x] Explore vulnerability and grouped reference views.
-- [x] Selected-application and cross-application CVE impact graphs.
-
-### Planned
-
-- [ ] Remove stale package vulnerability links after successful zero-result tracking is available.
-- [ ] Model affected ranges beyond the currently persisted fixed-version resources.
-- [ ] Add SHACL validation for graph shape constraints.
-- [ ] Add OWL or rule-based inference where it is useful.
-- [ ] Add hybrid graph-plus-vector retrieval for Graph-RAG workflows.
-- [ ] Add Java-first agent orchestration on top of the graph.
-- [ ] Add retrieval and prompt-evaluation tooling.
-- [ ] Add stronger automated test coverage and end-to-end tests.
-- [ ] Add Docker and Kubernetes deployment examples.
-
-## Project Structure
-
-- `src/main/java` - backend controllers, services, repository code, RDF mapping, and OSV client code
-- `src/main/resources` - Spring Boot configuration
-- `src/main/frontend` - React application bundled into the backend build
-- `src/main/frontend/src/pages` - main UI pages
-- `src/main/frontend/src/features/explore` - Explore page components and API helpers
-- `src/main/frontend/src/features/sparql` - SPARQL page helpers and prefix utilities
-- `src/test/java` - backend and JSON serialization tests
-- `data/tdb2` - local Jena TDB2 dataset
-
-## Testing
-
-Automated tests cover:
-
-- Spring Boot application context loading.
-- Jena repository and Explorer query behavior.
-- OSV planning, batching, advisory loading, finding assembly, and raw snapshots.
-- Vulnerability, CVSS assessment, and fixed-version RDF mapping.
-- OSV request/response DTO serialization and deserialization.
-- Explore Vulnerabilities and References component behavior.
-- CVE impact grouping, scoping, BFS paths, normalized graph assembly, and frontend interaction states.
-
-Recommended commands:
+### Tests
 
 ```bash
 ./mvnw test
 ```
-
-For frontend type-checking:
-
-```bash
-cd src/main/frontend
-npm run typecheck
-```
-
-For frontend component tests:
 
 ```bash
 cd src/main/frontend
 npm test
 ```
 
-## Contributing
+```bash
+cd src/main/frontend
+npm run build
+```
 
-- Keep changes small and source-driven.
-- Update RDF vocabulary and README examples together when the graph model changes.
-- Add tests for parser, mapper, controller, and serializer changes.
-- Separate implemented behavior from planned behavior in documentation and code comments.
-- Prefer the existing Spring Boot, Jena, and Material UI patterns already in the repository.
+## Technology Stack
+
+- Java 21
+- Spring Boot 4.1
+- Apache Jena 6.1 with TDB2 and ARQ
+- CycloneDX Core Java 12.2
+- JGraphT 1.5
+- React 19 and TypeScript
+- Material UI
+- React Flow (`@xyflow/react`)
+- ELK.js layered graph layout
+- Vite
+- OSV REST APIs through Spring `RestClient`
+
+## Project Structure
+
+```text
+src/main/java/io/github/pkjpathania/dependencyrisk/
+  graph/
+    controller/             RDF, Explore, SPARQL, and path APIs
+    parser/assembler/       CycloneDX JSON-LD assembly
+    repo/                   Jena persistence and graph projection
+    service/                Explore, CVE impact, SPARQL, and graph services
+  vulnerability/
+    assembler/              OSV JSON-LD assembly
+    client/                 OSV request/response client
+    service/                batching, advisory loading, and enrichment
+
+src/main/frontend/src/
+  pages/                    top-level application screens
+  features/explore/         Explore tabs and CVE impact graph
+  features/sparql/          SPARQL presets and helpers
+
+docs/sample/                README screenshots
+data/tdb2/                  local embedded RDF dataset
+```
+
+## Current Limitations
+
+- Only CycloneDX JSON is accepted by the new ingestion endpoint.
+- Ingestion and enrichment add triples to the default graph; they do not remove an older application snapshot or stale vulnerability links.
+- Only dependencies with usable PURLs can be sent to OSV.
+- OSV severity vectors are preserved, but the application does not infer a `CRITICAL`, `HIGH`, `MODERATE`, or `LOW` classification when OSV does not provide one.
+- SPARQL execution accepts `SELECT` queries only.
+- TDB2 is an embedded local dataset, not a distributed graph service.
+- The import-scoped dependency-path endpoint belongs to the older graph model and is not populated by `POST /rdf/new`.
+- The UI uses in-memory page navigation rather than routable browser URLs.
+- Authentication and authorization are not implemented.
+- Graph-RAG/vector retrieval is not part of the current implementation.
 
 ## License
 

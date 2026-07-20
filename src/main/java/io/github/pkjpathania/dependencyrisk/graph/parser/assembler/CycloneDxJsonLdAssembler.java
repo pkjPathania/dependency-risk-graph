@@ -1,6 +1,6 @@
 package io.github.pkjpathania.dependencyrisk.graph.parser.assembler;
 
-import io.github.pkjpathania.dependencyrisk.graph.parser.config.JsonLdProperties;
+import io.github.pkjpathania.dependencyrisk.graph.parser.config.CycloneDxGraphProperties;
 import java.util.List;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +14,7 @@ public abstract class CycloneDxJsonLdAssembler {
 
   private final ObjectMapper objectMapper;
 
-  private final JsonLdProperties properties;
+  private final CycloneDxGraphProperties properties;
 
   protected ObjectNode createDocument() {
     ObjectNode document = objectMapper.createObjectNode();

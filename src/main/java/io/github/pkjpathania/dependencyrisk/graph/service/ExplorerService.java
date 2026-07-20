@@ -62,21 +62,30 @@ public class ExplorerService {
       WHERE {
           VALUES ?application { ?applicationValue }
 
-          ?application risk:activeImport ?importRun .
-          ?importRun risk:rootOccurrence ?root .
-          ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
-          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
-          ?package a risk:PackageVersion ;
-                   rdfs:label ?packageName ;
-                   risk:affectedBy ?vulnerability .
+          {
+              ?application a risk:ApplicationOccurrence ; risk:dependsOn+ ?package .
+              ?package risk:name ?packageName ; risk:affectedBy ?vulnerability .
+              BIND(
+                  IF(EXISTS { ?application risk:dependsOn ?package }, "DIRECT", "TRANSITIVE")
+                  AS ?dependencyType
+              )
+          }
+          UNION
+          {
+              ?application risk:activeImport ?importRun .
+              ?importRun risk:rootOccurrence ?root .
+              ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
+              ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
+              ?package a risk:PackageVersion ; rdfs:label ?packageName ;
+                       risk:affectedBy ?vulnerability .
+              BIND(
+                  IF(EXISTS { ?root risk:dependsOn ?occurrence }, "DIRECT", "TRANSITIVE")
+                  AS ?dependencyType
+              )
+          }
 
           OPTIONAL { ?package risk:version ?installedVersion . }
           OPTIONAL { ?package risk:purl ?installedPurl . }
-
-          BIND(
-              IF(EXISTS { ?root risk:dependsOn ?occurrence }, "DIRECT", "TRANSITIVE")
-              AS ?dependencyType
-          )
 
           ?vulnerability a risk:Vulnerability ; risk:osvId ?osvId .
           OPTIONAL { ?vulnerability risk:alias ?alias . }
@@ -88,19 +97,40 @@ public class ExplorerService {
 
           OPTIONAL {
               ?vulnerability risk:hasSeverity ?assessment .
-              ?assessment a risk:CvssAssessment ; risk:vector ?vector .
-              OPTIONAL { ?assessment risk:cvssType ?cvssType . }
-              OPTIONAL { ?assessment risk:cvssVersion ?cvssVersion . }
+              {
+                  ?assessment a risk:SeverityAssessment ; risk:severityScore ?vector .
+                  OPTIONAL { ?assessment risk:severityType ?cvssType . }
+              }
+              UNION
+              {
+                  ?assessment a risk:CvssAssessment ; risk:vector ?vector .
+                  OPTIONAL { ?assessment risk:cvssType ?cvssType . }
+                  OPTIONAL { ?assessment risk:cvssVersion ?cvssVersion . }
+              }
           }
 
           OPTIONAL {
-              ?vulnerability risk:fixedIn ?fixedPackage .
-              ?fixedPackage a risk:PackageVersion ; risk:version ?fixedVersion .
-              OPTIONAL { ?fixedPackage rdfs:label ?fixedPackageName . }
-              OPTIONAL { ?fixedPackage risk:purl ?fixedPurl . }
+              {
+                  ?vulnerability risk:hasAffectedPackage ?affectedPackage .
+                  ?affectedPackage risk:hasRange/risk:hasEvent ?fixedPackage .
+                  ?fixedPackage risk:fixedVersion ?fixedVersion .
+                  OPTIONAL { ?affectedPackage risk:affectedPackageName ?fixedPackageName . }
+                  OPTIONAL { ?affectedPackage risk:affectedPackagePurl ?fixedPurl . }
+              }
+              UNION
+              {
+                  ?vulnerability risk:fixedIn ?fixedPackage .
+                  ?fixedPackage a risk:PackageVersion ; risk:version ?fixedVersion .
+                  OPTIONAL { ?fixedPackage rdfs:label ?fixedPackageName . }
+                  OPTIONAL { ?fixedPackage risk:purl ?fixedPurl . }
+              }
           }
 
-          OPTIONAL { ?vulnerability risk:referenceUrl ?referenceUrl . }
+          OPTIONAL {
+              { ?vulnerability risk:hasReference/risk:referenceUrl ?referenceUrl . }
+              UNION
+              { ?vulnerability risk:referenceUrl ?referenceUrl . }
+          }
       }
       ORDER BY LCASE(STR(?packageName)) LCASE(STR(?osvId))
       """;
@@ -112,16 +142,29 @@ public class ExplorerService {
       WHERE {
           VALUES ?application { ?applicationValue }
 
-          ?application risk:activeImport ?importRun .
-          ?importRun risk:rootOccurrence ?root .
-          ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
-          ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
-          ?package rdfs:label ?packageName ;
-                   risk:version ?installedVersion ;
-                   risk:affectedBy ?vulnerability .
+          {
+              ?application a risk:ApplicationOccurrence ; risk:dependsOn+ ?package .
+              ?package risk:name ?packageName ; risk:affectedBy ?vulnerability .
+              OPTIONAL { ?package risk:version ?installedVersion . }
+          }
+          UNION
+          {
+              ?application risk:activeImport ?importRun .
+              ?importRun risk:rootOccurrence ?root .
+              ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
+              ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
+              ?package rdfs:label ?packageName ; risk:version ?installedVersion ;
+                       risk:affectedBy ?vulnerability .
+          }
 
-          ?vulnerability risk:osvId ?osvId ;
-                         risk:referenceUrl ?referenceUrl .
+          ?vulnerability risk:osvId ?osvId .
+          {
+              ?vulnerability risk:hasReference/risk:referenceUrl ?referenceUrl .
+          }
+          UNION
+          {
+              ?vulnerability risk:referenceUrl ?referenceUrl .
+          }
 
           OPTIONAL { ?vulnerability risk:alias ?alias . }
           OPTIONAL { ?vulnerability risk:summary ?summary . }
@@ -205,7 +248,7 @@ public class ExplorerService {
     accumulator.summary =
         firstPresent(accumulator.summary, trimmedOrNull(literalValue(solution, "summary")));
     addNonBlank(accumulator.aliases, literalValue(solution, "alias"));
-    addNonBlank(accumulator.referenceUrls, literalValue(solution, "referenceUrl"));
+    addNonBlank(accumulator.referenceUrls, stringValue(solution, "referenceUrl"));
 
     String packageIri = resourceIri(solution, "package");
     String packageName = literalValue(solution, "packageName");
