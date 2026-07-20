@@ -1,5 +1,7 @@
 package io.github.pkjpathania.dependencyrisk.graph.util;
 
+import com.github.packageurl.MalformedPackageURLException;
+import com.github.packageurl.PackageURL;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.query.Query;
 import org.apache.jena.query.QueryFactory;
@@ -22,5 +24,13 @@ public class SparqlUtil {
     if (!valid.isSelectType()) throw new IllegalStateException("Only select are supported");
 
     return valid;
+  }
+
+  public static String trimPurl(String purl) {
+    try {
+      return new PackageURL(purl).getCoordinates();
+    } catch (MalformedPackageURLException e) {
+      throw new IllegalArgumentException("Invalid package URL: " + purl, e);
+    }
   }
 }

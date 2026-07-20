@@ -10,6 +10,7 @@ import io.github.pkjpathania.dependencyrisk.graph.model.CvssAssessmentView;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencySummary;
 import io.github.pkjpathania.dependencyrisk.graph.model.FixedVersionView;
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
+import io.github.pkjpathania.dependencyrisk.graph.util.SparqlUtil;
 import java.net.URI;
 import java.time.DateTimeException;
 import java.time.Instant;
@@ -355,40 +356,27 @@ public class ExplorerService {
         new ParameterizedSparqlString(
             PREFIXES
                 + """
-                SELECT
-                  ?package
-                  ?name
-                  ?version
-                  ?purl
-                  ?direct
-                WHERE {
+                SELECT DISTINCT
+                                       ?package
+                                       ?name
+                                       ?version
+                                       ?purl
+                                       ?direct
+                                     WHERE {
+                                       ?application risk:dependsOn+ ?package .
 
-                  ?application risk:activeImport ?importRun .
-                  ?importRun risk:rootOccurrence ?root .
-                  ?root risk:belongsToImport ?importRun ; risk:dependsOn+ ?occurrence .
-                  ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
+                                       OPTIONAL { ?package risk:name ?name . }
+                                       OPTIONAL { ?package risk:version ?version . }
+                                       OPTIONAL { ?package risk:purl ?purl . }
 
-                  ?package
-                      rdf:type risk:PackageVersion ;
-                      rdfs:label ?name .
-
-                  OPTIONAL {
-                    ?package risk:version ?version
-                  }
-
-                  OPTIONAL {
-                    ?package risk:purl ?purl
-                  }
-
-                  BIND(
-                    EXISTS {
-                      ?root risk:dependsOn ?occurrence
-                    }
-                    AS ?direct
-                  )
-                }
-
-                ORDER BY LCASE(?name)
+                                       BIND(
+                                         EXISTS {
+                                           ?application risk:dependsOn ?package .
+                                         }
+                                         AS ?direct
+                                       )
+                                     }
+                                     ORDER BY DESC(?direct) LCASE(STR(?name))
                 """);
 
     sparql.setIri("application", iri);
@@ -532,11 +520,14 @@ public class ExplorerService {
 
   private DependencySummary toDependencySummary(QuerySolution solution) {
 
+    String purl = repository.getValue(solution, "purl");
+    String cordinates = SparqlUtil.trimPurl(purl);
+
     return new DependencySummary(
         repository.getValue(solution, "package"),
         repository.getValue(solution, "name"),
         repository.getValue(solution, "version"),
-        repository.getValue(solution, "purl"),
+        cordinates,
         repository.getBoolean(solution, "direct"));
   }
 

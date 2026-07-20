@@ -82,7 +82,7 @@ export function DependenciesView({ dependencies, loading, error, onRefresh }: De
         <Table stickyHeader size="small" aria-label="Dependencies table">
           <TableHead>
             <TableRow>
-              <HeaderCell>Package</HeaderCell>
+              <HeaderCell>Name</HeaderCell>
               <HeaderCell>Version</HeaderCell>
               <HeaderCell>PURL</HeaderCell>
               <HeaderCell align="center">Direct</HeaderCell>
