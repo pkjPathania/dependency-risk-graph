@@ -1,6 +1,8 @@
 spring:
   application:
     name: dependency-risk-graph
+  config:
+    import: optional:file:.env[.properties]
   threads:
     virtual:
       enabled: true
@@ -212,3 +214,13 @@ dependency-risk:
         sourceUrl:
           "[@id]": "risk:sourceUrl"
           "[@type]": "@id"
+
+
+  ai:
+    model:
+      provider: groq
+      base-url: https://api.groq.com/openai/v1
+      model-name: llama-3.3-70b-versatile
+      api-key: ${AI_API_KEY:}
+      temperature: 0.1
+      timeout: 60s

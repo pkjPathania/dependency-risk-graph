@@ -1,5 +1,6 @@
 HELP.md
 .DS_Store
+.env
 target/
 src/main/frontend/node_modules/
 .mvn/wrapper/maven-wrapper.jar
