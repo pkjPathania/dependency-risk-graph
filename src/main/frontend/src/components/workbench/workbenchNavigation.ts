@@ -1,5 +1,5 @@
 export const workbenchNavigation = [
-  { id: 'assistant', label: 'Assistant' },
+  { id: 'assistant', label: 'Buggy' },
   { id: 'dependency-analysis', label: 'Dependency Analysis' },
   { id: 'cve-analysis', label: 'CVE Analysis' },
   { id: 'evidence', label: 'Evidence' },

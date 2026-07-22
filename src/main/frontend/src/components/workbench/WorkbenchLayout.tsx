@@ -70,7 +70,7 @@ export function WorkbenchLayout({
               sx: {
                 width: workbenchStyles.desktopSidebarWidth,
                 p: 1,
-                bgcolor: designTokens.colors.navigation
+                bgcolor: designTokens.shell.sidebar
               }
             }
           }}
@@ -92,9 +92,9 @@ export function WorkbenchLayout({
           minHeight: { xs: 520, md: 'auto' },
           px: { xs: 2, sm: 3, md: 3.5 },
           py: 3,
-          bgcolor: designTokens.colors.surface,
+          bgcolor: designTokens.surface.panel,
           border: '1px solid',
-          borderColor: designTokens.colors.border,
+          borderColor: designTokens.border.default,
           borderRadius: workbenchStyles.panelRadius,
           overflow: 'hidden'
         }}

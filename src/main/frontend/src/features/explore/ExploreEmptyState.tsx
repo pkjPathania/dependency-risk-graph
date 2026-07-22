@@ -7,7 +7,7 @@ interface ExploreEmptyStateProps {
 
 export function ExploreEmptyState({ title, message }: ExploreEmptyStateProps) {
   return (
-    <Card variant="outlined" sx={{ bgcolor: 'background.default' }}>
+    <Card variant="outlined">
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
         <Stack spacing={0.75}>
           <Typography variant="subtitle2" fontWeight={800} sx={{ fontSize: '0.82rem' }}>

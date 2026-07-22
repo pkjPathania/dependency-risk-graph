@@ -29,7 +29,9 @@ export function WorkbenchSidebar({
         px: 1.625,
         pt: 2,
         pb: 2,
-        bgcolor: designTokens.colors.navigation,
+        bgcolor: designTokens.shell.sidebar,
+        border: '1px solid',
+        borderColor: designTokens.border.default,
         borderRadius: workbenchStyles.panelRadius,
         overflow: 'hidden'
       }}

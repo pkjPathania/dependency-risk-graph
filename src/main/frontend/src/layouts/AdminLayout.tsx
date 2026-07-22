@@ -25,16 +25,16 @@ export function AdminLayout({
   const theme = useTheme();
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: designTokens.colors.canvas }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: designTokens.surface.app }}>
       <AppBar
         position="sticky"
         color="default"
         sx={{
           zIndex: theme.zIndex.appBar,
           backdropFilter: 'blur(12px)',
-          backgroundColor: designTokens.colors.navigation,
+          backgroundColor: designTokens.shell.topbar,
           borderBottom: '1px solid',
-          borderColor: designTokens.colors.navigationSelected,
+          borderColor: designTokens.border.default,
           boxShadow: 'none'
         }}
       >
@@ -70,7 +70,7 @@ export function AdminLayout({
                 '& .MuiTabs-indicator': {
                   height: 3,
                   borderRadius: 999,
-                  backgroundColor: designTokens.colors.accent
+                  backgroundColor: designTokens.accent.lime
                 }
               }}
             >
@@ -89,10 +89,16 @@ export function AdminLayout({
                     borderRadius: 999,
                     textTransform: 'none',
                     fontWeight: 700,
-                    color: designTokens.colors.navigationTextMuted,
+                    color: designTokens.text.navigationSecondary,
                     '&.Mui-selected': {
-                      color: designTokens.colors.white,
-                      backgroundColor: designTokens.colors.navigationSelected
+                      color: designTokens.text.navigationPrimary,
+                      backgroundColor: 'transparent'
+                    },
+                    '&:hover': {
+                      backgroundColor: designTokens.shell.topbarHover
+                    },
+                    '&.Mui-selected:hover': {
+                      backgroundColor: designTokens.shell.topbarHover
                     }
                   }}
                 />
@@ -108,7 +114,7 @@ export function AdminLayout({
           pt: 3,
           px: { xs: 1.5, sm: 2.5, md: 3 },
           pb: 3,
-          bgcolor: designTokens.colors.appShell
+          bgcolor: designTokens.surface.app
         }}
       >
         {children}

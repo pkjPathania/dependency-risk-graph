@@ -34,6 +34,7 @@ import type {
   CveImpactScope,
   ImpactGraphNode
 } from '../../api/types';
+import { designTokens } from '../../theme/designTokens';
 import { severityColors, type Severity } from '../../types/severity';
 import { fetchCveImpactDetail } from './exploreApi';
 import { CveImpactGraph } from './CveImpactGraph';
@@ -272,7 +273,7 @@ function isResolvedPath(status: string): boolean {
 
 function ImpactDetailsPanel({ detail, selectedNode, tab, onTabChange }: { detail: CveImpactDetailResponse; selectedNode: ImpactGraphNode | null; tab: number; onTabChange: (value: number) => void }) {
   return <Paper variant="outlined" sx={{ p: 1.5, minHeight: 480, overflow: 'auto' }}>
-    {selectedNode ? <Alert severity="info" sx={{ mb: 1.5 }}><strong>{selectedNode.label}</strong>{selectedNode.version ? ` ${selectedNode.version}` : ''}<br />{nodeContext(selectedNode)}</Alert> : null}
+    {selectedNode ? <SelectedNodeHeader node={selectedNode} /> : null}
     <Tabs value={tab} onChange={(_, value: number) => onTabChange(value)} variant="fullWidth"><Tab label="Details" /><Tab label="CVSS" /><Tab label="References" /></Tabs>
     <Divider sx={{ mb: 1.5 }} />
     {tab === 0 ? <Stack spacing={1.5}>
@@ -286,6 +287,25 @@ function ImpactDetailsPanel({ detail, selectedNode, tab, onTabChange }: { detail
     {tab === 1 ? <Stack spacing={1.5}>{detail.cvssAssessments.length ? detail.cvssAssessments.map((assessment) => <Box key={assessment.iri ?? assessment.vector}><Typography fontWeight={900}>CVSS {assessment.version ?? assessment.type ?? ''}</Typography><Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>{assessment.vector}</Typography></Box>) : <Typography color="text.secondary">No CVSS assessment listed.</Typography>}</Stack> : null}
     {tab === 2 ? <Stack spacing={1}>{detail.referenceUrls.length ? detail.referenceUrls.map((url) => <ExternalReference key={url} value={url} />) : <Typography color="text.secondary">No references listed.</Typography>}</Stack> : null}
   </Paper>;
+}
+
+function SelectedNodeHeader({ node }: { node: ImpactGraphNode }) {
+  const purl = typeof node.metadata.purl === 'string' ? node.metadata.purl : null;
+  return <Alert
+    severity="info"
+    sx={{
+      mb: 1.5,
+      '& .MuiAlert-icon': { color: designTokens.graph.node.warning.border },
+      '& .MuiAlert-message': { minWidth: 0 }
+    }}
+  >
+    <Typography className="selected-package-title" variant="body2" sx={{ color: designTokens.text.primary, fontWeight: 700, overflowWrap: 'anywhere' }}>
+      {node.label}
+    </Typography>
+    {node.version ? <Typography className="selected-package-version" variant="body2" sx={{ color: designTokens.text.secondary, fontWeight: 600 }}>{node.version}</Typography> : null}
+    {purl ? <Typography className="selected-package-purl" variant="caption" sx={{ display: 'block', color: designTokens.text.muted, fontWeight: 400, overflowWrap: 'anywhere' }}>{purl}</Typography> : null}
+    <Typography variant="caption" sx={{ display: 'block', color: designTokens.text.muted }}>{nodeContext(node, Boolean(purl))}</Typography>
+  </Alert>;
 }
 
 function ScopeSelect({ scope, onChange }: { scope: CveImpactScope; onChange: (scope: CveImpactScope) => void }) {
@@ -367,13 +387,13 @@ function Detail({ label, value, pre = false }: { label: string; value: string | 
 function CenteredProgress({ label }: { label: string }) { return <Box sx={{ minHeight: 260, display: 'grid', placeItems: 'center' }}><CircularProgress aria-label={label} /></Box>; }
 function formatDate(value: string | null): string { if (!value) return '—'; const date = new Date(value); return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date); }
 function distinctPackageVersions(detail: CveImpactDetailResponse): string[] { return Array.from(new Set(detail.exposures.map((exposure) => `${exposure.vulnerablePackage.name} ${exposure.vulnerablePackage.version ?? ''}`.trim()))); }
-function nodeContext(node: ImpactGraphNode): string {
+function nodeContext(node: ImpactGraphNode, omitPurl = false): string {
   if (node.nodeType === 'APPLICATION') return `${node.metadata.exposureCount ?? 0} matching paths`;
   if (node.nodeType === 'DEPENDENCY' || node.nodeType === 'VULNERABLE_PACKAGE') {
     const applications = Array.isArray(node.metadata.applications) ? node.metadata.applications.join(', ') : 'No application context';
-    const purl = typeof node.metadata.purl === 'string' && node.metadata.purl ? ` · ${node.metadata.purl}` : '';
+    const purl = !omitPurl && typeof node.metadata.purl === 'string' && node.metadata.purl ? ` · ${node.metadata.purl}` : '';
     return `${applications}${purl}`;
   }
-  if (node.nodeType === 'FIXED_VERSION') return typeof node.metadata.purl === 'string' && node.metadata.purl ? node.metadata.purl : 'Fixed package version';
+  if (node.nodeType === 'FIXED_VERSION') return !omitPurl && typeof node.metadata.purl === 'string' && node.metadata.purl ? node.metadata.purl : 'Fixed package version';
   return `${node.metadata.severity ?? 'UNRATED'} · ${node.metadata.affectedApplicationCount ?? 0} applications`;
 }

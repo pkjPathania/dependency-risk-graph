@@ -48,7 +48,7 @@ export function ExploreDataTable({
                 borderRadius: 2,
                 px: 2,
                 py: 2.25,
-                bgcolor: 'background.default'
+                bgcolor: 'background.paper'
               }}
             >
               <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>

@@ -20,9 +20,9 @@ export function WorkbenchPlaceholder({
       sx={{
         minHeight,
         p: 2.5,
-        bgcolor: designTokens.colors.surfaceMuted,
+        bgcolor: designTokens.surface.card,
         border: '1px dashed',
-        borderColor: designTokens.colors.border,
+        borderColor: designTokens.border.default,
         borderRadius: 2
       }}
     >

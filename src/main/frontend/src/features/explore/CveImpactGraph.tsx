@@ -25,7 +25,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ImpactGraph, ImpactGraphNode } from '../../api/types';
+import type { ImpactGraph, ImpactGraphEdge, ImpactGraphNode } from '../../api/types';
 import { designTokens } from '../../theme/designTokens';
 import { layoutImpactGraph } from './cveImpactElkLayout';
 import {
@@ -103,18 +103,21 @@ function CveImpactFlow({ graph, selectedExposureId, onSelectExposure, onSelectNo
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        bgcolor: designTokens.colors.surfaceMuted,
+        bgcolor: designTokens.surface.app,
         height: { xs: 460, lg: 520 },
         minHeight: 460,
         width: '100%',
         '& .react-flow__controls-button': {
-          bgcolor: designTokens.colors.surface,
-          color: designTokens.colors.textPrimary,
-          borderColor: designTokens.colors.border
+          bgcolor: designTokens.surface.card,
+          color: designTokens.text.primary,
+          borderColor: designTokens.border.default
         },
         '& .react-flow__minimap': {
-          bgcolor: designTokens.colors.surface,
-          border: `1px solid ${designTokens.colors.border}`
+          bgcolor: designTokens.surface.panel,
+          border: `1px solid ${designTokens.border.default}`
+        },
+        '& .react-flow__node, & .react-flow__node .MuiTypography-root, & .react-flow__node .MuiChip-root': {
+          opacity: 1
         }
       }}
     >
@@ -139,7 +142,7 @@ function CveImpactFlow({ graph, selectedExposureId, onSelectExposure, onSelectNo
           maxZoom={2.5}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color={designTokens.colors.border} />
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color={designTokens.border.default} />
           <Controls position="bottom-right" showInteractive={false} />
           <MiniMap pannable zoomable nodeColor={miniMapColor} />
           <Panel position="top-right">
@@ -204,12 +207,22 @@ function ImpactNodeCard({ data, selected, tone, kind, target = false, source = f
   return (
     <Paper
       elevation={selected ? 8 : 2}
-      sx={{ width: 220, minHeight: 92, p: 1.25, border: 2, borderColor: selected ? designTokens.colors.accent : colors.border, bgcolor: colors.background, borderRadius: tone === 'error' ? 3 : 2 }}
+      sx={{
+        width: 220,
+        minHeight: 92,
+        p: 1.25,
+        border: 2,
+        borderColor: selected ? designTokens.accent.lime : colors.border,
+        bgcolor: colors.background,
+        color: colors.primaryText,
+        opacity: 1,
+        borderRadius: tone === 'error' ? 3 : 2
+      }}
     >
       {target ? <Handle type="target" position={Position.Left} style={{ background: colors.border }} /> : null}
-      <Typography variant="overline" lineHeight={1} fontWeight={900} color="text.secondary">{kind}</Typography>
-      <Typography variant="body2" fontWeight={950} sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>{data.label}</Typography>
-      {data.version ? <Chip size="small" label={data.version} sx={{ mt: 0.75, maxWidth: '100%' }} /> : null}
+      <Typography className="node-type" variant="overline" lineHeight={1} sx={{ color: colors.typeText, fontWeight: 700, opacity: 1 }}>{kind}</Typography>
+      <Typography className="node-title" variant="body2" sx={{ mt: 0.5, color: colors.primaryText, fontWeight: 700, opacity: 1, overflowWrap: 'anywhere' }}>{data.label}</Typography>
+      {data.version ? <Chip className="node-version" size="small" label={data.version} sx={{ mt: 0.75, maxWidth: '100%', color: colors.metaText, fontWeight: 500, opacity: 1 }} /> : null}
       {source ? <Handle type="source" position={Position.Right} style={{ background: colors.border }} /> : null}
     </Paper>
   );
@@ -217,10 +230,11 @@ function ImpactNodeCard({ data, selected, tone, kind, target = false, source = f
 
 function SemanticEdge(props: EdgeProps<ImpactFlowEdge>) {
   const [path, labelX, labelY] = getSmoothStepPath(props);
+  const labelColor = edgeLabelColor(props.data?.relationship);
   return (
     <>
       <BaseEdge path={path} markerEnd={props.markerEnd} style={props.style} />
-      {props.label ? <EdgeLabelRenderer><Box sx={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`, bgcolor: 'background.paper', px: 0.5, borderRadius: 0.5, pointerEvents: 'none', color: props.labelStyle?.fill, fontSize: 10, fontWeight: 900 }}>{String(props.label)}</Box></EdgeLabelRenderer> : null}
+      {props.label ? <EdgeLabelRenderer><Box className="react-flow__edge-text" sx={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`, bgcolor: designTokens.surface.card, border: `1px solid ${designTokens.border.default}`, px: 0.5, borderRadius: 0.5, pointerEvents: 'none', color: labelColor, fontSize: 10, fontWeight: 700, lineHeight: 1.4, opacity: 1 }}>{String(props.label)}</Box></EdgeLabelRenderer> : null}
     </>
   );
 }
@@ -239,17 +253,20 @@ function Legend({ label, color, dashed = false }: { label: string; color: string
 }
 
 function nodeColors(tone: 'primary' | 'warning' | 'error' | 'success' | 'neutral') {
-  if (tone === 'primary') return { border: designTokens.colors.navigation, background: designTokens.colors.surface };
-  if (tone === 'warning') return { border: designTokens.security.high, background: designTokens.securitySurface.high };
-  if (tone === 'error') return { border: designTokens.security.critical, background: designTokens.securitySurface.critical };
-  if (tone === 'success') return { border: designTokens.security.safe, background: designTokens.securitySurface.safe };
-  return { border: designTokens.colors.border, background: designTokens.colors.surface };
+  return designTokens.graph.node[tone];
+}
+
+function edgeLabelColor(relationship: ImpactGraphEdge['relationship'] | undefined): string {
+  if (relationship === 'AFFECTED_BY') return designTokens.graph.edge.affectedBy;
+  if (relationship === 'FIXED_IN') return designTokens.graph.edge.fixedIn;
+  if (relationship === 'DEPENDS_ON') return designTokens.graph.edge.dependsOn;
+  return designTokens.graph.edge.identity;
 }
 
 function miniMapColor(node: ImpactFlowNode): string {
   if (node.type === 'vulnerability') return designTokens.security.critical;
   if (node.type === 'fixedVersion') return designTokens.security.safe;
   if (node.type === 'vulnerablePackage') return designTokens.security.high;
-  if (node.type === 'application') return designTokens.colors.navigation;
+  if (node.type === 'application') return designTokens.shell.topbar;
   return designTokens.security.unknown;
 }

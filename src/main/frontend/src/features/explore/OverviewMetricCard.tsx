@@ -16,7 +16,7 @@ export function OverviewMetricCard({ label, value, caption, loading }: OverviewM
         borderRadius: 2,
         px: 1.25,
         py: 1,
-        bgcolor: 'background.default',
+        bgcolor: 'background.paper',
         minWidth: 0
       }}
     >

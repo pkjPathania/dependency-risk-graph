@@ -332,7 +332,7 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
                   borderRadius: 2,
                   px: 2,
                   py: 2.25,
-                  bgcolor: 'background.default'
+                  bgcolor: 'background.paper'
                 }}
               >
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>
@@ -429,7 +429,7 @@ function FieldShell({ label, children }: { label: string; children: ReactNode })
         borderRadius: 2,
         px: 1.1,
         py: 0.9,
-        bgcolor: 'background.default',
+        bgcolor: 'background.paper',
         minWidth: 0
       }}
     >

@@ -18,15 +18,15 @@ export function DependencyRiskGraphBrand({ onClick }: DependencyRiskGraphBrandPr
         flexShrink: 0,
         borderRadius: '12px',
         p: 0.25,
-        color: designTokens.colors.brandWhite,
+        color: designTokens.text.navigationPrimary,
         '&:hover': {
-          color: designTokens.colors.navigationTextMuted,
+          color: designTokens.text.navigationSecondary,
           '& > div': {
-            bgcolor: designTokens.colors.accentHover
+            bgcolor: designTokens.text.navigationPrimary
           }
         },
         '&:focus-visible': {
-          outline: `3px solid ${designTokens.colors.accent}`,
+          outline: `2px solid ${designTokens.accent.limeHover}`,
           outlineOffset: 3
         }
       }}

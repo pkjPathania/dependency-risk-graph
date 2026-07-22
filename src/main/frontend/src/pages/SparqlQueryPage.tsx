@@ -252,7 +252,7 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
                             borderRadius: 1.5,
                             border: '1px solid',
                             borderColor: 'divider',
-                            bgcolor: 'background.default',
+                            bgcolor: 'background.paper',
                             textAlign: 'center'
                           }}
                         >
@@ -306,7 +306,7 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
                       border: '1px dashed',
                       borderColor: 'divider',
                       borderRadius: 1,
-                      bgcolor: 'background.default'
+                      bgcolor: 'background.paper'
                     }}
                   >
                     <Typography variant="body2" color="text.secondary">

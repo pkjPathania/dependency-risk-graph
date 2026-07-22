@@ -20,16 +20,16 @@ export function WorkbenchNavItem({ label, selected, onClick }: WorkbenchNavItemP
         minHeight: 46,
         px: 1.75,
         borderRadius: workbenchStyles.navigationItemRadius,
-        color: selected ? designTokens.colors.white : designTokens.colors.navigationTextMuted,
-        bgcolor: selected ? designTokens.colors.navigationSelected : 'transparent',
+        color: selected ? designTokens.text.navigationPrimary : designTokens.text.navigationSecondary,
+        bgcolor: selected ? designTokens.shell.sidebarActive : 'transparent',
         '&:hover': {
-          color: designTokens.colors.white,
+          color: designTokens.text.navigationPrimary,
           bgcolor: selected
-            ? designTokens.colors.navigationSelected
-            : designTokens.colors.navigationHover
+            ? designTokens.shell.sidebarActive
+            : designTokens.shell.sidebarHover
         },
         '&:focus-visible': {
-          outline: `3px solid ${designTokens.colors.accent}`,
+          outline: `2px solid ${designTokens.accent.limeHover}`,
           outlineOffset: -2
         },
         '&::after': selected
@@ -41,7 +41,7 @@ export function WorkbenchNavItem({ label, selected, onClick }: WorkbenchNavItemP
               bottom: 9,
               width: 3,
               borderRadius: 999,
-              bgcolor: designTokens.colors.accent
+              bgcolor: designTokens.accent.lime
             }
           : undefined
       }}

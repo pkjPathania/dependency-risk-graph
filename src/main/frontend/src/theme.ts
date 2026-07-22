@@ -1,32 +1,32 @@
 import { alpha, createTheme } from '@mui/material/styles';
 import { designTokens } from './theme/designTokens';
 
-const { colors, security } = designTokens;
+const { accent, border, disabled, security, shell, surface, text } = designTokens;
 
 export const appTheme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: colors.navigation,
-      dark: colors.navigationDark,
-      light: colors.surfaceMuted,
-      contrastText: colors.white
+      main: accent.lime,
+      dark: accent.limePressed,
+      light: accent.limeHover,
+      contrastText: accent.contrastText
     },
     secondary: {
-      main: colors.accent,
-      dark: colors.accentDark,
-      light: colors.accentLight,
-      contrastText: colors.textPrimary
+      main: shell.topbar,
+      dark: shell.sidebarActive,
+      light: shell.sidebar,
+      contrastText: text.navigationPrimary
     },
     background: {
-      default: colors.appShell,
-      paper: colors.surface
+      default: surface.app,
+      paper: surface.panel
     },
     text: {
-      primary: colors.textPrimary,
-      secondary: colors.textSecondary
+      primary: text.primary,
+      secondary: text.secondary
     },
-    divider: colors.border,
+    divider: border.default,
     error: {
       main: security.critical,
       dark: designTokens.securityDark.critical,
@@ -48,10 +48,11 @@ export const appTheme = createTheme({
       light: alpha(security.safe, 0.16)
     },
     action: {
-      hover: alpha(colors.navigation, 0.055),
-      selected: alpha(colors.navigation, 0.09),
-      disabledBackground: alpha(colors.navigation, 0.1),
-      focus: alpha(colors.accent, 0.65)
+      hover: alpha(shell.topbar, 0.055),
+      selected: alpha(shell.topbar, 0.09),
+      disabled: disabled.text,
+      disabledBackground: disabled.background,
+      focus: alpha(accent.lime, 0.65)
     }
   },
   shape: {
@@ -72,16 +73,16 @@ export const appTheme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
-        html: { height: '100%', backgroundColor: colors.canvas },
+        html: { height: '100%', backgroundColor: surface.app },
         body: {
           height: '100%',
-          backgroundColor: colors.canvas,
-          color: colors.textPrimary
+          backgroundColor: surface.app,
+          color: text.primary
         },
         '#root': { minHeight: '100%' },
         '::selection': {
-          backgroundColor: colors.accent,
-          color: colors.textPrimary
+          backgroundColor: accent.lime,
+          color: text.primary
         },
         'code, pre, kbd, samp': {
           fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace'
@@ -99,39 +100,44 @@ export const appTheme = createTheme({
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: colors.navigation,
-          color: colors.white,
+          backgroundColor: shell.topbar,
+          color: text.navigationPrimary,
           backgroundImage: 'none',
           boxShadow: 'none',
-          borderBottom: `1px solid ${colors.navigationSelected}`
+          borderBottom: `1px solid ${border.default}`
         }
+      }
+    },
+    MuiToolbar: {
+      styleOverrides: {
+        root: { color: 'inherit' }
       }
     },
     MuiDrawer: {
       styleOverrides: {
         paper: {
-          backgroundColor: colors.navigation,
-          color: colors.white,
-          borderColor: colors.navigationSelected
+          backgroundColor: shell.sidebar,
+          color: text.navigationPrimary,
+          borderColor: border.default
         }
       }
     },
     MuiPaper: {
       styleOverrides: {
         root: {
-          backgroundColor: colors.surface,
+          backgroundColor: surface.panel,
           backgroundImage: 'none',
-          borderColor: colors.border
+          borderColor: border.default
         },
         elevation1: { boxShadow: 'none' },
-        elevation2: { boxShadow: `0 8px 24px ${alpha(colors.navigation, 0.08)}` }
+        elevation2: { boxShadow: `0 8px 24px ${alpha(text.primary, 0.08)}` }
       }
     },
     MuiCard: {
       styleOverrides: {
         root: {
-          backgroundColor: colors.surface,
-          border: `1px solid ${colors.border}`,
+          backgroundColor: surface.card,
+          border: `1px solid ${border.default}`,
           boxShadow: 'none'
         }
       }
@@ -142,27 +148,54 @@ export const appTheme = createTheme({
           textTransform: 'none',
           borderRadius: 10,
           boxShadow: 'none',
+          '&.Mui-disabled': {
+            borderColor: disabled.border,
+            color: disabled.text,
+            opacity: 1
+          },
           '&:focus-visible': {
-            outline: `3px solid ${alpha(colors.accent, 0.85)}`,
+            outline: `2px solid ${alpha(accent.limeHover, 0.55)}`,
             outlineOffset: 2
           }
         },
         containedPrimary: {
-          backgroundColor: colors.navigation,
-          color: colors.white,
-          '&:hover': { backgroundColor: colors.navigationSelected, boxShadow: 'none' }
+          backgroundColor: accent.lime,
+          color: text.primary,
+          '&:hover': { backgroundColor: accent.limeHover, boxShadow: 'none' },
+          '&:active': { backgroundColor: accent.limePressed },
+          '&.Mui-disabled': {
+            backgroundColor: disabled.background,
+            color: disabled.text,
+            opacity: 1
+          }
         },
         containedSecondary: {
-          backgroundColor: colors.accent,
-          color: colors.textPrimary,
-          '&:hover': { backgroundColor: colors.accentHover, boxShadow: 'none' }
+          backgroundColor: surface.card,
+          color: text.primary,
+          border: `1px solid ${border.default}`,
+          '&:hover': {
+            backgroundColor: surface.app,
+            borderColor: border.strong,
+            boxShadow: 'none'
+          },
+          '&.Mui-disabled': {
+            backgroundColor: disabled.background,
+            color: disabled.text,
+            opacity: 1
+          }
         },
         outlinedPrimary: {
-          color: colors.textPrimary,
-          borderColor: colors.textSecondary,
+          color: text.primary,
+          borderColor: border.default,
           '&:hover': {
-            backgroundColor: alpha(colors.navigation, 0.05),
-            borderColor: colors.navigation
+            backgroundColor: surface.app,
+            borderColor: border.strong
+          },
+          '&.Mui-disabled': {
+            backgroundColor: disabled.background,
+            borderColor: disabled.border,
+            color: disabled.text,
+            opacity: 1
           }
         }
       }
@@ -170,10 +203,11 @@ export const appTheme = createTheme({
     MuiIconButton: {
       styleOverrides: {
         root: {
-          color: colors.textSecondary,
-          '&:hover': { backgroundColor: colors.surfaceMuted, color: colors.textPrimary },
+          color: text.secondary,
+          '&:hover': { backgroundColor: surface.app, color: text.primary },
+          '&.Mui-disabled': { color: disabled.text, opacity: 1 },
           '&:focus-visible': {
-            outline: `3px solid ${alpha(colors.accent, 0.85)}`,
+            outline: `2px solid ${alpha(accent.limeHover, 0.55)}`,
             outlineOffset: 2
           }
         }
@@ -182,62 +216,104 @@ export const appTheme = createTheme({
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          backgroundColor: colors.white,
-          '& .MuiOutlinedInput-notchedOutline': { borderColor: colors.border },
-          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: colors.textSecondary },
+          backgroundColor: surface.card,
+          '& .MuiOutlinedInput-notchedOutline': { borderColor: border.default },
+          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: border.strong },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-            borderColor: colors.navigation,
-            boxShadow: `0 0 0 3px ${alpha(colors.accent, 0.72)}`
+            borderColor: accent.limePressed,
+            boxShadow: `0 0 0 2px ${alpha(accent.limeHover, 0.28)}`
+          },
+          '&.Mui-disabled': {
+            backgroundColor: disabled.background,
+            color: disabled.text,
+            opacity: 1,
+            '& .MuiOutlinedInput-notchedOutline': { borderColor: disabled.border }
           }
         },
         input: {
-          '&::placeholder': { color: colors.textSecondary, opacity: 0.78 }
+          color: text.primary,
+          '&::placeholder': { color: text.placeholder, opacity: 1 },
+          '&.Mui-disabled': { WebkitTextFillColor: disabled.text, opacity: 1 }
         }
       }
     },
     MuiTextField: {
       styleOverrides: {
-        root: { '& .MuiOutlinedInput-root': { backgroundColor: colors.white } }
+        root: {
+          '& .MuiOutlinedInput-root': {
+            backgroundColor: surface.card,
+            '&.Mui-disabled': { backgroundColor: disabled.background }
+          }
+        }
       }
     },
     MuiSelect: {
       styleOverrides: {
-        select: { backgroundColor: colors.white }
+        select: {
+          backgroundColor: surface.card,
+          color: text.primary,
+          '&.Mui-disabled': {
+            backgroundColor: disabled.background,
+            WebkitTextFillColor: disabled.text,
+            opacity: 1
+          }
+        }
+      }
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          color: text.secondary,
+          '&.Mui-focused': { color: text.primary },
+          '&.Mui-disabled': { color: disabled.text, opacity: 1 }
+        }
       }
     },
     MuiChip: {
       styleOverrides: {
         root: {
           fontWeight: 700,
-          backgroundColor: colors.surfaceMuted,
-          color: colors.textPrimary
+          backgroundColor: surface.app,
+          color: text.primary,
+          '&.Mui-disabled': {
+            backgroundColor: disabled.background,
+            color: disabled.text,
+            opacity: 1
+          }
         },
-        outlined: { borderColor: colors.border }
+        outlined: { borderColor: border.default }
       }
     },
     MuiTabs: {
       styleOverrides: {
-        indicator: { backgroundColor: colors.accent, height: 3 }
+        indicator: { backgroundColor: accent.lime, height: 3 }
       }
     },
     MuiTab: {
       styleOverrides: {
         root: {
-          color: colors.textSecondary,
-          '&.Mui-selected': { color: colors.textPrimary },
-          '&:focus-visible': { outline: `3px solid ${alpha(colors.accent, 0.85)}`, outlineOffset: -3 }
+          color: text.secondary,
+          '&.Mui-selected': { color: text.primary },
+          '&.Mui-disabled': { color: disabled.text, opacity: 1 },
+          '&:focus-visible': { outline: `2px solid ${alpha(accent.limeHover, 0.55)}`, outlineOffset: -2 }
         }
       }
     },
     MuiToggleButton: {
       styleOverrides: {
         root: {
-          borderColor: colors.border,
-          color: colors.textSecondary,
+          borderColor: border.default,
+          color: text.secondary,
           '&.Mui-selected': {
-            backgroundColor: colors.accent,
-            color: colors.textPrimary,
-            '&:hover': { backgroundColor: colors.accentHover }
+            backgroundColor: accent.lime,
+            color: text.primary,
+            '&:hover': { backgroundColor: accent.limeHover }
+          },
+          '&.Mui-disabled': {
+            backgroundColor: disabled.background,
+            borderColor: disabled.border,
+            color: disabled.text,
+            opacity: 1
           }
         }
       }
@@ -245,9 +321,9 @@ export const appTheme = createTheme({
     MuiMenu: {
       styleOverrides: {
         paper: {
-          backgroundColor: colors.white,
-          border: `1px solid ${colors.border}`,
-          boxShadow: `0 12px 30px ${alpha(colors.navigation, 0.12)}`
+          backgroundColor: surface.elevated,
+          border: `1px solid ${border.default}`,
+          boxShadow: `0 12px 30px ${alpha(text.primary, 0.12)}`
         }
       }
     },
@@ -255,58 +331,88 @@ export const appTheme = createTheme({
       styleOverrides: {
         root: {
           '&.Mui-selected': {
-            backgroundColor: colors.surfaceMuted,
-            '&:hover': { backgroundColor: colors.border }
+            backgroundColor: surface.app,
+            '&:hover': { backgroundColor: alpha(accent.lime, 0.18) }
+          },
+          '&.Mui-disabled': {
+            color: disabled.text,
+            opacity: 1
           }
+        }
+      }
+    },
+    MuiFormLabel: {
+      styleOverrides: {
+        root: {
+          '&.Mui-disabled': { color: disabled.text, opacity: 1 }
         }
       }
     },
     MuiDialog: {
       styleOverrides: {
         paper: {
-          backgroundColor: colors.appShell,
-          border: `1px solid ${colors.border}`,
-          boxShadow: `0 20px 56px ${alpha(colors.navigation, 0.18)}`
+          backgroundColor: surface.panel,
+          border: `1px solid ${border.default}`,
+          boxShadow: `0 20px 56px ${alpha(text.primary, 0.18)}`
         }
       }
     },
     MuiTooltip: {
       styleOverrides: {
-        tooltip: { backgroundColor: colors.navigation, color: colors.white }
+        tooltip: { backgroundColor: text.primary, color: surface.elevated }
       }
     },
     MuiTableCell: {
       styleOverrides: {
-        root: { borderColor: colors.border },
+        root: { borderColor: border.default },
         head: {
           fontWeight: 700,
-          color: colors.textPrimary,
-          backgroundColor: colors.surfaceMuted
+          color: text.primary,
+          backgroundColor: surface.app
+        }
+      }
+    },
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          backgroundColor: surface.card,
+          borderColor: border.default
         }
       }
     },
     MuiTableRow: {
       styleOverrides: {
-        root: { '&.MuiTableRow-hover:hover': { backgroundColor: alpha(colors.navigation, 0.035) } }
+        root: {
+          '&.MuiTableRow-hover:hover': { backgroundColor: alpha(text.primary, 0.035) },
+          '&.Mui-selected': {
+            backgroundColor: alpha(accent.lime, 0.18),
+            '&:hover': { backgroundColor: alpha(accent.lime, 0.24) }
+          }
+        }
       }
     },
     MuiTablePagination: {
       styleOverrides: {
-        root: { color: colors.textSecondary }
+        root: { color: text.secondary }
       }
     },
     MuiLinearProgress: {
       styleOverrides: {
-        root: { backgroundColor: colors.surfaceMuted },
-        bar: { backgroundColor: colors.accent }
+        root: { backgroundColor: surface.app },
+        bar: { backgroundColor: shell.topbar }
+      }
+    },
+    MuiDivider: {
+      styleOverrides: {
+        root: { borderColor: border.default }
       }
     },
     MuiLink: {
       styleOverrides: {
         root: {
-          color: colors.textPrimary,
-          textDecorationColor: colors.textSecondary,
-          '&:hover': { textDecorationColor: colors.textPrimary }
+          color: text.primary,
+          textDecorationColor: text.secondary,
+          '&:hover': { textDecorationColor: text.primary }
         }
       }
     }

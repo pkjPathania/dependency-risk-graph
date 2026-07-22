@@ -75,7 +75,7 @@ export function SbomUploadPanel({
       sx={{
         height: '100%',
         overflow: 'hidden',
-        background: `linear-gradient(145deg, ${designTokens.colors.surface} 0%, ${designTokens.colors.surfaceMuted} 100%)`
+        backgroundColor: designTokens.surface.card
       }}
     >
       {loading ? <LinearProgress aria-label="Uploading SBOM" /> : null}
@@ -107,13 +107,13 @@ export function SbomUploadPanel({
                   p: 2.5,
                   textAlign: 'center',
                   border: '1.5px dashed',
-                  borderColor: isDragging ? designTokens.colors.accent : selectedFile ? 'success.main' : 'divider',
+                  borderColor: isDragging ? designTokens.border.strong : selectedFile ? 'success.main' : 'divider',
                   borderRadius: 2,
                   bgcolor: isDragging
-                    ? designTokens.colors.surfaceMuted
+                    ? designTokens.surface.panel
                     : selectedFile
                       ? alpha(designTokens.security.safe, 0.08)
-                      : designTokens.colors.white,
+                      : designTokens.surface.card,
                   transition: 'background-color 160ms ease, border-color 160ms ease'
                 }}
               >
@@ -125,10 +125,10 @@ export function SbomUploadPanel({
                       width: 48,
                       height: 48,
                       borderRadius: '14px',
-                      color: selectedFile ? 'success.main' : designTokens.colors.navigation,
+                      color: selectedFile ? 'success.main' : designTokens.text.primary,
                       bgcolor: selectedFile
                         ? alpha(designTokens.security.safe, 0.16)
-                        : designTokens.colors.surfaceMuted
+                        : designTokens.surface.panel
                     }}
                   >
                     {selectedFile ? <CheckCircleOutlineRoundedIcon /> : <UploadFileRoundedIcon />}

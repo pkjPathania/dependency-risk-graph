@@ -32,8 +32,8 @@ export function DependencyPathNodeCard({ node }: DependencyPathNodeCardProps) {
       sx={{
         width: '100%',
         borderLeft: '4px solid',
-        borderLeftColor: isApplication ? designTokens.colors.navigation : designTokens.security.low,
-        backgroundColor: isApplication ? designTokens.colors.surfaceMuted : designTokens.colors.surface,
+        borderLeftColor: isApplication ? designTokens.shell.topbar : designTokens.security.low,
+        backgroundColor: isApplication ? designTokens.surface.panel : designTokens.surface.card,
         borderRadius: 1.5
       }}
     >

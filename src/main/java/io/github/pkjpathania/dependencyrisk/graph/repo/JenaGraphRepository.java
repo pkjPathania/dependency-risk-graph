@@ -310,4 +310,8 @@ public class JenaGraphRepository {
           return new OsvStoreResult(parsedTriples, after - before, after);
         });
   }
+
+  public Dataset dataset() {
+    return dataset;
+  }
 }

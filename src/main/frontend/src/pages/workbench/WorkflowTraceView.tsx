@@ -28,10 +28,10 @@ export function WorkflowTraceView() {
                   width: 30,
                   height: 30,
                   border: '1px solid',
-                  borderColor: designTokens.colors.border,
+                  borderColor: designTokens.border.default,
                   borderRadius: '50%',
-                  bgcolor: designTokens.colors.surfaceMuted,
-                  color: designTokens.colors.textSecondary,
+                  bgcolor: designTokens.surface.card,
+                  color: designTokens.text.secondary,
                   fontSize: '0.78rem',
                   fontWeight: 700
                 }}
@@ -39,7 +39,7 @@ export function WorkflowTraceView() {
                 {index + 1}
               </Box>
               {index < workflowSteps.length - 1 && (
-                <Box sx={{ width: 1, flex: 1, bgcolor: designTokens.colors.border }} />
+                <Box sx={{ width: 1, flex: 1, bgcolor: designTokens.border.default }} />
               )}
             </Box>
             <Typography sx={{ pt: 0.5, fontWeight: 600, color: 'text.secondary' }}>
