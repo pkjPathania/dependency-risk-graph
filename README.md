@@ -6,6 +6,38 @@ The graph is the source of truth. Ingestion and enrichment write RDF; the Explor
 
 ![Dependency Risk Graph overview](docs/sample/overview.png)
 
+## Table of Contents
+
+- [What the Application Does](#what-the-application-does)
+- [Current Architecture](#current-architecture)
+  - [Design principles](#design-principles)
+- [End-to-End Data Flow](#end-to-end-data-flow)
+  - [CycloneDX ingestion](#1-cyclonedx-ingestion)
+  - [Application OSV enrichment](#2-application-osv-enrichment)
+  - [Explore and CVE impact](#3-explore-and-cve-impact)
+  - [Advisory evidence indexing and retrieval](#4-advisory-evidence-indexing-and-retrieval)
+- [RDF Model](#rdf-model)
+  - [CycloneDX occurrence graph](#cyclonedx-occurrence-graph)
+  - [OSV enrichment graph](#osv-enrichment-graph)
+- [User Interface](#user-interface)
+  - [Overview and ingestion](#overview-and-ingestion)
+  - [Application overview](#application-overview)
+  - [Dependencies](#dependencies)
+  - [Vulnerabilities and advisory detail](#vulnerabilities-and-advisory-detail)
+  - [References](#references)
+  - [CVE impact](#cve-impact)
+  - [SPARQL](#sparql)
+  - [AI Workbench advisory evidence](#ai-workbench-advisory-evidence)
+- [API Reference](#api-reference)
+- [Quick Start](#quick-start)
+- [SPARQL Examples](#sparql-examples)
+- [Configuration](#configuration)
+- [Development](#development)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Current Limitations](#current-limitations)
+- [License](#license)
+
 ## What the Application Does
 
 - Accepts a CycloneDX JSON SBOM as multipart form data at `POST /rdf/new`.
