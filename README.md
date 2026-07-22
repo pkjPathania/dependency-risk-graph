@@ -20,6 +20,7 @@ The graph is the source of truth. Ingestion and enrichment write RDF; the Explor
 - Exposes application-centric Explore tabs for overview, dependencies, vulnerabilities, references, and CVE impact.
 - Provides unrestricted read-only SPARQL `SELECT` execution through the UI/API.
 - Renders application-to-vulnerability paths with React Flow and ELK.
+- Rebuilds an in-memory advisory evidence index from the RDF graph and exposes global semantic evidence search in AI Workbench.
 
 ## Current Architecture
 
@@ -44,13 +45,20 @@ flowchart LR
         TDB --> SPARQL[SPARQL service]
         TDB --> META[Graph metadata]
         TDB --> PATH[Dependency-path projection]
+        TDB --> EVIDENCE[Advisory evidence projection]
     end
+
+    EVIDENCE --> CHUNKS[Typed evidence chunks]
+    CHUNKS --> BGE[BGE-small embeddings]
+    BGE --> VECTOR[(In-memory evidence index)]
+    VECTOR --> WORKBENCH[Workbench evidence API]
 
     EXPLORE --> API[Spring MVC APIs]
     SPARQL --> API
     META --> API
     PATH --> API
     API --> UI[React + Material UI]
+    WORKBENCH --> UI
     UI --> FLOW[React Flow + ELK CVE graph]
 ```
 
@@ -63,6 +71,7 @@ flowchart LR
 5. **OSV data stays normalized.** References, severities, affected packages, ranges, and events are RDF resources connected to one vulnerability resource.
 6. **Reads are application-scoped.** Explore begins at an `ApplicationOccurrence` and follows `risk:dependsOn+` to its reachable packages.
 7. **Single-PURL lookup is non-persistent.** `/enrich/purl` returns complete OSV DTO responses but does not patch RDF.
+8. **Evidence search is diagnostic and global.** AI Workbench ranks all indexed advisory chunks by semantic similarity; it does not treat a CVE or GHSA mentioned in the query as a retrieval scope.
 
 ## End-to-End Data Flow
 
@@ -125,6 +134,26 @@ Vulnerability
 ```
 
 The CVE Impact detail endpoint resolves the dependency path from the selected application occurrence to each affected package occurrence, appends the vulnerability, and returns a graph DTO for React Flow. Shared nodes and edges are deduplicated while exposure IDs preserve which application/package path each edge belongs to.
+
+### 4. Advisory evidence indexing and retrieval
+
+AI Workbench builds retrieval evidence from the advisory data already stored in Jena:
+
+```text
+Jena vulnerability resources
+  -> advisory source projection
+  -> overview / technical details / impact / remediation / severity / upstream-fix chunks
+  -> BGE-small-en-v1.5 quantized embeddings
+  -> LangChain4j InMemoryEmbeddingStore
+  -> global semantic similarity search
+  -> ranked Evidence cards
+```
+
+`POST /api/workbench/evidence/rebuild` finds all advisory identifiers in the graph, regenerates their typed evidence documents, embeds them, and replaces the complete in-memory evidence store. Embeddings are prepared before the write lock is taken, so existing searches can continue until the brief store replacement.
+
+`POST /api/workbench/evidence/search` embeds the natural-language query and searches across every indexed evidence chunk. `maxResults` controls the result limit and `minScore` applies the similarity threshold. Results contain the document ID, vulnerability ID, segment type, similarity score, and literal evidence text.
+
+This screen intentionally performs **global semantic discovery**. A query that names a CVE can return related advisories when their chunks are semantically similar. The UI marks an exact CVE or GHSA only when that identifier actually occurs in the returned vulnerability ID or evidence text. Identifier-scoped graph resolution and generated answers are not part of this workflow.
 
 ## RDF Model
 
@@ -235,6 +264,14 @@ The SPARQL screen provides prefix presets, example queries, formatting, `SELECT`
 
 ![SPARQL query editor](docs/sample/sparql.png)
 
+### AI Workbench advisory evidence
+
+The Evidence screen is the retrieval-inspection view for Buggy. It can rebuild the advisory vector index, submit natural-language semantic searches, configure the result limit and minimum score, and inspect the exact chunks available for later grounding workflows.
+
+Each result displays its global rank, evidence segment type, vulnerability and document identifiers, similarity score, and complete source text. Long chunks expand independently, and the copy action always copies the complete evidence. An exact-identifier marker distinguishes literal CVE/GHSA matches from merely related semantic results.
+
+![AI Workbench advisory evidence](docs/sample/workbench-Evidence.png)
+
 ## API Reference
 
 ### Primary new flow
@@ -269,6 +306,13 @@ The SPARQL screen provides prefix presets, example queries, formatting, `SELECT`
 | `POST` | `/api/osv` | Pass one package query directly to OSV without graph persistence. |
 | `POST` | `/api/v1/vulnerabilities/scan` | Compatibility scan pipeline returning the structured scan response. |
 | `GET` | `/api/dependencies/path?importId=...&targetPackageVersionIri=...` | Resolve a path for the older import-scoped graph model. |
+
+### AI Workbench Evidence APIs
+
+| Method | Path | Purpose | Response |
+| --- | --- | --- | --- |
+| `POST` | `/api/workbench/evidence/rebuild` | Regenerate typed advisory documents and replace the complete in-memory vector index. | `AdvisoryEvidenceDocument[]` |
+| `POST` | `/api/workbench/evidence/search` | Run global semantic similarity search over indexed advisory evidence. | `AdvisoryEvidenceMatch[]` |
 
 ## Quick Start
 
@@ -326,6 +370,28 @@ curl -sS -G http://localhost:8080/api/v1/vulnerabilities/enrich/purl \
 ```
 
 This endpoint returns the PURL and complete OSV advisory responses. It does not modify the RDF graph.
+
+### Rebuild and search advisory evidence
+
+Rebuild the in-memory index after advisory data has been added or updated:
+
+```bash
+curl -sS -X POST http://localhost:8080/api/workbench/evidence/rebuild
+```
+
+Then run a global semantic search:
+
+```bash
+curl -sS -X POST http://localhost:8080/api/workbench/evidence/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "Which versions fix CVE-2026-54515?",
+    "maxResults": 5,
+    "minScore": 0.55
+  }'
+```
+
+The evidence index is process-local and is not persisted to TDB2. Rebuild it after an application restart before searching.
 
 ## SPARQL Examples
 
@@ -472,6 +538,8 @@ npm run build
 - JGraphT 1.5
 - React 19 and TypeScript
 - Material UI
+- LangChain4j with the quantized BGE-small-en-v1.5 embedding model
+- LangChain4j `InMemoryEmbeddingStore` for advisory evidence
 - React Flow (`@xyflow/react`)
 - ELK.js layered graph layout
 - Vite
@@ -490,9 +558,15 @@ src/main/java/io/github/pkjpathania/dependencyrisk/
     assembler/              OSV JSON-LD assembly
     client/                 OSV request/response client
     service/                batching, advisory loading, and enrichment
+  workbench/
+    api/                    advisory evidence rebuild and search endpoints
+    config/                 local embedding model and in-memory store
+    evidence/               RDF projection, chunking, indexing, and search
 
 src/main/frontend/src/
   pages/                    top-level application screens
+  components/workbench/     Workbench shell and Evidence result components
+  api/workbenchEvidence.ts  typed Evidence HTTP integration
   features/explore/         Explore tabs and CVE impact graph
   features/sparql/          SPARQL presets and helpers
 
@@ -511,7 +585,9 @@ data/tdb2/                  local embedded RDF dataset
 - The import-scoped dependency-path endpoint belongs to the older graph model and is not populated by `POST /rdf/new`.
 - The UI uses in-memory page navigation rather than routable browser URLs.
 - Authentication and authorization are not implemented.
-- Graph-RAG/vector retrieval is not part of the current implementation.
+- Advisory evidence retrieval is global semantic discovery, not CVE/GHSA-scoped retrieval through the knowledge graph.
+- The advisory embedding store is in memory and must be rebuilt after each application restart.
+- AI Workbench does not yet generate answers, maintain conversation memory, or run an agent workflow.
 
 ## License
 

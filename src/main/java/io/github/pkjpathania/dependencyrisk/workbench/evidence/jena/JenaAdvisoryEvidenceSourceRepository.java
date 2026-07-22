@@ -7,6 +7,7 @@ import io.github.pkjpathania.dependencyrisk.workbench.evidence.AffectedPackageEv
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -25,6 +26,29 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class JenaAdvisoryEvidenceSourceRepository implements AdvisoryEvidenceSourceRepository {
 
+  private static final String FIND_ALL_IDENTIFIERS_QUERY =
+      """
+      PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+      PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>
+
+      SELECT DISTINCT ?identifier
+      WHERE {
+        ?vulnerability
+            rdf:type risk:Vulnerability ;
+            risk:osvId ?osvId .
+
+        {
+          BIND(?osvId AS ?identifier)
+        }
+        UNION
+        {
+          ?vulnerability risk:alias ?alias .
+          FILTER(STRSTARTS(UCASE(STR(?alias)), "CVE-"))
+          BIND(?alias AS ?identifier)
+        }
+      }
+      ORDER BY ?identifier
+      """;
   private static final String FIND_BY_IDENTIFIER_QUERY =
       """
       PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -117,6 +141,38 @@ public class JenaAdvisoryEvidenceSourceRepository implements AdvisoryEvidenceSou
     return toSource(rows);
   }
 
+  @Override
+  public List<AdvisoryEvidenceSource> findAll() {
+    return List.of();
+  }
+
+  @Override
+  public List<String> findAllIdentifiers() {
+
+    return repository
+        .dataset()
+        .calculateRead(
+            () -> {
+              List<String> identifiers = new ArrayList<>();
+
+              try (QueryExecution queryExecution =
+                  QueryExecutionFactory.create(FIND_ALL_IDENTIFIERS_QUERY, repository.dataset())) {
+
+                ResultSet resultSet = queryExecution.execSelect();
+
+                while (resultSet.hasNext()) {
+                  String identifier = literalValue(resultSet.nextSolution(), "identifier");
+
+                  if (identifier != null) {
+                    identifiers.add(identifier);
+                  }
+                }
+              }
+
+              return identifiers.stream().distinct().sorted().toList();
+            });
+  }
+
   private List<AdvisoryEvidenceRow> execSelect(Dataset dataset, String query) {
 
     return dataset.calculateRead(
@@ -179,35 +235,62 @@ public class JenaAdvisoryEvidenceSourceRepository implements AdvisoryEvidenceSou
             .sorted()
             .toList();
 
-    Map<String, AffectedPackageEvidenceSource> affectedPackagesByIri = new LinkedHashMap<>();
+    Map<String, AffectedPackageEvidenceSource> affectedPackagesByIdentity = new LinkedHashMap<>();
 
     for (AdvisoryEvidenceRow row : rows) {
       String affectedPackageIri = StringUtils.trimToNull(row.affectedPackageIri());
 
-      if (affectedPackageIri == null) {
+      String packageName = StringUtils.trimToNull(row.packageName());
+
+      String packagePurl = StringUtils.trimToNull(row.packagePurl());
+
+      String ecosystem = StringUtils.trimToNull(row.ecosystem());
+
+      String sourceUrl = StringUtils.trimToNull(row.sourceUrl());
+
+      if (affectedPackageIri == null && packageName == null && packagePurl == null) {
         continue;
       }
 
-      affectedPackagesByIri.putIfAbsent(
-          affectedPackageIri,
+      AffectedPackageEvidenceSource packageSource =
           new AffectedPackageEvidenceSource(
-              affectedPackageIri,
-              StringUtils.trimToNull(row.packageName()),
-              StringUtils.trimToNull(row.packagePurl()),
-              StringUtils.trimToNull(row.ecosystem()),
-              StringUtils.trimToNull(row.sourceUrl())));
+              affectedPackageIri, packageName, packagePurl, ecosystem, sourceUrl);
+
+      affectedPackagesByIdentity.putIfAbsent(packageIdentity(packageSource), packageSource);
     }
 
-    AdvisoryEvidenceSource source =
+    return Optional.of(
         new AdvisoryEvidenceSource(
             vulnerabilityIri,
             vulnerabilityId,
             aliases,
             summary,
             details,
-            List.copyOf(affectedPackagesByIri.values()));
+            List.copyOf(affectedPackagesByIdentity.values())));
+  }
 
-    return Optional.of(source);
+  private String packageIdentity(AffectedPackageEvidenceSource source) {
+
+    String ecosystem = normalizeIdentityPart(source.ecosystem());
+
+    String purl = normalizeIdentityPart(source.purl());
+
+    if (!purl.isBlank()) {
+      return ecosystem + "|purl|" + purl;
+    }
+
+    String name = normalizeIdentityPart(source.name());
+
+    if (!name.isBlank()) {
+      return ecosystem + "|name|" + name;
+    }
+
+    return "iri|" + normalizeIdentityPart(source.iri());
+  }
+
+  private String normalizeIdentityPart(String value) {
+
+    return StringUtils.trimToEmpty(value).toLowerCase(Locale.ROOT);
   }
 
   private void validateSingleVulnerability(List<AdvisoryEvidenceRow> rows) {

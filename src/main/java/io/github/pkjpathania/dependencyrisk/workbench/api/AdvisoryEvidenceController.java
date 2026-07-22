@@ -44,4 +44,9 @@ public class AdvisoryEvidenceController {
     return indexService.search(
         request.query(), request.resolvedMaxResults(), request.resolvedMinScore());
   }
+
+  @PostMapping("/rebuild")
+  public List<AdvisoryEvidenceDocument> rebuild() {
+    return indexService.rebuildAll();
+  }
 }

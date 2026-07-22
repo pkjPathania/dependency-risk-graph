@@ -36,6 +36,22 @@ public class AdvisoryEvidenceIndexService {
     return documents;
   }
 
+  public List<AdvisoryEvidenceDocument> rebuildAll() {
+
+    List<String> identifiers = sourceRepository.findAllIdentifiers();
+
+    List<AdvisoryEvidenceDocument> documents =
+        identifiers.stream()
+            .map(sourceRepository::findByIdentifier)
+            .flatMap(java.util.Optional::stream)
+            .flatMap(source -> documentFactory.create(source).stream())
+            .toList();
+
+    evidenceIndex.replaceAll(documents);
+
+    return documents;
+  }
+
   public List<AdvisoryEvidenceMatch> search(String query, int maxResults, double minScore) {
 
     return evidenceIndex.search(query, maxResults, minScore);

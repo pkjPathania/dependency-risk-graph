@@ -115,6 +115,43 @@ export const designTokens = {
       dependsOn: '#405A4B',
       identity: '#26302A'
     }
+  },
+  evidence: {
+    remediation: {
+      background: accent.lime,
+      border: accent.limePressed,
+      text: accent.contrastText
+    },
+    technicalDetails: {
+      background: '#E8EDF2',
+      border: shell.sidebar,
+      text: '#445266'
+    },
+    impact: {
+      background: '#F7E8DD',
+      border: '#B66A3C',
+      text: '#744225'
+    },
+    severity: {
+      background: '#F5EDD1',
+      border: '#A17720',
+      text: '#684F18'
+    },
+    overview: {
+      background: '#E8EDE7',
+      border: '#77847A',
+      text: '#4F5C52'
+    },
+    upstreamFix: {
+      background: '#E7F0DF',
+      border: '#68804E',
+      text: '#465936'
+    },
+    unknown: {
+      background: surface.panel,
+      border: border.strong,
+      text: text.secondary
+    }
   }
 } as const;
 

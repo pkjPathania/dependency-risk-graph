@@ -1,250 +1,162 @@
 package io.github.pkjpathania.dependencyrisk.workbench.evidence;
 
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class AdvisoryEvidenceDocumentFactory {
 
-  private static final String OVERVIEW_ID_SUFFIX = "::overview";
-
-  private static final String DETAILS_ID_SUFFIX = "::details-and-remediation";
+  private final AdvisoryDetailsSectionParser sectionParser;
 
   public List<AdvisoryEvidenceDocument> create(AdvisoryEvidenceSource source) {
 
-    Objects.requireNonNull(source, "Advisory evidence source must not be null");
+    if (source == null) {
+      throw new IllegalArgumentException("Advisory evidence source must not be null");
+    }
 
-    String vulnerabilityId = requireNonBlank(source.vulnerabilityId(), "Vulnerability ID");
+    String vulnerabilityId = StringUtils.trimToNull(source.vulnerabilityId());
 
-    AdvisoryEvidenceDocument overview =
-        new AdvisoryEvidenceDocument(
-            vulnerabilityId + OVERVIEW_ID_SUFFIX,
-            vulnerabilityId,
-            AdvisoryEvidenceSegmentType.OVERVIEW,
-            buildOverviewText(source));
+    if (vulnerabilityId == null) {
+      throw new IllegalArgumentException("Advisory evidence source is missing vulnerability ID");
+    }
 
-    AdvisoryEvidenceDocument detailsAndRemediation =
-        new AdvisoryEvidenceDocument(
-            vulnerabilityId + DETAILS_ID_SUFFIX,
-            vulnerabilityId,
-            AdvisoryEvidenceSegmentType.DETAILS_AND_REMEDIATION,
-            buildDetailsAndRemediationText(source));
+    List<AdvisoryEvidenceDocument> documents = new ArrayList<>();
 
-    return List.of(overview, detailsAndRemediation);
+    documents.add(createOverview(source));
+
+    Map<AdvisoryEvidenceSegmentType, String> sections = sectionParser.parse(source.details());
+
+    for (Map.Entry<AdvisoryEvidenceSegmentType, String> section : sections.entrySet()) {
+
+      documents.add(createSection(source, section.getKey(), section.getValue()));
+    }
+
+    return List.copyOf(documents);
   }
 
-  private String buildOverviewText(AdvisoryEvidenceSource source) {
+  private AdvisoryEvidenceDocument createOverview(AdvisoryEvidenceSource source) {
 
-    StringBuilder text = new StringBuilder();
+    String affectedPackages =
+        source.affectedPackages() == null
+            ? ""
+            : source.affectedPackages().stream()
+                .map(this::formatAffectedPackage)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .collect(Collectors.joining("\n"));
 
-    appendLine(text, "Vulnerability: " + source.vulnerabilityId());
-
-    appendAliases(text, source.aliases());
-
-    if (StringUtils.isNotBlank(source.summary())) {
-      appendBlankLine(text);
-      appendLine(text, "Summary:");
-      appendLine(text, source.summary().trim());
+    if (affectedPackages.isBlank()) {
+      affectedPackages = "- No affected package metadata available";
     }
 
-    List<AffectedPackageEvidenceSource> packages = uniquePackagesByPurl(source.affectedPackages());
+    String text =
+        """
+        Vulnerability: %s
+        Aliases: %s
 
-    if (!packages.isEmpty()) {
-      appendBlankLine(text);
-      appendLine(text, "Affected packages:");
+        Summary:
+        %s
 
-      for (AffectedPackageEvidenceSource affectedPackage : packages) {
+        Affected packages:
+        %s
+        """
+            .formatted(
+                source.vulnerabilityId(),
+                formatAliases(source.aliases()),
+                StringUtils.defaultIfBlank(source.summary(), "No summary available"),
+                affectedPackages)
+            .trim();
 
-        appendLine(text, "- " + packageDescription(affectedPackage));
-      }
-    }
-
-    return text.toString().trim();
+    return createDocument(source, AdvisoryEvidenceSegmentType.OVERVIEW, text);
   }
 
-  private String buildDetailsAndRemediationText(AdvisoryEvidenceSource source) {
+  private AdvisoryEvidenceDocument createSection(
+      AdvisoryEvidenceSource source, AdvisoryEvidenceSegmentType segmentType, String body) {
 
-    StringBuilder text = new StringBuilder();
+    String text =
+        """
+        Vulnerability: %s
+        Aliases: %s
 
-    appendLine(text, "Vulnerability: " + source.vulnerabilityId());
+        Section: %s
 
-    appendAliases(text, source.aliases());
+        %s
+        """
+            .formatted(
+                source.vulnerabilityId(),
+                formatAliases(source.aliases()),
+                displayName(segmentType),
+                StringUtils.defaultString(body))
+            .trim();
 
-    if (StringUtils.isNotBlank(source.summary())) {
-      appendBlankLine(text);
-      appendLine(text, "Summary:");
-      appendLine(text, source.summary().trim());
-    }
-
-    if (StringUtils.isNotBlank(source.details())) {
-      appendBlankLine(text);
-      appendLine(text, "Technical details and remediation evidence:");
-
-      appendLine(text, source.details().trim());
-    }
-
-    Set<String> sourceUrls = uniqueSourceUrls(source.affectedPackages());
-
-    if (!sourceUrls.isEmpty()) {
-      appendBlankLine(text);
-      appendLine(text, "Advisory sources:");
-
-      for (String sourceUrl : sourceUrls) {
-        appendLine(text, "- " + sourceUrl);
-      }
-    }
-
-    return text.toString().trim();
+    return createDocument(source, segmentType, text);
   }
 
-  /**
-   * The RDF source preserves every affected-package resource because separate resources may
-   * represent separate affected version ranges.
-   *
-   * <p>Embedded overview text only needs each semantic package identity once, so deduplication
-   * happens here by package PURL.
-   */
-  private List<AffectedPackageEvidenceSource> uniquePackagesByPurl(
-      List<AffectedPackageEvidenceSource> affectedPackages) {
+  private AdvisoryEvidenceDocument createDocument(
+      AdvisoryEvidenceSource source, AdvisoryEvidenceSegmentType segmentType, String text) {
 
-    if (affectedPackages == null || affectedPackages.isEmpty()) {
-      return List.of();
-    }
+    String id =
+        source.vulnerabilityId()
+            + "::"
+            + segmentType.name().toLowerCase(Locale.ROOT).replace('_', '-');
 
-    Map<String, AffectedPackageEvidenceSource> packagesByIdentity = new LinkedHashMap<>();
-
-    for (AffectedPackageEvidenceSource affectedPackage : affectedPackages) {
-
-      if (affectedPackage == null) {
-        continue;
-      }
-
-      String identity =
-          firstNonBlank(affectedPackage.purl(), affectedPackage.name(), affectedPackage.iri());
-
-      if (identity == null) {
-        continue;
-      }
-
-      packagesByIdentity.putIfAbsent(identity, affectedPackage);
-    }
-
-    return List.copyOf(packagesByIdentity.values());
+    return new AdvisoryEvidenceDocument(id, source.vulnerabilityId(), segmentType, text);
   }
 
-  private Set<String> uniqueSourceUrls(List<AffectedPackageEvidenceSource> affectedPackages) {
-
-    Set<String> sourceUrls = new LinkedHashSet<>();
-
-    if (affectedPackages == null) {
-      return sourceUrls;
-    }
-
-    for (AffectedPackageEvidenceSource affectedPackage : affectedPackages) {
-
-      if (affectedPackage == null) {
-        continue;
-      }
-
-      String sourceUrl = StringUtils.trimToNull(affectedPackage.sourceUrl());
-
-      if (sourceUrl != null) {
-        sourceUrls.add(sourceUrl);
-      }
-    }
-
-    return sourceUrls;
-  }
-
-  private String packageDescription(AffectedPackageEvidenceSource affectedPackage) {
-
-    String name = StringUtils.trimToNull(affectedPackage.name());
-
-    String purl = StringUtils.trimToNull(affectedPackage.purl());
-
-    String ecosystem = StringUtils.trimToNull(affectedPackage.ecosystem());
-
-    StringBuilder description = new StringBuilder();
-
-    if (name != null) {
-      description.append(name);
-    } else if (purl != null) {
-      description.append(purl);
-    } else {
-      description.append(affectedPackage.iri());
-    }
-
-    if (purl != null && !purl.equals(name)) {
-      description.append(" [").append(purl).append(']');
-    }
-
-    if (ecosystem != null) {
-      description.append(" (").append(ecosystem).append(')');
-    }
-
-    return description.toString();
-  }
-
-  private void appendAliases(StringBuilder text, List<String> aliases) {
+  private String formatAliases(List<String> aliases) {
 
     if (aliases == null || aliases.isEmpty()) {
-      return;
+      return "None";
     }
 
-    List<String> normalizedAliases =
+    String value =
         aliases.stream()
             .map(StringUtils::trimToNull)
-            .filter(Objects::nonNull)
+            .filter(alias -> alias != null)
             .distinct()
             .sorted()
-            .toList();
+            .collect(Collectors.joining(", "));
 
-    if (!normalizedAliases.isEmpty()) {
-      appendLine(text, "Aliases: " + String.join(", ", normalizedAliases));
-    }
+    return StringUtils.defaultIfBlank(value, "None");
   }
 
-  private String firstNonBlank(String... values) {
+  private String formatAffectedPackage(AffectedPackageEvidenceSource source) {
 
-    for (String value : values) {
-      String normalized = StringUtils.trimToNull(value);
-
-      if (normalized != null) {
-        return normalized;
-      }
+    if (source == null) {
+      return null;
     }
 
-    return null;
-  }
+    String name = StringUtils.defaultIfBlank(source.name(), "Unknown package");
 
-  private String requireNonBlank(String value, String fieldName) {
+    StringBuilder result = new StringBuilder("- ").append(name);
 
-    String normalized = StringUtils.trimToNull(value);
-
-    if (normalized == null) {
-      throw new IllegalArgumentException(fieldName + " must not be blank");
+    if (StringUtils.isNotBlank(source.purl())) {
+      result.append(" [").append(source.purl()).append(']');
     }
 
-    return normalized;
-  }
-
-  private void appendBlankLine(StringBuilder text) {
-
-    if (!text.isEmpty() && text.charAt(text.length() - 1) != '\n') {
-      text.append('\n');
+    if (StringUtils.isNotBlank(source.ecosystem())) {
+      result.append(" (").append(source.ecosystem()).append(')');
     }
 
-    text.append('\n');
+    return result.toString();
   }
 
-  private void appendLine(StringBuilder text, String value) {
+  private String displayName(AdvisoryEvidenceSegmentType type) {
 
-    text.append(value).append('\n');
+    return switch (type) {
+      case OVERVIEW -> "Overview";
+      case TECHNICAL_DETAILS -> "Technical details";
+      case IMPACT -> "Impact";
+      case REMEDIATION -> "Remediation and patched versions";
+      case SEVERITY -> "Severity and CWE";
+      case UPSTREAM_FIX -> "Upstream fix";
+    };
   }
 }
