@@ -1,6 +1,7 @@
 import { readApiErrorMessage } from './httpError';
 
-const EVIDENCE_BASE_URL = '/api/workbench/evidence';
+const EVIDENCE_REBUILD_URL = '/api/workbench/evidence/rebuild';
+const ASSISTANT_EVIDENCE_URL = '/api/workbench/assistant/evidence';
 
 export type AdvisoryEvidenceSegmentType =
   | 'OVERVIEW'
@@ -25,24 +26,36 @@ export interface AdvisoryEvidenceMatch {
   text: string;
 }
 
+export interface BuggyEvidenceResponse {
+  question: string;
+  answer: string;
+  evidence: AdvisoryEvidenceMatch[];
+  finalSnitch: string | null;
+  model: string | null;
+}
+
 export async function searchAdvisoryEvidence(
   request: AdvisoryEvidenceSearchRequest
-): Promise<AdvisoryEvidenceMatch[]> {
-  const response = await fetch(`${EVIDENCE_BASE_URL}/search`, {
+): Promise<BuggyEvidenceResponse> {
+  const response = await fetch(ASSISTANT_EVIDENCE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request)
+    body: JSON.stringify({
+      question: request.query,
+      maxResults: request.maxResults,
+      minScore: request.minScore
+    })
   });
 
   if (!response.ok) {
     throw new Error(await readApiErrorMessage(response, 'Unable to search advisory evidence.'));
   }
 
-  return (await response.json()) as AdvisoryEvidenceMatch[];
+  return (await response.json()) as BuggyEvidenceResponse;
 }
 
 export async function rebuildAdvisoryEvidence(): Promise<void> {
-  const response = await fetch(`${EVIDENCE_BASE_URL}/rebuild`, { method: 'POST' });
+  const response = await fetch(EVIDENCE_REBUILD_URL, { method: 'POST' });
 
   if (!response.ok) {
     throw new Error(await readApiErrorMessage(response, 'Unable to rebuild the evidence index.'));

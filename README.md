@@ -51,7 +51,7 @@ flowchart LR
     EVIDENCE --> CHUNKS[Typed evidence chunks]
     CHUNKS --> BGE[BGE-small embeddings]
     BGE --> VECTOR[(In-memory evidence index)]
-    VECTOR --> WORKBENCH[Workbench evidence API]
+    VECTOR --> WORKBENCH[Workbench assistant evidence API]
 
     EXPLORE --> API[Spring MVC APIs]
     SPARQL --> API
@@ -151,9 +151,9 @@ Jena vulnerability resources
 
 `POST /api/workbench/evidence/rebuild` finds all advisory identifiers in the graph, regenerates their typed evidence documents, embeds them, and replaces the complete in-memory evidence store. Embeddings are prepared before the write lock is taken, so existing searches can continue until the brief store replacement.
 
-`POST /api/workbench/evidence/search` embeds the natural-language query and searches across every indexed evidence chunk. `maxResults` controls the result limit and `minScore` applies the similarity threshold. Results contain the document ID, vulnerability ID, segment type, similarity score, and literal evidence text.
+`POST /api/workbench/assistant/evidence` embeds the natural-language question and searches across every indexed evidence chunk. `maxResults` controls the result limit and `minScore` applies the similarity threshold. The retrieved chunks are supplied to Buggy's configured chat model, and the response contains the question, generated answer summary, evidence matches, final-snitch metadata, and model identity.
 
-This screen intentionally performs **global semantic discovery**. A query that names a CVE can return related advisories when their chunks are semantically similar. The UI marks an exact CVE or GHSA only when that identifier actually occurs in the returned vulnerability ID or evidence text. Identifier-scoped graph resolution and generated answers are not part of this workflow.
+This screen intentionally performs **global semantic discovery**. A query that names a CVE can return related advisories when their chunks are semantically similar. The UI shows Buggy's summary after the match count and marks an exact CVE or GHSA only when that identifier actually occurs in the returned vulnerability ID or evidence text. Identifier-scoped graph resolution is not part of this workflow.
 
 ## RDF Model
 
@@ -266,7 +266,7 @@ The SPARQL screen provides prefix presets, example queries, formatting, `SELECT`
 
 ### AI Workbench advisory evidence
 
-The Evidence screen is the retrieval-inspection view for Buggy. It can rebuild the advisory vector index, submit natural-language semantic searches, configure the result limit and minimum score, and inspect the exact chunks available for later grounding workflows.
+The Evidence screen combines Buggy's generated summary with retrieval inspection. It can rebuild the advisory vector index, submit natural-language questions, configure the result limit and minimum score, and inspect the exact chunks used to ground the summary.
 
 Each result displays its global rank, evidence segment type, vulnerability and document identifiers, similarity score, and complete source text. Long chunks expand independently, and the copy action always copies the complete evidence. An exact-identifier marker distinguishes literal CVE/GHSA matches from merely related semantic results.
 
@@ -312,7 +312,7 @@ Each result displays its global rank, evidence segment type, vulnerability and d
 | Method | Path | Purpose | Response |
 | --- | --- | --- | --- |
 | `POST` | `/api/workbench/evidence/rebuild` | Regenerate typed advisory documents and replace the complete in-memory vector index. | `AdvisoryEvidenceDocument[]` |
-| `POST` | `/api/workbench/evidence/search` | Run global semantic similarity search over indexed advisory evidence. | `AdvisoryEvidenceMatch[]` |
+| `POST` | `/api/workbench/assistant/evidence` | Retrieve global semantic evidence and generate Buggy's grounded summary. | `BuggyAnswerResponse` |
 
 ## Quick Start
 
@@ -382,10 +382,10 @@ curl -sS -X POST http://localhost:8080/api/workbench/evidence/rebuild
 Then run a global semantic search:
 
 ```bash
-curl -sS -X POST http://localhost:8080/api/workbench/evidence/search \
+curl -sS -X POST http://localhost:8080/api/workbench/assistant/evidence \
   -H 'Content-Type: application/json' \
   -d '{
-    "query": "Which versions fix CVE-2026-54515?",
+    "question": "Which versions fix CVE-2026-54515?",
     "maxResults": 5,
     "minScore": 0.55
   }'
@@ -587,7 +587,7 @@ data/tdb2/                  local embedded RDF dataset
 - Authentication and authorization are not implemented.
 - Advisory evidence retrieval is global semantic discovery, not CVE/GHSA-scoped retrieval through the knowledge graph.
 - The advisory embedding store is in memory and must be rebuilt after each application restart.
-- AI Workbench does not yet generate answers, maintain conversation memory, or run an agent workflow.
+- AI Workbench summaries use global semantic evidence; identifier-scoped graph retrieval, conversation memory, and agent workflows are not yet implemented.
 
 ## License
 

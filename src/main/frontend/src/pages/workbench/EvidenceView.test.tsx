@@ -19,13 +19,24 @@ const match = {
   text: longEvidence
 };
 
+const summary = 'Upgrade to a patched version listed in the matching remediation evidence.';
+
 describe('EvidenceView', () => {
   const writeText = vi.fn();
 
   beforeEach(() => {
     apiMocks.searchAdvisoryEvidence.mockReset();
     apiMocks.rebuildAdvisoryEvidence.mockReset();
-    apiMocks.searchAdvisoryEvidence.mockResolvedValue([match]);
+    apiMocks.searchAdvisoryEvidence.mockImplementation(
+      ({ query }: { query: string }) =>
+        Promise.resolve({
+          question: query,
+          answer: summary,
+          evidence: [match],
+          finalSnitch: null,
+          model: 'groq:llama-3.3-70b-versatile'
+        })
+    );
     apiMocks.rebuildAdvisoryEvidence.mockResolvedValue(undefined);
     writeText.mockReset();
     writeText.mockResolvedValue(undefined);
@@ -75,6 +86,8 @@ describe('EvidenceView', () => {
     });
 
     expect(await screen.findByText('1 evidence match')).toBeInTheDocument();
+    expect(screen.getByText('Buggy summary')).toBeInTheDocument();
+    expect(screen.getByText(summary)).toBeInTheDocument();
     expect(screen.getByText('Global semantic discovery')).toBeInTheDocument();
     expect(
       screen.getByText(/Results are ranked by semantic similarity and may include related advisories/)
@@ -117,7 +130,13 @@ describe('EvidenceView', () => {
 
   it('shows the dedicated no-results state after a successful empty search', async () => {
     const user = userEvent.setup();
-    apiMocks.searchAdvisoryEvidence.mockResolvedValue([]);
+    apiMocks.searchAdvisoryEvidence.mockResolvedValue({
+      question: 'An unmatched advisory question',
+      answer: "I couldn't find enough advisory evidence to answer that question.",
+      evidence: [],
+      finalSnitch: null,
+      model: null
+    });
     render(<EvidenceView />);
 
     await user.type(screen.getByLabelText('Evidence search query'), 'An unmatched advisory question');

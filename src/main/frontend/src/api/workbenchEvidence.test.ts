@@ -16,8 +16,15 @@ describe('workbenchEvidence API', () => {
         text: 'Complete evidence'
       }
     ];
+    const responseBody = {
+      question: 'Which version fixes it?',
+      answer: 'Upgrade to the patched release.',
+      evidence: matches,
+      finalSnitch: null,
+      model: 'groq:llama-3.3-70b-versatile'
+    };
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(matches), {
+      new Response(JSON.stringify(responseBody), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
@@ -25,11 +32,15 @@ describe('workbenchEvidence API', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const request = { query: 'Which version fixes it?', maxResults: 5, minScore: 0.55 };
-    await expect(searchAdvisoryEvidence(request)).resolves.toEqual(matches);
-    expect(fetchMock).toHaveBeenCalledWith('/api/workbench/evidence/search', {
+    await expect(searchAdvisoryEvidence(request)).resolves.toEqual(responseBody);
+    expect(fetchMock).toHaveBeenCalledWith('/api/workbench/assistant/evidence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request)
+      body: JSON.stringify({
+        question: request.query,
+        maxResults: request.maxResults,
+        minScore: request.minScore
+      })
     });
   });
 

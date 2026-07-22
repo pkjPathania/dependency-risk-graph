@@ -1,4 +1,4 @@
-import { Chip, Stack, Typography } from '@mui/material';
+import { Box, Chip, Stack, Typography } from '@mui/material';
 import type { AdvisoryEvidenceMatch } from '../../../api/workbenchEvidence';
 import { designTokens } from '../../../theme/designTokens';
 import { EvidenceEmptyState } from './EvidenceEmptyState';
@@ -8,6 +8,7 @@ import { GlobalSearchNotice } from './GlobalSearchNotice';
 
 interface EvidenceResultsProps {
   results: AdvisoryEvidenceMatch[];
+  summary: string;
   submittedQuery: string;
   hasSearched: boolean;
   expandedIds: ReadonlySet<string>;
@@ -18,6 +19,7 @@ interface EvidenceResultsProps {
 
 export function EvidenceResults({
   results,
+  summary,
   submittedQuery,
   hasSearched,
   expandedIds,
@@ -61,6 +63,29 @@ export function EvidenceResults({
           for “{submittedQuery}”
         </Typography>
       </Stack>
+
+      {summary.trim() ? (
+        <Box
+          sx={{
+            bgcolor: designTokens.surface.panel,
+            border: '1px solid',
+            borderColor: designTokens.border.default,
+            borderRadius: 2,
+            px: 1.5,
+            py: 1.25
+          }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+            Buggy summary
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{ mt: 0.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.6 }}
+          >
+            {summary}
+          </Typography>
+        </Box>
+      ) : null}
 
       <GlobalSearchNotice />
 

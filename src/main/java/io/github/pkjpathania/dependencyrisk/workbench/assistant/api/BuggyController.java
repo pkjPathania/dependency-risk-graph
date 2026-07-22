@@ -16,7 +16,7 @@ public class BuggyController {
 
   private final BuggyAnswerService buggyAnswerService;
 
-  @PostMapping("/ask")
+  @PostMapping("/evidence")
   public BuggyAnswerResponse ask(@RequestBody BuggyAnswerRequest request) {
 
     return buggyAnswerService.answer(request);

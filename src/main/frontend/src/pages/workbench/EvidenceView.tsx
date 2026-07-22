@@ -26,6 +26,7 @@ export function EvidenceView() {
   const [maxResults, setMaxResults] = useState('5');
   const [minScore, setMinScore] = useState('0.55');
   const [results, setResults] = useState<AdvisoryEvidenceMatch[]>([]);
+  const [summary, setSummary] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
   const [rebuildLoading, setRebuildLoading] = useState(false);
@@ -45,13 +46,14 @@ export function EvidenceView() {
       const resolvedMinScore = clampedNumber(minScore, 0.55, 0, 1);
       setMaxResults(String(resolvedMaxResults));
       setMinScore(String(resolvedMinScore));
-      const matches = await searchAdvisoryEvidence({
+      const response = await searchAdvisoryEvidence({
         query: normalizedQuery,
         maxResults: resolvedMaxResults,
         minScore: resolvedMinScore
       });
-      setResults(matches);
-      setSubmittedQuery(normalizedQuery);
+      setResults(response.evidence);
+      setSummary(response.answer);
+      setSubmittedQuery(response.question.trim() || normalizedQuery);
       setHasSearched(true);
       setExpandedIds(new Set());
     } catch (error) {
@@ -154,6 +156,7 @@ export function EvidenceView() {
 
         <EvidenceResults
           results={results}
+          summary={summary}
           submittedQuery={submittedQuery}
           hasSearched={hasSearched}
           expandedIds={expandedIds}

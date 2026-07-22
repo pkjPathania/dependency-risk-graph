@@ -18,6 +18,7 @@ import {
   Typography
 } from '@mui/material';
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import { useMemo, useState } from 'react';
 import { executeSparqlQuery, formatSparqlQuery } from '../api/sparqlApi';
 import type { SparqlSelectResponse } from '../api/types';
@@ -28,6 +29,7 @@ import {
   SPARQL_PREFIX_PRESETS,
   type SparqlPrefixPresetId
 } from '../features/sparql/prefixPresets';
+import { downloadSparqlResultsCsv } from '../features/sparql/csvExport';
 
 const EXAMPLE_QUERIES = [
   {
@@ -134,6 +136,18 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
       await navigator.clipboard.writeText(text);
     } catch (error) {
       setPopupError(error instanceof Error ? error.message : 'Copy failed.');
+    }
+  }
+
+  function handleDownloadResults() {
+    if (!execResult || execResult.columns.length === 0) {
+      return;
+    }
+
+    try {
+      downloadSparqlResultsCsv(execResult);
+    } catch (error) {
+      setPopupError(error instanceof Error ? error.message : 'CSV download failed.');
     }
   }
 
@@ -272,6 +286,19 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
                           disabled={!execResult}
                         >
                           Copy
+                        </Button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title="Download table data as CSV with column headers">
+                      <span>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<FileDownloadOutlinedIcon fontSize="small" />}
+                          onClick={handleDownloadResults}
+                          disabled={!execResult || execResult.columns.length === 0}
+                        >
+                          Download CSV
                         </Button>
                       </span>
                     </Tooltip>
