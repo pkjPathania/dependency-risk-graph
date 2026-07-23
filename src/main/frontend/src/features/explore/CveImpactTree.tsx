@@ -1,4 +1,4 @@
-import { Box, Paper, Stack, Typography } from '@mui/material';
+import { Box, Paper } from '@mui/material';
 import { hierarchy, tree, type HierarchyPointNode } from 'd3';
 import { useMemo, useState } from 'react';
 import type { CveImpactDetailResponse, ExposurePath, ImpactGraphNode, PathNodeView } from '../../api/types';
@@ -89,7 +89,6 @@ export function CveImpactTree({
         }
       }}
     >
-      <TreeVocabulary />
       <Box
         sx={{
           minHeight: 500,
@@ -116,9 +115,10 @@ export function CveImpactTree({
             {layout.links.map((link) => (
               <g key={link.key}>
                 <path
+                  data-edge-relationship={link.relationship}
                   d={treeLinkPath(link)}
                   fill="none"
-                  stroke={link.side === 'left' ? designTokens.shell.topbar : designTokens.accent.lime}
+                  stroke={relationshipColor(link.relationship)}
                   strokeWidth={2}
                   strokeOpacity={0.78}
                   vectorEffect="non-scaling-stroke"
@@ -137,7 +137,6 @@ export function CveImpactTree({
                     pointerEvents="none"
                   />
                 ) : null}
-                <EdgeLabel link={link} />
               </g>
             ))}
           </g>
@@ -227,59 +226,6 @@ function TreeNode({
       ) : null}
       <title>{`${node.datum.label}${node.datum.version ? ` ${node.datum.version}` : ''}`}</title>
     </g>
-  );
-}
-
-function EdgeLabel({ link }: { link: PositionedLink }) {
-  const x = (link.sourceX + link.targetX) / 2;
-  const y = (link.sourceY + link.targetY) / 2;
-  return (
-    <g transform={`translate(${x},${y})`} data-edge-relationship={link.relationship}>
-      <rect
-        x={-14}
-        y={-9}
-        width={28}
-        height={18}
-        rx={4}
-        fill={designTokens.surface.card}
-        stroke={designTokens.border.default}
-      />
-      <text textAnchor="middle" dominantBaseline="central" fill={designTokens.text.secondary} fontSize={8.5} fontWeight={900}>
-        {relationshipAbbreviation(link.relationship)}
-      </text>
-    </g>
-  );
-}
-
-function TreeVocabulary() {
-  return (
-    <Stack
-      direction="row"
-      spacing={1.5}
-      useFlexGap
-      flexWrap="wrap"
-      aria-label="Tree relationship vocabulary"
-      sx={{
-        position: 'absolute',
-        top: 8,
-        left: 12,
-        zIndex: 1,
-        justifyContent: 'flex-start'
-      }}
-    >
-      <VocabularyItem abbreviation="DO" relationship="DEPENDS_ON" />
-      <VocabularyItem abbreviation="AB" relationship="AFFECTED_BY" />
-      <VocabularyItem abbreviation="FI" relationship="FIXED_IN" />
-    </Stack>
-  );
-}
-
-function VocabularyItem({ abbreviation, relationship }: { abbreviation: string; relationship: string }) {
-  return (
-    <Stack direction="row" spacing={0.5} alignItems="center">
-      <Typography variant="caption" fontWeight={950}>{abbreviation}</Typography>
-      <Typography variant="caption" color="text.secondary">{relationship}</Typography>
-    </Stack>
   );
 }
 
@@ -584,12 +530,10 @@ function nodeStroke(kind: TreeNodeKind): string {
   return designTokens.shell.sidebar;
 }
 
-function relationshipAbbreviation(
-  relationship: PositionedLink['relationship']
-): 'DO' | 'AB' | 'FI' {
-  if (relationship === 'DEPENDS_ON') return 'DO';
-  if (relationship === 'AFFECTED_BY') return 'AB';
-  return 'FI';
+function relationshipColor(relationship: PositionedLink['relationship']): string {
+  if (relationship === 'AFFECTED_BY') return designTokens.security.critical;
+  if (relationship === 'FIXED_IN') return designTokens.accent.lime;
+  return designTokens.shell.topbar;
 }
 
 function truncate(value: string, length: number): string {

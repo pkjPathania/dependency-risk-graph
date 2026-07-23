@@ -4,26 +4,27 @@ import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationView;
 import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactDetailResponse;
 import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactListItem;
 import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactListResponse;
+import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactStatus;
 import io.github.pkjpathania.dependencyrisk.graph.model.CvssAssessmentView;
+import io.github.pkjpathania.dependencyrisk.graph.model.DependencyGraphSnapshot;
+import io.github.pkjpathania.dependencyrisk.graph.model.DependencyNode;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyPathNode;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyPathResult;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyPathStatus;
-import io.github.pkjpathania.dependencyrisk.graph.model.DependencyGraphSnapshot;
-import io.github.pkjpathania.dependencyrisk.graph.model.DependencyNode;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencyVertex;
-import io.github.pkjpathania.dependencyrisk.graph.model.ImportContext;
-import io.github.pkjpathania.dependencyrisk.graph.model.CveImpactStatus;
 import io.github.pkjpathania.dependencyrisk.graph.model.ExposurePath;
 import io.github.pkjpathania.dependencyrisk.graph.model.FixedVersionView;
 import io.github.pkjpathania.dependencyrisk.graph.model.ImpactGraph;
 import io.github.pkjpathania.dependencyrisk.graph.model.ImpactGraphEdge;
 import io.github.pkjpathania.dependencyrisk.graph.model.ImpactGraphNode;
+import io.github.pkjpathania.dependencyrisk.graph.model.ImportContext;
 import io.github.pkjpathania.dependencyrisk.graph.model.PackageVersionView;
 import io.github.pkjpathania.dependencyrisk.graph.model.PathNodeView;
 import io.github.pkjpathania.dependencyrisk.graph.model.VulnerabilityDetail;
-import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
 import io.github.pkjpathania.dependencyrisk.graph.repo.ImportContextRepository;
+import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
 import io.github.pkjpathania.dependencyrisk.graph.repo.PackageOccurrenceRepository;
+import io.github.pkjpathania.dependencyrisk.graph.util.CvssParserUtil;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ import org.apache.jena.query.QuerySolution;
 import org.jgrapht.GraphPath;
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.springframework.stereotype.Service;
+import us.springett.cvss.Cvss;
 
 @Slf4j
 @Service
@@ -54,11 +56,362 @@ public class CveImpactService {
       PREFIX rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
       """;
-
+  private static final String LIST_QUERY =
+      """
+      SELECT DISTINCT
+          ?vulnerability ?osvId ?alias ?summary ?severityLevel ?cvssVector
+          ?application ?applicationName ?importRun ?rootOccurrence ?occurrence ?package ?packageName ?installedVersion ?referenceUrl
+      WHERE {
+          #SCOPE#
+          {
+              ?application a risk:ApplicationOccurrence ; risk:name ?applicationName ;
+                           risk:dependsOn+ ?package .
+              ?package risk:name ?packageName ; risk:affectedBy ?vulnerability .
+              OPTIONAL { ?package risk:version ?installedVersion . }
+          }
+          UNION
+          {
+              ?application a risk:Application ; rdfs:label ?applicationName ;
+                           risk:activeImport ?importRun .
+              ?importRun risk:rootOccurrence ?rootOccurrence .
+              ?rootOccurrence risk:belongsToImport ?importRun .
+              ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
+              ?package a risk:PackageVersion ; rdfs:label ?packageName ;
+                       risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
+          }
+          ?vulnerability a risk:Vulnerability ; risk:osvId ?osvId .
+          OPTIONAL { ?vulnerability risk:alias ?alias . }
+          OPTIONAL { ?vulnerability risk:summary ?summary . }
+          OPTIONAL { ?vulnerability risk:severityLevel ?vulnerabilitySeverity . }
+          OPTIONAL {
+              ?vulnerability risk:hasSeverity ?severityAssessment .
+              ?severityAssessment risk:severityLevel ?assessmentSeverity .
+          }
+          BIND(COALESCE(?vulnerabilitySeverity, ?assessmentSeverity) AS ?severityLevel)
+          OPTIONAL {
+              ?vulnerability risk:hasSeverity ?cvssAssessment .
+              {
+                  ?cvssAssessment risk:vector ?cvssVector .
+              }
+              UNION
+              {
+                  ?cvssAssessment risk:severityScore ?cvssVector .
+              }
+          }
+          OPTIONAL {
+              { ?vulnerability risk:hasReference/risk:referenceUrl ?referenceUrl . }
+              UNION
+              { ?vulnerability risk:referenceUrl ?referenceUrl . }
+          }
+      }
+      ORDER BY LCASE(STR(?osvId)) LCASE(STR(?applicationName)) LCASE(STR(?packageName))
+      """;
+  private static final String EXPOSURE_QUERY =
+      """
+      SELECT DISTINCT ?application ?applicationName ?applicationVersion
+                      ?importRun ?importId ?rootOccurrence ?package ?packageName ?installedVersion ?installedPurl
+      WHERE {
+          VALUES ?vulnerability { ?vulnerabilityValue }
+          #SCOPE#
+          {
+              ?application a risk:ApplicationOccurrence ; risk:name ?applicationName ;
+                           risk:dependsOn+ ?package .
+              ?package risk:name ?packageName ; risk:affectedBy ?vulnerability .
+              OPTIONAL { ?application risk:version ?applicationVersion . }
+              OPTIONAL { ?package risk:version ?installedVersion . }
+          }
+          UNION
+          {
+              ?application a risk:Application ; rdfs:label ?applicationName ;
+                           risk:activeImport ?importRun .
+              OPTIONAL { ?application risk:version ?applicationVersion . }
+              ?importRun risk:importId ?importId ; risk:rootOccurrence ?rootOccurrence .
+              ?rootOccurrence risk:belongsToImport ?importRun .
+              ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
+              ?package a risk:PackageVersion ; rdfs:label ?packageName ;
+                       risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
+          }
+          OPTIONAL { ?package risk:purl ?installedPurl . }
+      }
+      ORDER BY LCASE(STR(?applicationName)) LCASE(STR(?packageName)) STR(?installedVersion)
+      """;
+  private static final String VULNERABILITY_DETAIL_QUERY =
+      """
+      SELECT ?osvId ?alias ?summary ?details ?severityLevel ?publishedAt ?modifiedAt
+             ?assessment ?cvssType ?cvssVersion ?vector
+             ?fixedPackage ?fixedPackageName ?fixedVersion ?fixedPurl ?referenceUrl
+      WHERE {
+          VALUES ?vulnerability { ?vulnerabilityValue }
+          ?vulnerability a risk:Vulnerability ; risk:osvId ?osvId .
+          OPTIONAL { ?vulnerability risk:alias ?alias . }
+          OPTIONAL { ?vulnerability risk:summary ?summary . }
+          OPTIONAL { ?vulnerability risk:details ?details . }
+          OPTIONAL { ?vulnerability risk:severityLevel ?vulnerabilitySeverity . }
+          OPTIONAL {
+              ?vulnerability risk:hasSeverity ?severityAssessment .
+              ?severityAssessment risk:severityLevel ?assessmentSeverity .
+          }
+          BIND(COALESCE(?vulnerabilitySeverity, ?assessmentSeverity) AS ?severityLevel)
+          OPTIONAL { ?vulnerability risk:publishedAt ?publishedAt . }
+          OPTIONAL { ?vulnerability risk:modifiedAt ?modifiedAt . }
+          OPTIONAL {
+              { ?vulnerability risk:hasReference/risk:referenceUrl ?referenceUrl . }
+              UNION
+              { ?vulnerability risk:referenceUrl ?referenceUrl . }
+          }
+          OPTIONAL {
+              ?vulnerability risk:hasSeverity ?assessment .
+              {
+                  ?assessment a risk:SeverityAssessment ; risk:severityScore ?vector .
+                  OPTIONAL { ?assessment risk:severityType ?cvssType . }
+              }
+              UNION
+              {
+                  ?assessment a risk:CvssAssessment ; risk:vector ?vector .
+                  OPTIONAL { ?assessment risk:cvssType ?cvssType . }
+                  OPTIONAL { ?assessment risk:cvssVersion ?cvssVersion . }
+              }
+          }
+          OPTIONAL {
+              {
+                  ?vulnerability risk:hasAffectedPackage ?affectedPackage .
+                  ?affectedPackage risk:hasRange/risk:hasEvent ?fixedPackage .
+                  ?fixedPackage risk:fixedVersion ?fixedVersion .
+                  OPTIONAL { ?affectedPackage risk:affectedPackageName ?fixedPackageName . }
+                  OPTIONAL { ?affectedPackage risk:affectedPackagePurl ?fixedPurl . }
+              }
+              UNION
+              {
+                  ?vulnerability risk:fixedIn ?fixedPackage .
+                  ?fixedPackage a risk:PackageVersion ; risk:version ?fixedVersion .
+                  OPTIONAL { ?fixedPackage rdfs:label ?fixedPackageName . }
+                  OPTIONAL { ?fixedPackage risk:purl ?fixedPurl . }
+              }
+          }
+      }
+      """;
   private final JenaGraphRepository repository;
   private final ImportContextRepository importContextRepository;
   private final PackageOccurrenceRepository packageOccurrenceRepository;
   private final DependencyPathResolver dependencyPathResolver;
+
+  private static void putApplication(
+      Map<String, ImpactGraphNode> nodes, ApplicationView application, long exposureCount) {
+    nodes.putIfAbsent(
+        application.iri(),
+        new ImpactGraphNode(
+            application.iri(), application.iri(), application.name(), application.version(), "APPLICATION", Map.of("exposureCount", exposureCount)));
+  }
+
+  private static void putPackage(
+      Map<String, ImpactGraphNode> nodes,
+      PackageVersionView pkg,
+      String nodeType,
+      Set<String> applications) {
+    nodes.putIfAbsent(
+        pkg.iri(),
+        new ImpactGraphNode(
+            pkg.iri(),
+            pkg.iri(),
+            pkg.name(),
+            pkg.version(),
+            nodeType,
+            Map.of(
+                "purl", StringUtils.defaultString(pkg.purl()),
+                "applications", List.copyOf(applications == null ? Set.of() : applications))));
+  }
+
+  private static void mergeEdge(
+      Map<String, EdgeAccumulator> edges,
+      String source,
+      String relationship,
+      String target,
+      String exposureId) {
+    String id = edgeId(source, relationship, target);
+    EdgeAccumulator edge =
+        edges.computeIfAbsent(id, ignored -> new EdgeAccumulator(id, source, target, relationship));
+    if (exposureId != null) {
+      edge.exposureIds.add(exposureId);
+    }
+  }
+
+  private static String edgeId(String source, String relationship, String target) {
+    return source + "\u0000" + relationship + "\u0000" + target;
+  }
+
+  private static EdgeTuple parseEdgeId(String encodedEdgeId) {
+    if (encodedEdgeId == null) {
+      throw new IllegalArgumentException("Path edge ID must not be null");
+    }
+    String[] parts = encodedEdgeId.split("\u0000", -1);
+    if (parts.length != 3
+        || StringUtils.isBlank(parts[0])
+        || StringUtils.isBlank(parts[1])
+        || StringUtils.isBlank(parts[2])) {
+      throw new IllegalArgumentException("Invalid path edge ID: " + encodedEdgeId);
+    }
+    try {
+      return new EdgeTuple(parts[0], EdgeRelationship.valueOf(parts[1]), parts[2]);
+    } catch (IllegalArgumentException exception) {
+      throw new IllegalArgumentException("Unsupported path relationship: " + parts[1], exception);
+    }
+  }
+
+  private static int dependencyHopCount(List<String> pathEdgeIds) {
+    return Math.toIntExact(
+        pathEdgeIds.stream()
+            .map(CveImpactService::parseEdgeId)
+            .filter(edge -> edge.relationship() == EdgeRelationship.DEPENDS_ON)
+            .count());
+  }
+
+  private static void registerExposureNodeRoles(
+      Map<String, NodeRole> nodeRoles, ExposurePath exposure, String vulnerabilityIri) {
+    nodeRoles.put(vulnerabilityIri, NodeRole.VULNERABILITY);
+    nodeRoles.put(exposure.vulnerablePackage().iri(), NodeRole.PACKAGE_VERSION);
+    for (PathNodeView node : exposure.path()) {
+      if (node.iri().equals(vulnerabilityIri)) {
+        nodeRoles.put(node.iri(), NodeRole.VULNERABILITY);
+      } else if (node.iri().equals(exposure.vulnerablePackage().iri())) {
+        nodeRoles.put(node.iri(), NodeRole.PACKAGE_VERSION);
+      } else {
+        nodeRoles.put(node.iri(), NodeRole.OCCURRENCE);
+      }
+    }
+  }
+
+  private static void validateEdge(EdgeTuple edge, Map<String, NodeRole> nodeRoles) {
+    NodeRole source = nodeRoles.get(edge.source());
+    NodeRole target = nodeRoles.get(edge.target());
+    boolean valid =
+        switch (edge.relationship()) {
+          case DEPENDS_ON ->
+              source == NodeRole.OCCURRENCE
+                  && (target == NodeRole.OCCURRENCE || target == NodeRole.PACKAGE_VERSION);
+          case INSTANCE_OF ->
+              source == NodeRole.OCCURRENCE && target == NodeRole.PACKAGE_VERSION;
+          case AFFECTED_BY ->
+              source == NodeRole.PACKAGE_VERSION && target == NodeRole.VULNERABILITY;
+          case FIXED_IN ->
+              source == NodeRole.VULNERABILITY
+                  && target == NodeRole.FIXED_PACKAGE_VERSION;
+        };
+    if (!valid) {
+      throw new IllegalStateException(
+          "Invalid "
+              + edge.relationship()
+              + " edge roles: "
+              + edge.source()
+              + " ("
+              + source
+              + ") -> "
+              + edge.target()
+              + " ("
+              + target
+              + ")");
+    }
+  }
+
+  private static PathNodeView toPathNode(DependencyPathNode node) {
+    return new PathNodeView(node.occurrenceIri(), node.label(), node.version(), node.purl(), node.type());
+  }
+
+  private static ExposureTarget toExposureTarget(QuerySolution solution) {
+    return new ExposureTarget(
+        new ApplicationView(
+            resourceIri(solution, "application"),
+            literalValue(solution, "applicationName"),
+            literalValue(solution, "applicationVersion")),
+        new PackageVersionView(
+            resourceIri(solution, "package"),
+            literalValue(solution, "packageName"),
+            literalValue(solution, "installedVersion"),
+            literalValue(solution, "installedPurl")),
+        new ImportContext(
+            literalValue(solution, "importId"),
+            resourceIri(solution, "importRun"),
+            resourceIri(solution, "rootOccurrence")));
+  }
+
+  private static void accumulateListRow(
+      Map<String, ListAccumulator> grouped, QuerySolution solution) {
+    String vulnerabilityIri = resourceIri(solution, "vulnerability");
+    if (vulnerabilityIri == null) {
+      return;
+    }
+    ListAccumulator item =
+        grouped.computeIfAbsent(vulnerabilityIri, ListAccumulator::new);
+    item.osvId = first(item.osvId, literalValue(solution, "osvId"));
+    item.summary = first(item.summary, literalValue(solution, "summary"));
+    item.severityLevel = first(item.severityLevel, literalValue(solution, "severityLevel"));
+    Cvss cvss = CvssParserUtil.from(literalValue(solution, "cvssVector"));
+    if (cvss != null) {
+      double baseScore = cvss.calculateScore().getBaseScore();
+      item.cvssBaseScore =
+          item.cvssBaseScore == null ? baseScore : Math.max(item.cvssBaseScore, baseScore);
+    }
+    add(item.aliases, literalValue(solution, "alias"));
+    add(item.applicationIris, resourceIri(solution, "application"));
+    add(item.applicationNames, literalValue(solution, "applicationName"));
+    add(item.packageIris, resourceIri(solution, "package"));
+    add(item.packageNames, literalValue(solution, "packageName"));
+    add(item.referenceUrls, nodeValue(solution, "referenceUrl"));
+  }
+
+  private static void bindApplication(
+      ParameterizedSparqlString query, Scope scope, String applicationIri) {
+    if (scope == Scope.SELECTED) {
+      query.setIri("applicationValue", applicationIri.trim());
+    }
+  }
+
+  private static String listQuery(Scope scope) {
+    return PREFIXES + LIST_QUERY.replace("#SCOPE#", scope.valuesClause());
+  }
+
+  private static String exposureQuery(Scope scope) {
+    return PREFIXES + EXPOSURE_QUERY.replace("#SCOPE#", scope.valuesClause());
+  }
+
+  private static String resourceIri(QuerySolution solution, String variable) {
+    return solution.contains(variable) && solution.get(variable).isURIResource()
+        ? solution.getResource(variable).getURI()
+        : null;
+  }
+
+  private static String literalValue(QuerySolution solution, String variable) {
+    return solution.contains(variable) && solution.get(variable).isLiteral()
+        ? StringUtils.trimToNull(solution.getLiteral(variable).getString())
+        : null;
+  }
+
+  private static String nodeValue(QuerySolution solution, String variable) {
+    if (!solution.contains(variable) || solution.get(variable) == null) {
+      return null;
+    }
+    return solution.get(variable).isLiteral()
+        ? StringUtils.trimToNull(solution.getLiteral(variable).getString())
+        : StringUtils.trimToNull(solution.get(variable).toString());
+  }
+
+  private static Instant instantValue(QuerySolution solution, String variable) {
+    String value = literalValue(solution, variable);
+    try {
+      return value == null ? null : Instant.parse(value);
+    } catch (DateTimeException ignored) {
+      return null;
+    }
+  }
+
+  private static <T> T first(T current, T candidate) {
+    return current == null ? candidate : current;
+  }
+
+  private static void add(Set<String> values, String value) {
+    if (value != null) {
+      values.add(value);
+    }
+  }
 
   public CveImpactListResponse list(String scopeValue, String applicationIri) {
     Scope scope = validateScope(scopeValue, applicationIri);
@@ -354,224 +707,12 @@ public class CveImpactService {
         List.copyOf(nodes.values()), edges.values().stream().map(EdgeAccumulator::toEdge).toList());
   }
 
-  private static void putApplication(
-      Map<String, ImpactGraphNode> nodes, ApplicationView application, long exposureCount) {
-    nodes.putIfAbsent(
-        application.iri(),
-        new ImpactGraphNode(
-            application.iri(), application.iri(), application.name(), application.version(), "APPLICATION", Map.of("exposureCount", exposureCount)));
-  }
-
-  private static void putPackage(
-      Map<String, ImpactGraphNode> nodes,
-      PackageVersionView pkg,
-      String nodeType,
-      Set<String> applications) {
-    nodes.putIfAbsent(
-        pkg.iri(),
-        new ImpactGraphNode(
-            pkg.iri(),
-            pkg.iri(),
-            pkg.name(),
-            pkg.version(),
-            nodeType,
-            Map.of(
-                "purl", StringUtils.defaultString(pkg.purl()),
-                "applications", List.copyOf(applications == null ? Set.of() : applications))));
-  }
-
-  private static void mergeEdge(
-      Map<String, EdgeAccumulator> edges,
-      String source,
-      String relationship,
-      String target,
-      String exposureId) {
-    String id = edgeId(source, relationship, target);
-    EdgeAccumulator edge =
-        edges.computeIfAbsent(id, ignored -> new EdgeAccumulator(id, source, target, relationship));
-    if (exposureId != null) {
-      edge.exposureIds.add(exposureId);
-    }
-  }
-
-  private static String edgeId(String source, String relationship, String target) {
-    return source + "\u0000" + relationship + "\u0000" + target;
-  }
-
-  private static EdgeTuple parseEdgeId(String encodedEdgeId) {
-    if (encodedEdgeId == null) {
-      throw new IllegalArgumentException("Path edge ID must not be null");
-    }
-    String[] parts = encodedEdgeId.split("\u0000", -1);
-    if (parts.length != 3
-        || StringUtils.isBlank(parts[0])
-        || StringUtils.isBlank(parts[1])
-        || StringUtils.isBlank(parts[2])) {
-      throw new IllegalArgumentException("Invalid path edge ID: " + encodedEdgeId);
-    }
-    try {
-      return new EdgeTuple(parts[0], EdgeRelationship.valueOf(parts[1]), parts[2]);
-    } catch (IllegalArgumentException exception) {
-      throw new IllegalArgumentException("Unsupported path relationship: " + parts[1], exception);
-    }
-  }
-
-  private static int dependencyHopCount(List<String> pathEdgeIds) {
-    return Math.toIntExact(
-        pathEdgeIds.stream()
-            .map(CveImpactService::parseEdgeId)
-            .filter(edge -> edge.relationship() == EdgeRelationship.DEPENDS_ON)
-            .count());
-  }
-
-  private static void registerExposureNodeRoles(
-      Map<String, NodeRole> nodeRoles, ExposurePath exposure, String vulnerabilityIri) {
-    nodeRoles.put(vulnerabilityIri, NodeRole.VULNERABILITY);
-    nodeRoles.put(exposure.vulnerablePackage().iri(), NodeRole.PACKAGE_VERSION);
-    for (PathNodeView node : exposure.path()) {
-      if (node.iri().equals(vulnerabilityIri)) {
-        nodeRoles.put(node.iri(), NodeRole.VULNERABILITY);
-      } else if (node.iri().equals(exposure.vulnerablePackage().iri())) {
-        nodeRoles.put(node.iri(), NodeRole.PACKAGE_VERSION);
-      } else {
-        nodeRoles.put(node.iri(), NodeRole.OCCURRENCE);
-      }
-    }
-  }
-
-  private static void validateEdge(EdgeTuple edge, Map<String, NodeRole> nodeRoles) {
-    NodeRole source = nodeRoles.get(edge.source());
-    NodeRole target = nodeRoles.get(edge.target());
-    boolean valid =
-        switch (edge.relationship()) {
-          case DEPENDS_ON ->
-              source == NodeRole.OCCURRENCE
-                  && (target == NodeRole.OCCURRENCE || target == NodeRole.PACKAGE_VERSION);
-          case INSTANCE_OF ->
-              source == NodeRole.OCCURRENCE && target == NodeRole.PACKAGE_VERSION;
-          case AFFECTED_BY ->
-              source == NodeRole.PACKAGE_VERSION && target == NodeRole.VULNERABILITY;
-          case FIXED_IN ->
-              source == NodeRole.VULNERABILITY
-                  && target == NodeRole.FIXED_PACKAGE_VERSION;
-        };
-    if (!valid) {
-      throw new IllegalStateException(
-          "Invalid "
-              + edge.relationship()
-              + " edge roles: "
-              + edge.source()
-              + " ("
-              + source
-              + ") -> "
-              + edge.target()
-              + " ("
-              + target
-              + ")");
-    }
-  }
-
-  private static PathNodeView toPathNode(DependencyPathNode node) {
-    return new PathNodeView(node.occurrenceIri(), node.label(), node.version(), node.purl(), node.type());
-  }
-
-  private static ExposureTarget toExposureTarget(QuerySolution solution) {
-    return new ExposureTarget(
-        new ApplicationView(
-            resourceIri(solution, "application"),
-            literalValue(solution, "applicationName"),
-            literalValue(solution, "applicationVersion")),
-        new PackageVersionView(
-            resourceIri(solution, "package"),
-            literalValue(solution, "packageName"),
-            literalValue(solution, "installedVersion"),
-            literalValue(solution, "installedPurl")),
-        new ImportContext(
-            literalValue(solution, "importId"),
-            resourceIri(solution, "importRun"),
-            resourceIri(solution, "rootOccurrence")));
-  }
-
-  private static void accumulateListRow(
-      Map<String, ListAccumulator> grouped, QuerySolution solution) {
-    String vulnerabilityIri = resourceIri(solution, "vulnerability");
-    if (vulnerabilityIri == null) {
-      return;
-    }
-    ListAccumulator item =
-        grouped.computeIfAbsent(vulnerabilityIri, ListAccumulator::new);
-    item.osvId = first(item.osvId, literalValue(solution, "osvId"));
-    item.summary = first(item.summary, literalValue(solution, "summary"));
-    item.severityLevel = first(item.severityLevel, literalValue(solution, "severityLevel"));
-    add(item.aliases, literalValue(solution, "alias"));
-    add(item.applicationIris, resourceIri(solution, "application"));
-    add(item.applicationNames, literalValue(solution, "applicationName"));
-    add(item.packageIris, resourceIri(solution, "package"));
-    add(item.packageNames, literalValue(solution, "packageName"));
-    add(item.referenceUrls, nodeValue(solution, "referenceUrl"));
-  }
-
   private Scope validateScope(String value, String applicationIri) {
     Scope scope = Scope.from(value);
     if (scope == Scope.SELECTED && StringUtils.isBlank(applicationIri)) {
       throw new IllegalArgumentException("applicationIri is required for selected scope");
     }
     return scope;
-  }
-
-  private static void bindApplication(
-      ParameterizedSparqlString query, Scope scope, String applicationIri) {
-    if (scope == Scope.SELECTED) {
-      query.setIri("applicationValue", applicationIri.trim());
-    }
-  }
-
-  private static String listQuery(Scope scope) {
-    return PREFIXES + LIST_QUERY.replace("#SCOPE#", scope.valuesClause());
-  }
-
-  private static String exposureQuery(Scope scope) {
-    return PREFIXES + EXPOSURE_QUERY.replace("#SCOPE#", scope.valuesClause());
-  }
-
-  private static String resourceIri(QuerySolution solution, String variable) {
-    return solution.contains(variable) && solution.get(variable).isURIResource()
-        ? solution.getResource(variable).getURI()
-        : null;
-  }
-
-  private static String literalValue(QuerySolution solution, String variable) {
-    return solution.contains(variable) && solution.get(variable).isLiteral()
-        ? StringUtils.trimToNull(solution.getLiteral(variable).getString())
-        : null;
-  }
-
-  private static String nodeValue(QuerySolution solution, String variable) {
-    if (!solution.contains(variable) || solution.get(variable) == null) {
-      return null;
-    }
-    return solution.get(variable).isLiteral()
-        ? StringUtils.trimToNull(solution.getLiteral(variable).getString())
-        : StringUtils.trimToNull(solution.get(variable).toString());
-  }
-
-  private static Instant instantValue(QuerySolution solution, String variable) {
-    String value = literalValue(solution, variable);
-    try {
-      return value == null ? null : Instant.parse(value);
-    } catch (DateTimeException ignored) {
-      return null;
-    }
-  }
-
-  private static <T> T first(T current, T candidate) {
-    return current == null ? candidate : current;
-  }
-
-  private static void add(Set<String> values, String value) {
-    if (value != null) {
-      values.add(value);
-    }
   }
 
   private enum Scope {
@@ -584,10 +725,6 @@ public class CveImpactService {
       this.value = value;
     }
 
-    private String valuesClause() {
-      return this == SELECTED ? "VALUES ?application { ?applicationValue }" : "";
-    }
-
     private static Scope from(String value) {
       String normalized = StringUtils.defaultIfBlank(value, "selected").trim();
       for (Scope scope : values()) {
@@ -597,19 +734,38 @@ public class CveImpactService {
       }
       throw new IllegalArgumentException("scope must be selected or all");
     }
+
+    private String valuesClause() {
+      return this == SELECTED ? "VALUES ?application { ?applicationValue }" : "";
+    }
+  }
+
+  private enum EdgeRelationship {
+    DEPENDS_ON,
+    INSTANCE_OF,
+    AFFECTED_BY,
+    FIXED_IN
+  }
+
+  private enum NodeRole {
+    OCCURRENCE,
+    PACKAGE_VERSION,
+    FIXED_PACKAGE_VERSION,
+    VULNERABILITY
   }
 
   private static final class ListAccumulator {
     private final String vulnerabilityIri;
-    private String osvId;
-    private String summary;
-    private String severityLevel;
     private final Set<String> aliases = new LinkedHashSet<>();
     private final Set<String> applicationIris = new LinkedHashSet<>();
     private final Set<String> applicationNames = new LinkedHashSet<>();
     private final Set<String> packageIris = new LinkedHashSet<>();
     private final Set<String> packageNames = new LinkedHashSet<>();
     private final Set<String> referenceUrls = new LinkedHashSet<>();
+    private String osvId;
+    private String summary;
+    private String severityLevel;
+    private Double cvssBaseScore;
 
     private ListAccumulator(String vulnerabilityIri) {
       this.vulnerabilityIri = vulnerabilityIri;
@@ -623,13 +779,16 @@ public class CveImpactService {
     }
 
     private CveImpactListItem toItem() {
+      String calculatedSeverity =
+          cvssBaseScore == null ? null : CvssParserUtil.severity(cvssBaseScore);
       return new CveImpactListItem(
           vulnerabilityIri,
           preferredIdentifier(),
           osvId,
           aliases.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList(),
           summary,
-          severityLevel,
+          first(severityLevel, calculatedSeverity),
+          calculatedSeverity,
           applicationIris.size(),
           packageIris.size(),
           referenceUrls.size(),
@@ -640,16 +799,16 @@ public class CveImpactService {
 
   private static final class DetailAccumulator {
     private final String vulnerabilityIri;
+    private final Set<String> aliases = new LinkedHashSet<>();
+    private final Set<String> referenceUrls = new LinkedHashSet<>();
+    private final Set<CvssAssessmentView> cvssAssessments = new LinkedHashSet<>();
+    private final Set<FixedVersionView> fixedVersions = new LinkedHashSet<>();
     private String osvId;
     private String summary;
     private String details;
     private String severityLevel;
     private Instant publishedAt;
     private Instant modifiedAt;
-    private final Set<String> aliases = new LinkedHashSet<>();
-    private final Set<String> referenceUrls = new LinkedHashSet<>();
-    private final Set<CvssAssessmentView> cvssAssessments = new LinkedHashSet<>();
-    private final Set<FixedVersionView> fixedVersions = new LinkedHashSet<>();
 
     private DetailAccumulator(String vulnerabilityIri) {
       this.vulnerabilityIri = vulnerabilityIri;
@@ -665,13 +824,16 @@ public class CveImpactService {
       add(aliases, literalValue(solution, "alias"));
       add(referenceUrls, nodeValue(solution, "referenceUrl"));
       String vector = literalValue(solution, "vector");
+
       if (vector != null) {
-        cvssAssessments.add(
-            new CvssAssessmentView(
-                resourceIri(solution, "assessment"),
-                literalValue(solution, "cvssType"),
-                literalValue(solution, "cvssVersion"),
-                vector));
+        Cvss cvss = CvssParserUtil.from(vector);
+        if (cvss != null) {
+          cvssAssessments.add(
+              new CvssAssessmentView(
+                  resourceIri(solution, "assessment"),
+                  literalValue(solution, "cvssType"),
+                  cvss));
+        }
       }
       String fixedVersion = literalValue(solution, "fixedVersion");
       String fixedIri = resourceIri(solution, "fixedPackage");
@@ -693,6 +855,15 @@ public class CveImpactService {
     }
 
     private VulnerabilityDetail toVulnerability(List<ExposureTarget> targets) {
+      String calculatedSeverity =
+          cvssAssessments.stream()
+              .map(CvssAssessmentView::cvss)
+              .mapToDouble(cvss -> cvss.calculateScore().getBaseScore())
+              .max()
+              .stream()
+              .mapToObj(CvssParserUtil::severity)
+              .findFirst()
+              .orElse(null);
       return new VulnerabilityDetail(
           vulnerabilityIri,
           preferredIdentifier(),
@@ -700,7 +871,7 @@ public class CveImpactService {
           List.copyOf(aliases),
           summary,
           details,
-          severityLevel,
+          first(severityLevel, calculatedSeverity),
           publishedAt,
           modifiedAt,
           (int) targets.stream().map(target -> target.application.iri()).distinct().count(),
@@ -714,20 +885,6 @@ public class CveImpactService {
       ImportContext importContext) {}
 
   private record EdgeTuple(String source, EdgeRelationship relationship, String target) {}
-
-  private enum EdgeRelationship {
-    DEPENDS_ON,
-    INSTANCE_OF,
-    AFFECTED_BY,
-    FIXED_IN
-  }
-
-  private enum NodeRole {
-    OCCURRENCE,
-    PACKAGE_VERSION,
-    FIXED_PACKAGE_VERSION,
-    VULNERABILITY
-  }
 
   private static final class EdgeAccumulator {
     private final String id;
@@ -747,131 +904,4 @@ public class CveImpactService {
       return new ImpactGraphEdge(id, source, target, relationship, List.copyOf(exposureIds));
     }
   }
-
-  private static final String LIST_QUERY =
-      """
-      SELECT DISTINCT
-          ?vulnerability ?osvId ?alias ?summary ?severityLevel
-          ?application ?applicationName ?importRun ?rootOccurrence ?occurrence ?package ?packageName ?installedVersion ?referenceUrl
-      WHERE {
-          #SCOPE#
-          {
-              ?application a risk:ApplicationOccurrence ; risk:name ?applicationName ;
-                           risk:dependsOn+ ?package .
-              ?package risk:name ?packageName ; risk:affectedBy ?vulnerability .
-              OPTIONAL { ?package risk:version ?installedVersion . }
-          }
-          UNION
-          {
-              ?application a risk:Application ; rdfs:label ?applicationName ;
-                           risk:activeImport ?importRun .
-              ?importRun risk:rootOccurrence ?rootOccurrence .
-              ?rootOccurrence risk:belongsToImport ?importRun .
-              ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
-              ?package a risk:PackageVersion ; rdfs:label ?packageName ;
-                       risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
-          }
-          ?vulnerability a risk:Vulnerability ; risk:osvId ?osvId .
-          OPTIONAL { ?vulnerability risk:alias ?alias . }
-          OPTIONAL { ?vulnerability risk:summary ?summary . }
-          OPTIONAL { ?vulnerability risk:severityLevel ?vulnerabilitySeverity . }
-          OPTIONAL {
-              ?vulnerability risk:hasSeverity ?severityAssessment .
-              ?severityAssessment risk:severityLevel ?assessmentSeverity .
-          }
-          BIND(COALESCE(?vulnerabilitySeverity, ?assessmentSeverity) AS ?severityLevel)
-          OPTIONAL {
-              { ?vulnerability risk:hasReference/risk:referenceUrl ?referenceUrl . }
-              UNION
-              { ?vulnerability risk:referenceUrl ?referenceUrl . }
-          }
-      }
-      ORDER BY LCASE(STR(?osvId)) LCASE(STR(?applicationName)) LCASE(STR(?packageName))
-      """;
-
-  private static final String EXPOSURE_QUERY =
-      """
-      SELECT DISTINCT ?application ?applicationName ?applicationVersion
-                      ?importRun ?importId ?rootOccurrence ?package ?packageName ?installedVersion ?installedPurl
-      WHERE {
-          VALUES ?vulnerability { ?vulnerabilityValue }
-          #SCOPE#
-          {
-              ?application a risk:ApplicationOccurrence ; risk:name ?applicationName ;
-                           risk:dependsOn+ ?package .
-              ?package risk:name ?packageName ; risk:affectedBy ?vulnerability .
-              OPTIONAL { ?application risk:version ?applicationVersion . }
-              OPTIONAL { ?package risk:version ?installedVersion . }
-          }
-          UNION
-          {
-              ?application a risk:Application ; rdfs:label ?applicationName ;
-                           risk:activeImport ?importRun .
-              OPTIONAL { ?application risk:version ?applicationVersion . }
-              ?importRun risk:importId ?importId ; risk:rootOccurrence ?rootOccurrence .
-              ?rootOccurrence risk:belongsToImport ?importRun .
-              ?occurrence risk:belongsToImport ?importRun ; risk:instanceOf ?package .
-              ?package a risk:PackageVersion ; rdfs:label ?packageName ;
-                       risk:version ?installedVersion ; risk:affectedBy ?vulnerability .
-          }
-          OPTIONAL { ?package risk:purl ?installedPurl . }
-      }
-      ORDER BY LCASE(STR(?applicationName)) LCASE(STR(?packageName)) STR(?installedVersion)
-      """;
-
-  private static final String VULNERABILITY_DETAIL_QUERY =
-      """
-      SELECT ?osvId ?alias ?summary ?details ?severityLevel ?publishedAt ?modifiedAt
-             ?assessment ?cvssType ?cvssVersion ?vector
-             ?fixedPackage ?fixedPackageName ?fixedVersion ?fixedPurl ?referenceUrl
-      WHERE {
-          VALUES ?vulnerability { ?vulnerabilityValue }
-          ?vulnerability a risk:Vulnerability ; risk:osvId ?osvId .
-          OPTIONAL { ?vulnerability risk:alias ?alias . }
-          OPTIONAL { ?vulnerability risk:summary ?summary . }
-          OPTIONAL { ?vulnerability risk:details ?details . }
-          OPTIONAL { ?vulnerability risk:severityLevel ?vulnerabilitySeverity . }
-          OPTIONAL {
-              ?vulnerability risk:hasSeverity ?severityAssessment .
-              ?severityAssessment risk:severityLevel ?assessmentSeverity .
-          }
-          BIND(COALESCE(?vulnerabilitySeverity, ?assessmentSeverity) AS ?severityLevel)
-          OPTIONAL { ?vulnerability risk:publishedAt ?publishedAt . }
-          OPTIONAL { ?vulnerability risk:modifiedAt ?modifiedAt . }
-          OPTIONAL {
-              { ?vulnerability risk:hasReference/risk:referenceUrl ?referenceUrl . }
-              UNION
-              { ?vulnerability risk:referenceUrl ?referenceUrl . }
-          }
-          OPTIONAL {
-              ?vulnerability risk:hasSeverity ?assessment .
-              {
-                  ?assessment a risk:SeverityAssessment ; risk:severityScore ?vector .
-                  OPTIONAL { ?assessment risk:severityType ?cvssType . }
-              }
-              UNION
-              {
-                  ?assessment a risk:CvssAssessment ; risk:vector ?vector .
-                  OPTIONAL { ?assessment risk:cvssType ?cvssType . }
-                  OPTIONAL { ?assessment risk:cvssVersion ?cvssVersion . }
-              }
-          }
-          OPTIONAL {
-              {
-                  ?vulnerability risk:hasAffectedPackage ?affectedPackage .
-                  ?affectedPackage risk:hasRange/risk:hasEvent ?fixedPackage .
-                  ?fixedPackage risk:fixedVersion ?fixedVersion .
-                  OPTIONAL { ?affectedPackage risk:affectedPackageName ?fixedPackageName . }
-                  OPTIONAL { ?affectedPackage risk:affectedPackagePurl ?fixedPurl . }
-              }
-              UNION
-              {
-                  ?vulnerability risk:fixedIn ?fixedPackage .
-                  ?fixedPackage a risk:PackageVersion ; risk:version ?fixedVersion .
-                  OPTIONAL { ?fixedPackage rdfs:label ?fixedPackageName . }
-                  OPTIONAL { ?fixedPackage risk:purl ?fixedPurl . }
-              }
-          }
-      }
-      """;
 }

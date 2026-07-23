@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -16,6 +16,9 @@ describe('CveImpactView', () => {
     renderView();
     expect(screen.getAllByText('CVE-2026-1000')).toHaveLength(1);
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(2);
+    const row = screen.getByText('CVE-2026-1000').closest('tr');
+    expect(row).not.toBeNull();
+    expect(within(row!).getByText('CRITICAL')).toBeInTheDocument();
   });
 
   it('shows vulnerabilities affecting the most applications first', () => {
@@ -47,10 +50,9 @@ describe('CveImpactView', () => {
     expect(tree.querySelector('[data-node-kind="cve"]')).toBeInTheDocument();
     expect(tree.querySelectorAll('[data-node-kind="application"]')).toHaveLength(2);
     expect(tree.querySelectorAll('[data-node-kind="fix"]')).toHaveLength(1);
-    expect(screen.getByLabelText('Tree relationship vocabulary')).toHaveTextContent('DO');
-    expect(screen.getByLabelText('Tree relationship vocabulary')).toHaveTextContent('DEPENDS_ON');
-    expect(screen.getByLabelText('Tree relationship vocabulary')).toHaveTextContent('FI');
-    expect(screen.getByLabelText('Tree relationship vocabulary')).toHaveTextContent('FIXED_IN');
+    expect(tree.querySelector('path[data-edge-relationship="DEPENDS_ON"]')).toBeInTheDocument();
+    expect(tree.querySelector('path[data-edge-relationship="AFFECTED_BY"]')).toBeInTheDocument();
+    expect(tree.querySelector('path[data-edge-relationship="FIXED_IN"]')).toBeInTheDocument();
   });
 
   it('selects tree nodes into the existing details panel', async () => {
@@ -88,6 +90,24 @@ describe('CveImpactView', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByText('https://nvd.nist.gov/vuln/detail/CVE-2026-1000')).toBeInTheDocument();
     expect(screen.getByText('not a url')).toBeInTheDocument();
+  });
+
+  it('projects the structured CVSS assessment into the details panel', async () => {
+    renderView();
+    await userEvent.click(screen.getByText('CVE-2026-1000'));
+    await screen.findByLabelText('CVE impact and fixes tree');
+    await userEvent.click(screen.getByRole('button', { name: 'CVE-2026-1000' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'CVSS' }));
+
+    expect(screen.getByText('Base 9.8')).toBeInTheDocument();
+    expect(screen.getAllByText('CRITICAL').length).toBeGreaterThan(0);
+    expect(screen.getByText('Impact')).toBeInTheDocument();
+    expect(screen.getByText('Exploitability')).toBeInTheDocument();
+    expect(screen.getByText('Attack Vector')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'CVSS metrics' })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'CVSS vector summary' })).toBeInTheDocument();
+    expect(screen.getByText('NETWORK')).toBeInTheDocument();
+    expect(screen.getByText('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H')).toBeInTheDocument();
   });
 
   it('renders advisory markdown headings and URLs as UI content', async () => {
@@ -142,7 +162,7 @@ function listResponse(items: ReturnType<typeof listItem>[]): CveImpactListRespon
 function listItem(overrides: Partial<CveImpactListResponse['items'][number]> = {}) {
   return {
     vulnerabilityIri: 'urn:test:vulnerability', preferredIdentifier: 'CVE-2026-1000', osvId: 'GHSA-IMPACT',
-    aliases: ['CVE-2026-1000'], summary: 'Shared vulnerability', severityLevel: 'HIGH',
+    aliases: ['CVE-2026-1000'], summary: 'Shared vulnerability', severityLevel: 'HIGH', cvssSeverity: 'CRITICAL',
     affectedApplicationCount: 2, affectedPackageVersionCount: 2, referenceCount: 2,
     applicationNames: ['Orders', 'Analytics'], packageNames: ['jackson-databind'],
     ...overrides
@@ -164,7 +184,19 @@ function detailResponse(): CveImpactDetailResponse {
   return {
     vulnerability, exposures,
     fixedVersions: [{ iri: 'urn:test:fixed', packageName: 'jackson-databind', version: '2.10.5', purl: null }],
-    cvssAssessments: [{ iri: 'urn:test:assessment', type: 'CVSS_V3', version: '3.1', vector: 'CVSS:3.1/AV:N' }],
+    cvssAssessments: [{
+      iri: 'urn:test:assessment',
+      type: 'CVSS_V3',
+      cvss: {
+        implementation: 'CvssV3_1',
+        name: 'CVSS:3.1',
+        vector: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+        severity: 'CRITICAL',
+        score: { base: 9.8, impact: 5.9, exploitability: 3.9, temporal: 9.8, environmental: 9.8, modifiedImpact: 5.9 },
+        av: 'NETWORK',
+        ac: 'LOW'
+      }
+    }],
     referenceUrls: ['https://nvd.nist.gov/vuln/detail/CVE-2026-1000', 'not a url'],
     graph: {
       nodes: [

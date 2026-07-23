@@ -135,6 +135,7 @@ class CveImpactServiceTest {
 
     assertEquals("CVE-2026-1000", list.items().get(0).preferredIdentifier());
     assertEquals(2, list.items().get(0).affectedApplicationCount());
+    assertEquals("CRITICAL", list.items().get(0).cvssSeverity());
     assertEquals("CVE-2026-2000", list.items().get(1).preferredIdentifier());
     assertEquals(1, list.items().get(1).affectedApplicationCount());
   }
@@ -146,7 +147,8 @@ class CveImpactServiceTest {
     CveImpactDetailResponse detail = fixture.service.detail(fixture.vulnerabilityIri, "all", null);
 
     assertEquals(1, detail.cvssAssessments().size());
-    assertEquals("3.1", detail.cvssAssessments().getFirst().version());
+    assertEquals("CVSS:3.1", detail.cvssAssessments().getFirst().cvss().getName());
+    assertEquals(9.8, detail.cvssAssessments().getFirst().cvss().calculateScore().getBaseScore());
     assertEquals(1, detail.fixedVersions().size());
     assertTrue(detail.graph().edges().stream().anyMatch(edge -> edge.relationship().equals("FIXED_IN")));
     assertTrue(detail.graph().edges().stream().anyMatch(edge -> edge.relationship().equals("AFFECTED_BY")));
@@ -279,7 +281,9 @@ class CveImpactServiceTest {
             .addProperty(RDF.type, RiskVocabulary.CVSS_ASSESSMENT)
             .addProperty(RiskVocabulary.CVSS_TYPE, "CVSS_V3")
             .addProperty(RiskVocabulary.CVSS_VERSION, "3.1")
-            .addProperty(RiskVocabulary.VECTOR, "CVSS:3.1/AV:N/AC:L");
+            .addProperty(
+                RiskVocabulary.VECTOR,
+                "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
     vulnerability.addProperty(RiskVocabulary.HAS_SEVERITY, assessment);
 
     Resource fixed = packageVersion(model, "urn:test:impact:jackson:fixed", "jackson-databind", "2.10.5");

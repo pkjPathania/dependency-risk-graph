@@ -4,7 +4,9 @@ Dependency Risk Graph is a Java-first software supply-chain knowledge graph. It 
 
 The graph is the source of truth. Ingestion and enrichment write RDF; the Explore and SPARQL APIs read the persisted model without making hidden OSV calls.
 
-![Dependency Risk Graph overview](docs/sample/overview.png)
+![Dependency Risk Graph](docs/sample/img.png)
+
+[Explore Page Demo v1 (YouTube)](https://www.youtube.com/watch?v=0JgUOX8NOmY)
 
 ## Table of Contents
 

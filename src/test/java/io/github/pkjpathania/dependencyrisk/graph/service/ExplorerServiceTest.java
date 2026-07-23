@@ -190,8 +190,18 @@ class ExplorerServiceTest {
             .addProperty(RiskVocabulary.REFERENCE_URL, "https://example.test/one")
             .addProperty(RiskVocabulary.REFERENCE_URL, "https://example.test/two");
     directPackage.addProperty(RiskVocabulary.AFFECTED_BY, detailedVulnerability);
-    addAssessment(model, detailedVulnerability, "one", "3.1", "CVSS:3.1/AV:N/AC:L");
-    addAssessment(model, detailedVulnerability, "two", "4.0", "CVSS:4.0/AV:N/AC:H");
+    addAssessment(
+        model,
+        detailedVulnerability,
+        "one",
+        "3.1",
+        "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
+    addAssessment(
+        model,
+        detailedVulnerability,
+        "two",
+        "3.0",
+        "CVSS:3.0/AV:L/AC:H/PR:L/UI:R/S:U/C:L/I:L/A:L");
     addFixedVersion(model, detailedVulnerability, "2.0");
     addFixedVersion(model, detailedVulnerability, "3.0");
 

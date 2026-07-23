@@ -50,6 +50,7 @@
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
     <jgrapht-core.version>1.5.3</jgrapht-core.version>
     <langchain4j.version>1.17.2</langchain4j.version>
+    <cvss-calculator.version>1.5.1</cvss-calculator.version>
   </properties>
 
   <dependencyManagement>
@@ -67,6 +68,11 @@
 
   <dependencies>
 
+    <dependency>
+      <groupId>us.springett</groupId>
+      <artifactId>cvss-calculator</artifactId>
+      <version>${cvss-calculator.version}</version>
+    </dependency>
     <dependency>
       <groupId>dev.langchain4j</groupId>
       <artifactId>langchain4j-open-ai</artifactId>

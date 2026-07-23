@@ -9,6 +9,7 @@ public record CveImpactListItem(
     List<String> aliases,
     String summary,
     String severityLevel,
+    String cvssSeverity,
     int affectedApplicationCount,
     int affectedPackageVersionCount,
     int referenceCount,

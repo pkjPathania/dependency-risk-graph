@@ -41,6 +41,7 @@ import { designTokens } from '../../theme/designTokens';
 import { severityColors, type Severity } from '../../types/severity';
 import { fetchCveImpactDetail } from './exploreApi';
 import { CveImpactTree } from './CveImpactTree';
+import { cvssMetricName, displayScore, presentCvss, type PresentedCvss } from './cvssPresentation';
 import { ExploreEmptyState } from './ExploreEmptyState';
 import { referenceLabel } from './ReferencesView';
 
@@ -177,7 +178,7 @@ export function CveImpactView({
         <Table size="small" aria-label="CVE impact vulnerabilities">
           <TableHead><TableRow>
             <TableCell>Identifier</TableCell><TableCell>OSV ID</TableCell><TableCell>Summary</TableCell>
-            <TableCell>Severity</TableCell><TableCell align="right">Affected applications</TableCell>
+            <TableCell>Severity</TableCell><TableCell>CVSS severity</TableCell><TableCell align="right">Affected applications</TableCell>
             <TableCell align="right">Package versions</TableCell><TableCell align="right">References</TableCell>
           </TableRow></TableHead>
           <TableBody>
@@ -194,6 +195,7 @@ export function CveImpactView({
                 <TableCell>{item.osvId}</TableCell>
                 <TableCell sx={{ minWidth: 260, maxWidth: 440 }}>{item.summary || 'No summary provided'}</TableCell>
                 <TableCell><SeverityChip value={item.severityLevel} /></TableCell>
+                <TableCell><SeverityChip value={item.cvssSeverity} /></TableCell>
                 <TableCell align="right">{item.affectedApplicationCount.toLocaleString()}</TableCell>
                 <TableCell align="right">{item.affectedPackageVersionCount.toLocaleString()}</TableCell>
                 <TableCell align="right">{item.referenceCount.toLocaleString()}</TableCell>
@@ -313,13 +315,77 @@ function ImpactDetailsPanel({ detail, selectedNode, tab, onTabChange }: { detail
       <Detail label="Summary" value={detail.vulnerability.summary} />
       <AdvisoryDetails value={detail.vulnerability.details} />
       <Detail label="Severity" value={detail.vulnerability.severityLevel || 'UNRATED'} /><Detail label="Published" value={formatDate(detail.vulnerability.publishedAt)} />
+      <Detail label="CVSS severity" value={cvssSeverities(detail)} />
       <Detail label="Modified" value={formatDate(detail.vulnerability.modifiedAt)} />
       <Detail label="Affected package versions" value={distinctPackageVersions(detail).join('\n')} pre />
       <Detail label="Fixed versions" value={detail.fixedVersions.length ? detail.fixedVersions.map((fixed) => `${fixed.packageName ?? 'Package'} ${fixed.version}${fixed.purl ? `\n${fixed.purl}` : ''}`).join('\n\n') : 'No fixed version listed'} pre />
     </Stack> : null}
-    {tab === 1 ? <Stack spacing={1.5}>{detail.cvssAssessments.length ? detail.cvssAssessments.map((assessment) => <Box key={assessment.iri ?? assessment.vector}><Typography fontWeight={900}>CVSS {assessment.version ?? assessment.type ?? ''}</Typography><Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>{assessment.vector}</Typography></Box>) : <Typography color="text.secondary">No CVSS assessment listed.</Typography>}</Stack> : null}
+    {tab === 1 ? <Stack spacing={1.5}>{detail.cvssAssessments.length ? detail.cvssAssessments.map((assessment) => {
+      const cvss = presentCvss(assessment);
+      if (!cvss) {
+        return <Alert key={assessment.iri ?? assessment.type ?? 'invalid-cvss'} severity="warning">CVSS vector is unavailable.</Alert>;
+      }
+      return <Box key={assessment.iri ?? cvss.vector}>
+        <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+          <Typography fontWeight={900}>{cvss.name || assessment.type || cvss.implementation}</Typography>
+          <SeverityChip value={cvss.severity} />
+          <Chip size="small" label={`Base ${displayScore(cvss.score.base)}`} />
+        </Stack>
+        <Stack direction="row" spacing={2} sx={{ my: 1 }}>
+          <Typography variant="body2">Impact <strong>{displayScore(cvss.score.impact)}</strong></Typography>
+          <Typography variant="body2">Exploitability <strong>{displayScore(cvss.score.exploitability)}</strong></Typography>
+        </Stack>
+        <CvssVectorSummary cvss={cvss} />
+        <CvssMetrics cvss={cvss} />
+      </Box>
+    }) : <Typography color="text.secondary">No CVSS assessment listed.</Typography>}</Stack> : null}
     {tab === 2 ? <Stack spacing={1}>{detail.referenceUrls.length ? detail.referenceUrls.map((url) => <ExternalReference key={url} value={url} />) : <Typography color="text.secondary">No references listed.</Typography>}</Stack> : null}
   </Paper>;
+}
+
+function CvssVectorSummary({ cvss }: { cvss: PresentedCvss }) {
+  return <TableContainer component={Paper} variant="outlined" sx={{ mt: 1 }}>
+    <Table size="small" aria-label="CVSS vector summary">
+      <TableHead>
+        <TableRow>
+          <TableCell>Vector</TableCell>
+          <TableCell align="right">Base score</TableCell>
+          <TableCell>Severity</TableCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        <TableRow>
+          <TableCell sx={{ overflowWrap: 'anywhere' }}>{cvss.vector}</TableCell>
+          <TableCell align="right">{displayScore(cvss.score.base)}</TableCell>
+          <TableCell><SeverityChip value={cvss.severity} /></TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
+  </TableContainer>;
+}
+
+function CvssMetrics({ cvss }: { cvss: PresentedCvss }) {
+  return <TableContainer component={Paper} variant="outlined" sx={{ mt: 2 }}>
+    <Table size="small" aria-label="CVSS metrics">
+      <TableHead>
+        <TableRow>
+          <TableCell>Metric</TableCell>
+          <TableCell>Value</TableCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {cvss.metrics.map(([code, value]) => (
+          <TableRow key={code}>
+            <TableCell>
+              <Typography variant="body2" fontWeight={800}>{cvssMetricName(code)}</Typography>
+              <Typography variant="caption" color="text.secondary">{code}</Typography>
+            </TableCell>
+            <TableCell>{value}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </TableContainer>;
 }
 
 function SelectedNodeHeader({ node }: { node: ImpactGraphNode }) {
@@ -411,6 +477,14 @@ function renderInlineContent(value: string): ReactNode[] {
   }
   if (cursor < value.length) content.push(value.slice(cursor));
   return content;
+}
+
+function cvssSeverities(detail: CveImpactDetailResponse): string {
+  const severities = detail.cvssAssessments
+    .map(presentCvss)
+    .filter((cvss): cvss is PresentedCvss => cvss !== null)
+    .map((cvss) => cvss.severity);
+  return Array.from(new Set(severities)).join(', ') || 'UNKNOWN';
 }
 
 function Detail({ label, value, pre = false }: { label: string; value: string | null; pre?: boolean }) {

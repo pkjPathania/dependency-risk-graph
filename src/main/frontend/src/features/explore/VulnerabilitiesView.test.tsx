@@ -24,12 +24,12 @@ describe('VulnerabilitiesView', () => {
     expect(onOpenEnrichment).toHaveBeenCalledOnce();
   });
 
-  it('renders populated vulnerability rows and unrated severity', () => {
+  it('falls back to calculated CVSS severity when advisory severity is absent', () => {
     renderView({ response: response([item()]) });
 
     expect(screen.getByText('jackson-databind')).toBeInTheDocument();
     expect(screen.getByText('CVE-2026-54515')).toBeInTheDocument();
-    expect(screen.getByText('UNRATED')).toBeInTheDocument();
+    expect(screen.getByText('CRITICAL')).toBeInTheDocument();
   });
 
   it('renders multiple fixed versions distinctly', () => {
@@ -37,6 +37,12 @@ describe('VulnerabilitiesView', () => {
 
     expect(screen.getByText('2.18.9')).toBeInTheDocument();
     expect(screen.getByText('2.21.5')).toBeInTheDocument();
+  });
+
+  it('renders the calculated CVSS score and severity', () => {
+    renderView({ response: response([item()]) });
+
+    expect(screen.getByText('CVSS:3.1 · 9.8 CRITICAL')).toBeInTheDocument();
   });
 
   it('filters by CVE alias', async () => {
@@ -128,7 +134,18 @@ function item(overrides: Partial<ApplicationVulnerabilityItem> = {}): Applicatio
     publishedAt: '2026-07-18T00:00:00Z',
     modifiedAt: '2026-07-18T01:00:00Z',
     cvssAssessments: [
-      { iri: 'urn:test:assessment', type: 'CVSS_V3', version: '3.1', vector: 'CVSS:3.1/AV:N/AC:L' }
+      {
+        iri: 'urn:test:assessment',
+        type: 'CVSS_V3',
+        cvss: {
+          implementation: 'CvssV3_1',
+          name: 'CVSS:3.1',
+          vector: 'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H',
+          severity: 'CRITICAL',
+          score: { base: 9.8, impact: 5.9, exploitability: 3.9, temporal: 9.8, environmental: 9.8, modifiedImpact: 5.9 },
+          av: 'NETWORK'
+        }
+      }
     ],
     fixedVersions: [
       { iri: 'urn:test:fixed:2189', packageName: 'jackson-databind', version: '2.18.9', purl: 'pkg:maven/jackson@2.18.9' },

@@ -43,11 +43,28 @@ export interface DependencySummary {
   highestSeverity?: string | null;
 }
 
+export interface CvssScore {
+  base: number;
+  impact: number;
+  exploitability: number;
+  temporal: number;
+  environmental: number;
+  modifiedImpact: number;
+}
+
+export interface Cvss {
+  implementation: string;
+  name: string;
+  vector: string;
+  severity: string;
+  score: CvssScore;
+  [metric: string]: string | CvssScore;
+}
+
 export interface CvssAssessmentView {
   iri: string | null;
   type: string | null;
-  version: string | null;
-  vector: string;
+  cvss: Cvss;
 }
 
 export interface FixedVersionView {
@@ -112,6 +129,7 @@ export interface CveImpactListItem {
   aliases: string[];
   summary: string | null;
   severityLevel: string | null;
+  cvssSeverity: string | null;
   affectedApplicationCount: number;
   affectedPackageVersionCount: number;
   referenceCount: number;

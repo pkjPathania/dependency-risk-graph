@@ -10,6 +10,7 @@ import io.github.pkjpathania.dependencyrisk.graph.model.CvssAssessmentView;
 import io.github.pkjpathania.dependencyrisk.graph.model.DependencySummary;
 import io.github.pkjpathania.dependencyrisk.graph.model.FixedVersionView;
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
+import io.github.pkjpathania.dependencyrisk.graph.util.CvssParserUtil;
 import io.github.pkjpathania.dependencyrisk.graph.util.SparqlUtil;
 import java.net.URI;
 import java.time.DateTimeException;
@@ -26,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.query.ParameterizedSparqlString;
 import org.apache.jena.query.QuerySolution;
 import org.springframework.stereotype.Service;
+import us.springett.cvss.Cvss;
 
 @Service
 @RequiredArgsConstructor
@@ -213,12 +215,14 @@ public class ExplorerService {
 
     String vector = stringValue(solution, "vector");
     if (StringUtils.isNotBlank(vector)) {
-      accumulator.cvssAssessments.add(
-          new CvssAssessmentView(
-              resourceIri(solution, "assessment"),
-              trimmedOrNull(stringValue(solution, "cvssType")),
-              trimmedOrNull(stringValue(solution, "cvssVersion")),
-              vector.trim()));
+      Cvss cvss = CvssParserUtil.from(vector);
+      if (cvss != null) {
+        accumulator.cvssAssessments.add(
+            new CvssAssessmentView(
+                resourceIri(solution, "assessment"),
+                trimmedOrNull(stringValue(solution, "cvssType")),
+                cvss));
+      }
     }
 
     String fixedVersion = stringValue(solution, "fixedVersion");
@@ -593,6 +597,15 @@ public class ExplorerService {
     private Instant modifiedAt;
 
     private ApplicationVulnerabilityItem toItem() {
+      String calculatedSeverity =
+          cvssAssessments.stream()
+              .map(CvssAssessmentView::cvss)
+              .mapToDouble(cvss -> cvss.calculateScore().getBaseScore())
+              .max()
+              .stream()
+              .mapToObj(CvssParserUtil::severity)
+              .findFirst()
+              .orElse(null);
       return new ApplicationVulnerabilityItem(
           packageIri,
           packageName,
@@ -604,7 +617,7 @@ public class ExplorerService {
           List.copyOf(aliases),
           summary,
           details,
-          severityLevel,
+          firstPresent(severityLevel, calculatedSeverity),
           publishedAt,
           modifiedAt,
           List.copyOf(cvssAssessments),

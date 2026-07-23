@@ -34,6 +34,7 @@ import type {
 } from '../../api/types';
 import { severityColors, type Severity } from '../../types/severity';
 import { ExploreEmptyState } from './ExploreEmptyState';
+import { displayScore, highestCvssSeverity, presentCvss } from './cvssPresentation';
 
 interface VulnerabilitiesViewProps {
   response: ApplicationVulnerabilitiesResponse | null;
@@ -61,14 +62,14 @@ export function VulnerabilitiesView({
   const severityOptions = useMemo(
     () =>
       Array.from(
-        new Set(items.map((item) => normalizedSeverity(item.severityLevel)))
+        new Set(items.map((item) => normalizedSeverity(item.severityLevel ?? highestCvssSeverity(item.cvssAssessments))))
       ).sort(),
     [items]
   );
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
     return items.filter((item) => {
-      if (severity !== 'ALL' && normalizedSeverity(item.severityLevel) !== severity) {
+      if (severity !== 'ALL' && normalizedSeverity(item.severityLevel ?? highestCvssSeverity(item.cvssAssessments)) !== severity) {
         return false;
       }
       if (dependencyType !== 'ALL' && item.dependencyType !== dependencyType) {
@@ -232,7 +233,7 @@ export function VulnerabilitiesView({
                     {item.summary || 'No summary provided'}
                   </Typography>
                 </TableCell>
-                <TableCell><SeverityChip value={item.severityLevel} /></TableCell>
+                <TableCell><SeverityChip value={item.severityLevel ?? highestCvssSeverity(item.cvssAssessments)} /></TableCell>
                 <TableCell><CvssChips item={item} /></TableCell>
                 <TableCell sx={{ minWidth: 180 }}><FixedVersionChips versions={item.fixedVersions} /></TableCell>
                 <TableCell>{formatDate(item.publishedAt)}</TableCell>
@@ -299,11 +300,19 @@ function CvssChips({ item }: { item: ApplicationVulnerabilityItem }) {
   }
   return (
     <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
-      {item.cvssAssessments.map((assessment) => (
-        <Tooltip key={`${assessment.type}:${assessment.vector}`} title={assessment.vector}>
-          <Chip size="small" label={assessment.version || assessment.type || 'CVSS'} variant="outlined" />
+      {item.cvssAssessments.map((assessment) => {
+        const cvss = presentCvss(assessment);
+        if (!cvss) {
+          return <Chip key={assessment.iri ?? assessment.type ?? 'invalid-cvss'} size="small" label="CVSS unavailable" variant="outlined" />;
+        }
+        return <Tooltip key={assessment.iri ?? `${assessment.type}:${cvss.vector}`} title={cvss.vector}>
+          <Chip
+            size="small"
+            label={`${cvss.name || assessment.type || cvss.implementation} · ${displayScore(cvss.score.base)} ${normalizedSeverity(cvss.severity)}`}
+            variant="outlined"
+          />
         </Tooltip>
-      ))}
+      })}
     </Stack>
   );
 }
@@ -343,10 +352,21 @@ function VulnerabilityDetailsDialog({
             <Detail label="Aliases" value={item.aliases.join(', ')} />
             <Detail label="Summary" value={item.summary} />
             <Detail label="Details" value={item.details} preWrap />
-            <Detail label="Severity" value={normalizedSeverity(item.severityLevel)} />
+            <Detail label="Severity" value={normalizedSeverity(item.severityLevel ?? highestCvssSeverity(item.cvssAssessments))} />
+            <Detail
+              label="CVSS severity"
+              value={Array.from(new Set(item.cvssAssessments.map(presentCvss).filter(Boolean).map((cvss) => cvss!.severity))).join(', ') || 'UNKNOWN'}
+            />
             <Detail
               label="CVSS assessments"
-              value={item.cvssAssessments.map((assessment) => `${assessment.version || assessment.type || 'CVSS'}: ${assessment.vector}`).join('\n')}
+              value={item.cvssAssessments.map((assessment) => {
+                const cvss = presentCvss(assessment);
+                return cvss
+                  ? `${cvss.name || assessment.type || cvss.implementation} — ${displayScore(cvss.score.base)} ${cvss.severity}\n` +
+                    `Impact ${displayScore(cvss.score.impact)} · Exploitability ${displayScore(cvss.score.exploitability)}\n` +
+                    `${cvss.vector}\n${cvss.metrics.map(([key, value]) => `${key}: ${value}`).join('\n')}`
+                  : 'CVSS vector is unavailable.';
+              }).join('\n\n')}
               preWrap
             />
             <Detail
