@@ -256,27 +256,27 @@ Upload one CycloneDX JSON file, inspect live graph totals, and open an imported 
 
 The Overview tab summarizes direct and transitive dependencies, graph size, vulnerable packages, and vulnerability metrics for the selected application.
 
-![Explore application overview](docs/sample/1.png)
+![Explore application overview](docs/sample/explore-overview.png)
 
 ### Dependencies
 
 Dependencies are read by following `risk:dependsOn+` from the selected application. Direct dependencies are distinguished from transitive dependencies.
 
-![Explore dependencies](docs/sample/explore-dependencies-1.png)
+![Explore dependencies](docs/sample/explore-dependencies.png)
 
 ### Vulnerabilities and advisory detail
 
 The Vulnerabilities tab joins imported occurrences to OSV resources. It displays the installed package, dependency type, advisory identity, severity data, CVSS vector type, fixed range events, publication time, complete advisory content, and reference links.
 
-![Explore vulnerabilities](docs/sample/explore-vluns-1.png)
+![Explore vulnerabilities](docs/sample/explore-vluns.png)
 
-![Vulnerability advisory details](docs/sample/expore-vlun-detail-1.png)
+![Vulnerability advisory details](docs/sample/expore-vlun-detail.png)
 
 ### References
 
 References are stored as dedicated RDF resources. The UI groups them by advisory and displays affected installed packages.
 
-![Explore vulnerability references](docs/sample/explore-vluns-ref-1.png)
+![Explore vulnerability references](docs/sample/explore-vluns-ref.png)
 
 ### CVE impact
 
@@ -286,17 +286,17 @@ The initial CVE Impact view groups one vulnerability across selected or all appl
 
 Selecting an advisory opens the focused application-to-package-to-vulnerability diagram. The diagram supports pan, zoom, fit view, layout reset, simplified/detailed modes, node selection, and exposure filtering.
 
-![CVE impact dependency graph](docs/sample/explore-cve-impacted-applications-1.png)
+![CVE impact dependency graph](docs/sample/explore-cve-impacted-applications.png)
 
 The adjacent detail panel renders OSV advisory content, CVSS data, and complete reference URLs without leaving the dependency diagram.
 
-![CVE impact graph and advisory detail panel](docs/sample/explore-cve-jetty-all-direct-1.png)
+![CVE impact graph and advisory detail panel](docs/sample/explore-cve-jetty-all-direct.png)
 
 ### SPARQL
 
 The SPARQL screen provides prefix presets, example queries, formatting, `SELECT` execution, results, and clipboard export.
 
-![SPARQL query editor](docs/sample/sparql-1.png)
+![SPARQL query editor](docs/sample/sparql.png)
 
 ### AI Workbench advisory evidence
 
@@ -304,7 +304,7 @@ The Evidence screen combines Buggy's generated summary with retrieval inspection
 
 Each result displays its global rank, evidence segment type, vulnerability and document identifiers, similarity score, and complete source text. Long chunks expand independently, and the copy action always copies the complete evidence. An exact-identifier marker distinguishes literal CVE/GHSA matches from merely related semantic results.
 
-![AI Workbench advisory evidence](docs/sample/workbench-Evidence-1.png)
+![AI Workbench advisory evidence](docs/sample/workbench-Evidence.png)
 
 ## API Reference
 
