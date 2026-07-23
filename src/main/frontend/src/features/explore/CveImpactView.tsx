@@ -1,4 +1,5 @@
 import ArrowBackOutlinedIcon from '@mui/icons-material/ArrowBackOutlined';
+import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined';
 import LaunchOutlinedIcon from '@mui/icons-material/LaunchOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import {
@@ -12,7 +13,9 @@ import {
   InputLabel,
   Link,
   MenuItem,
+  IconButton,
   Paper,
+  Popover,
   Select,
   Stack,
   Tab,
@@ -37,7 +40,7 @@ import type {
 import { designTokens } from '../../theme/designTokens';
 import { severityColors, type Severity } from '../../types/severity';
 import { fetchCveImpactDetail } from './exploreApi';
-import { CveImpactGraph } from './CveImpactGraph';
+import { CveImpactTree } from './CveImpactTree';
 import { ExploreEmptyState } from './ExploreEmptyState';
 import { referenceLabel } from './ReferencesView';
 
@@ -224,6 +227,7 @@ function ImpactDetail({
   const [selectedExposureId, setSelectedExposureId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState(0);
   const [selectedNode, setSelectedNode] = useState<ImpactGraphNode | null>(null);
+  const [selectedNodeAnchor, setSelectedNodeAnchor] = useState<Element | null>(null);
   if (loading) return <CenteredProgress label="Loading CVE impact graph" />;
   if (error || !detail) {
     return <Stack spacing={1}><Button startIcon={<ArrowBackOutlinedIcon />} onClick={onBack} sx={{ alignSelf: 'flex-start' }}>Back to CVE list</Button><Alert severity="error" action={<Button onClick={onRetry}>Retry</Button>}>Unable to load CVE impact data.</Alert></Stack>;
@@ -234,21 +238,50 @@ function ImpactDetail({
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
         <Stack direction="row" spacing={1.25} alignItems="center" useFlexGap flexWrap="wrap">
           <Button size="small" startIcon={<ArrowBackOutlinedIcon />} onClick={onBack}>Back to CVE list</Button>
-          <Divider orientation="vertical" flexItem />
-          <Box><Typography variant="h5" fontWeight={950}>{detail.vulnerability.preferredIdentifier}</Typography><Typography variant="caption" color="text.secondary">{detail.vulnerability.osvId}</Typography></Box>
-          <SeverityChip value={detail.vulnerability.severityLevel} />
         </Stack>
         <ScopeSelect scope={scope} onChange={onScopeChange} />
       </Stack>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 2.2fr) minmax(320px, 0.8fr)' }, gap: 1.5 }}>
-        <CveImpactGraph graph={detail.graph} selectedExposureId={selectedExposureId} onSelectExposure={setSelectedExposureId} onSelectNode={(node) => { setSelectedNode(node); if (node.nodeType === 'VULNERABILITY') setDetailTab(0); }} />
-        <ImpactDetailsPanel detail={detail} selectedNode={selectedNode} tab={detailTab} onTabChange={setDetailTab} />
+      <Box sx={{ minWidth: 0, width: '100%' }}>
+        <CveImpactTree
+          detail={detail}
+          selectedExposureId={selectedExposureId}
+          onSelectExposure={setSelectedExposureId}
+          onSelectNode={(node, anchor) => {
+            setSelectedNode(node);
+            setSelectedNodeAnchor(anchor);
+            if (node.nodeType === 'VULNERABILITY') setDetailTab(0);
+          }}
+        />
       </Box>
+      <Popover
+        open={Boolean(selectedNode && selectedNodeAnchor)}
+        anchorEl={selectedNodeAnchor}
+        onClose={() => setSelectedNodeAnchor(null)}
+        anchorOrigin={{ vertical: 'center', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'center', horizontal: 'left' }}
+        slotProps={{ paper: { sx: { ml: 1, maxWidth: 460, width: 'min(460px, calc(100vw - 32px))', maxHeight: '80vh' } } }}
+      >
+        <Box aria-label="Selected node details" sx={{ position: 'relative' }}>
+          <IconButton
+            size="small"
+            aria-label="Close selected node details"
+            onClick={() => setSelectedNodeAnchor(null)}
+            sx={{ position: 'absolute', top: 6, right: 6, zIndex: 2 }}
+          >
+            <CloseOutlinedIcon fontSize="small" />
+          </IconButton>
+          <ImpactDetailsPanel detail={detail} selectedNode={selectedNode} tab={detailTab} onTabChange={setDetailTab} />
+        </Box>
+      </Popover>
 
       <Paper variant="outlined">
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 1.5 }}>
-          <Typography variant="h6" fontWeight={900}>Affected applications</Typography>
+          <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+            <Typography variant="subtitle1" fontWeight={950}>{detail.vulnerability.preferredIdentifier}</Typography>
+            <Typography variant="subtitle2" fontWeight={900}>{detail.vulnerability.osvId}</Typography>
+            <SeverityChip value={detail.vulnerability.severityLevel} />
+          </Stack>
           {selectedExposureId ? <Button size="small" onClick={() => setSelectedExposureId(null)}>Show all paths</Button> : null}
         </Stack>
         <TableContainer><Table size="small" aria-label="Affected application exposures"><TableHead><TableRow>

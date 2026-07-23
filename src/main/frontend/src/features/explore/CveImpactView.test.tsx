@@ -7,14 +7,6 @@ import { fetchCveImpactDetail } from './exploreApi';
 import { CveImpactView } from './CveImpactView';
 
 vi.mock('./exploreApi', () => ({ fetchCveImpactDetail: vi.fn() }));
-vi.mock('./CveImpactGraph', () => ({
-  CveImpactGraph: ({ graph }: { graph: CveImpactDetailResponse['graph'] }) => (
-    <div aria-label="CVE impact graph">
-      {graph.nodes.map((node) => <span key={node.id}>{node.nodeType}:{node.label}</span>)}
-    </div>
-  )
-}));
-
 describe('CveImpactView', () => {
   beforeEach(() => {
     vi.mocked(fetchCveImpactDetail).mockResolvedValue(detailResponse());
@@ -37,20 +29,59 @@ describe('CveImpactView', () => {
     expect(rows[2]).toHaveTextContent('CVE-2026-2000');
   });
 
-  it('opens the focused graph and renders the vulnerability once', async () => {
+  it('opens the CVE-centered tree by default', async () => {
     renderView();
     await userEvent.click(screen.getByText('CVE-2026-1000'));
     await waitFor(() => expect(fetchCveImpactDetail).toHaveBeenCalledOnce());
-    expect(screen.getByLabelText('CVE impact graph')).toBeInTheDocument();
-    expect(screen.getAllByText('VULNERABILITY:CVE-2026-1000')).toHaveLength(1);
-    expect(screen.getByText('Orders')).toBeInTheDocument();
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
+    expect(screen.getByLabelText('CVE impact and fixes tree')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Dependency graph' })).not.toBeInTheDocument();
+  });
+
+  it('switches to a CVE-centered tree with impacts on the left and fixes on the right', async () => {
+    renderView();
+    await userEvent.click(screen.getByText('CVE-2026-1000'));
+    await screen.findByLabelText('CVE impact and fixes tree');
+
+    const tree = screen.getByRole('img', { name: 'CVE impact and provided fixes tree' });
+    expect(tree).toBeInTheDocument();
+    expect(tree.querySelector('[data-node-kind="cve"]')).toBeInTheDocument();
+    expect(tree.querySelectorAll('[data-node-kind="application"]')).toHaveLength(2);
+    expect(tree.querySelectorAll('[data-node-kind="fix"]')).toHaveLength(1);
+    expect(screen.getByLabelText('Tree relationship vocabulary')).toHaveTextContent('DO');
+    expect(screen.getByLabelText('Tree relationship vocabulary')).toHaveTextContent('DEPENDS_ON');
+    expect(screen.getByLabelText('Tree relationship vocabulary')).toHaveTextContent('FI');
+    expect(screen.getByLabelText('Tree relationship vocabulary')).toHaveTextContent('FIXED_IN');
+  });
+
+  it('selects tree nodes into the existing details panel', async () => {
+    renderView();
+    await userEvent.click(screen.getByText('CVE-2026-1000'));
+    await screen.findByLabelText('CVE impact and fixes tree');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Orders 1.0' }));
+    expect(screen.getByLabelText('Selected node details')).toBeInTheDocument();
+    expect(screen.getByText('Orders', { selector: '.selected-package-title' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close selected node details' }));
+    expect(screen.queryByLabelText('Selected node details')).not.toBeInTheDocument();
+  });
+
+  it('animates the selected exposure when viewing its path', async () => {
+    renderView();
+    await userEvent.click(screen.getByText('CVE-2026-1000'));
+    const tree = await screen.findByRole('img', { name: 'CVE impact and provided fixes tree' });
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'View path' })[0]);
+
+    expect(tree.querySelectorAll('path[data-exposure-active="true"]').length).toBeGreaterThan(0);
+    expect(tree.querySelector('path[data-exposure-active="true"]')).toHaveAttribute('stroke-dasharray', '1 6');
   });
 
   it('renders safe clickable references and tolerates malformed values', async () => {
     renderView();
     await userEvent.click(screen.getByText('CVE-2026-1000'));
-    await screen.findByLabelText('CVE impact graph');
+    await screen.findByLabelText('CVE impact and fixes tree');
+    await userEvent.click(screen.getByRole('button', { name: 'CVE-2026-1000' }));
     await userEvent.click(screen.getByRole('tab', { name: 'References' }));
     const link = screen.getByRole('link', { name: 'NVD' });
     expect(link).toHaveAttribute('target', '_blank');
@@ -62,7 +93,8 @@ describe('CveImpactView', () => {
   it('renders advisory markdown headings and URLs as UI content', async () => {
     renderView();
     await userEvent.click(screen.getByText('CVE-2026-1000'));
-    await screen.findByLabelText('CVE impact graph');
+    await screen.findByLabelText('CVE impact and fixes tree');
+    await userEvent.click(screen.getByRole('button', { name: 'CVE-2026-1000' }));
 
     expect(screen.getByText('Impact')).toBeInTheDocument();
     expect(screen.queryByText('## Impact')).not.toBeInTheDocument();

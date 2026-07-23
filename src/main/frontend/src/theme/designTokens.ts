@@ -7,37 +7,37 @@ const shell = {
 } as const;
 
 const surface = {
-  app: '#F1F3F0',
-  panel: '#F7F8F5',
-  card: '#FCFDFB',
+  app: '#F1F4F6',
+  panel: '#F7F9FA',
+  card: '#FCFDFE',
   elevated: '#FFFFFF'
 } as const;
 
 const border = {
-  default: '#D8DDD8',
-  strong: '#C8CFC9'
+  default: '#D8E0E5',
+  strong: '#C8D3DA'
 } as const;
 
 const text = {
   primary: '#25292D',
   secondary: '#62686E',
-  muted: '#767D79',
-  placeholder: '#7C837F',
+  muted: '#737D85',
+  placeholder: '#79838B',
   navigationPrimary: '#F5F7F8',
   navigationSecondary: '#DEE3E8'
 } as const;
 
 const accent = {
-  lime: '#DDEB70',
-  limeHover: '#E6F28A',
-  limePressed: '#D1DF65',
-  contrastText: '#25292D'
+  lime: '#0F7F91',
+  limeHover: '#168C9E',
+  limePressed: '#0A6878',
+  contrastText: '#FFFFFF'
 } as const;
 
 const disabled = {
-  background: '#ECEEEC',
-  text: '#989E9A',
-  border: '#D8DCD9'
+  background: '#ECEFF1',
+  text: '#969FA6',
+  border: '#D7DFE4'
 } as const;
 
 export const designTokens = {
@@ -51,30 +51,30 @@ export const designTokens = {
     critical: '#C62828',
     high: '#E65100',
     medium: '#F9A825',
-    low: '#728978',
-    safe: '#8FA75F',
+    low: '#4F93A1',
+    safe: '#0F7F91',
     unknown: '#7A7F7B'
   },
   securityDark: {
     critical: '#8E1C1C',
     high: '#A83B00',
     medium: '#A86F00',
-    low: '#4D6253',
-    safe: '#60733C',
+    low: '#356D78',
+    safe: '#0A6878',
     unknown: '#505552'
   },
   securitySurface: {
     critical: '#F8E8E8',
     high: '#FBECE5',
     medium: '#FFF6D8',
-    low: '#E8EEE9',
-    safe: '#EDF1E3',
+    low: '#E3F0F2',
+    safe: '#DDF1F4',
     unknown: '#E3E8E4'
   },
   graph: {
     node: {
       primary: {
-        border: '#4E5751',
+        border: '#4E6872',
         background: surface.card,
         primaryText: text.primary,
         typeText: text.secondary,
@@ -102,18 +102,18 @@ export const designTokens = {
         metaText: '#663232'
       },
       success: {
-        border: '#82984D',
-        background: '#EFF5DF',
-        primaryText: '#1E2812',
-        typeText: '#4B5B2E',
-        metaText: '#4B5B2E'
+        border: '#168C9E',
+        background: '#DDF1F4',
+        primaryText: '#12343B',
+        typeText: '#0A6878',
+        metaText: '#0A6878'
       }
     },
     edge: {
       affectedBy: '#B4232C',
-      fixedIn: '#58752C',
-      dependsOn: '#405A4B',
-      identity: '#26302A'
+      fixedIn: '#0F7F91',
+      dependsOn: '#3E7E8A',
+      identity: '#315B64'
     }
   },
   evidence: {
@@ -138,14 +138,14 @@ export const designTokens = {
       text: '#684F18'
     },
     overview: {
-      background: '#E8EDE7',
-      border: '#77847A',
-      text: '#4F5C52'
+      background: '#E8EDF2',
+      border: '#788D9B',
+      text: '#445A66'
     },
     upstreamFix: {
-      background: '#E7F0DF',
-      border: '#68804E',
-      text: '#465936'
+      background: '#DDF1F4',
+      border: '#168C9E',
+      text: '#0A6878'
     },
     unknown: {
       background: surface.panel,
