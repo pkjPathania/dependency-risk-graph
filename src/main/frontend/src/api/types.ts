@@ -140,6 +140,7 @@ export interface CveImpactListItem {
 export interface CveImpactListResponse {
   scope: CveImpactScope;
   applicationIri: string | null;
+  applicationIris: string[];
   total: number;
   items: CveImpactListItem[];
 }

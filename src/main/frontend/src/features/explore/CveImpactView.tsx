@@ -6,6 +6,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -16,6 +17,7 @@ import {
   IconButton,
   InputLabel,
   Link,
+  ListItemText,
   MenuItem,
   Paper,
   Popover,
@@ -32,10 +34,11 @@ import {
   Typography
 } from '@mui/material';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { SelectChangeEvent } from '@mui/material/Select';
 import type {
+  ApplicationSummary,
   CveImpactDetailResponse,
   CveImpactListResponse,
-  CveImpactScope,
   ImpactGraphNode
 } from '../../api/types';
 import { designTokens } from '../../theme/designTokens';
@@ -47,23 +50,23 @@ import { ExploreEmptyState } from './ExploreEmptyState';
 import { referenceLabel } from './ReferencesView';
 
 interface CveImpactViewProps {
-  applicationIri: string;
-  scope: CveImpactScope;
+  applications: ApplicationSummary[];
+  selectedApplicationIris: string[];
   response: CveImpactListResponse | null;
   loading: boolean;
   error: string | null;
-  onScopeChange: (scope: CveImpactScope) => void;
+  onApplicationSelectionChange: (applicationIris: string[]) => void;
   onRefresh: () => void;
   onOpenEnrichment: () => void;
 }
 
 export function CveImpactView({
-  applicationIri,
-  scope,
+  applications,
+  selectedApplicationIris,
   response,
   loading,
   error,
-  onScopeChange,
+  onApplicationSelectionChange,
   onRefresh,
   onOpenEnrichment
 }: CveImpactViewProps) {
@@ -75,6 +78,7 @@ export function CveImpactView({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [detailReload, setDetailReload] = useState(0);
+  const applicationSelectionKey = selectedApplicationIris.join('\u0000');
 
   const items = response?.items ?? [];
   const filteredItems = useMemo(() => {
@@ -102,14 +106,14 @@ export function CveImpactView({
     setSelectedVulnerabilityIri(null);
     setDetail(null);
     setPage(0);
-  }, [applicationIri]);
+  }, [applicationSelectionKey]);
 
   useEffect(() => {
     if (!selectedVulnerabilityIri) return;
     let active = true;
     setDetailLoading(true);
     setDetailError(null);
-    void fetchCveImpactDetail(selectedVulnerabilityIri, scope, applicationIri)
+    void fetchCveImpactDetail(selectedVulnerabilityIri, 'selected', selectedApplicationIris)
       .then((nextDetail) => {
         if (active) setDetail(nextDetail);
       })
@@ -123,7 +127,7 @@ export function CveImpactView({
         if (active) setDetailLoading(false);
       });
     return () => { active = false; };
-  }, [applicationIri, detailReload, scope, selectedVulnerabilityIri]);
+  }, [applicationSelectionKey, detailReload, selectedApplicationIris, selectedVulnerabilityIri]);
 
   if (selectedVulnerabilityIri) {
     return (
@@ -131,24 +135,65 @@ export function CveImpactView({
         detail={detail}
         loading={detailLoading}
         error={detailError}
-        scope={scope}
+        applications={applications}
+        selectedApplicationIris={selectedApplicationIris}
         onBack={() => setSelectedVulnerabilityIri(null)}
         onRetry={() => setDetailReload((current) => current + 1)}
-        onScopeChange={onScopeChange}
+        onApplicationSelectionChange={onApplicationSelectionChange}
       />
     );
   }
 
+  if (selectedApplicationIris.length === 0) {
+    return (
+      <Stack spacing={1.25}>
+        <ApplicationMultiSelect
+          applications={applications}
+          selectedApplicationIris={selectedApplicationIris}
+          onChange={onApplicationSelectionChange}
+        />
+        <ExploreEmptyState
+          title="Select applications"
+          message="Choose one or more applications to project their CVE impact graph."
+        />
+      </Stack>
+    );
+  }
+
   if (loading) {
-    return <CenteredProgress label="Loading CVE impact data" />;
+    return (
+      <Stack spacing={1.25}>
+        <ApplicationMultiSelect
+          applications={applications}
+          selectedApplicationIris={selectedApplicationIris}
+          onChange={onApplicationSelectionChange}
+        />
+        <CenteredProgress label="Loading CVE impact data" />
+      </Stack>
+    );
   }
   if (error) {
-    return <Alert severity="error" action={<Button onClick={onRefresh}>Retry</Button>}>Unable to load CVE impact data.</Alert>;
+    return (
+      <Stack spacing={1.25}>
+        <ApplicationMultiSelect
+          applications={applications}
+          selectedApplicationIris={selectedApplicationIris}
+          onChange={onApplicationSelectionChange}
+        />
+        <Alert severity="error" action={<Button onClick={onRefresh}>Retry</Button>}>
+          Unable to load CVE impact data.
+        </Alert>
+      </Stack>
+    );
   }
   if (items.length === 0) {
     return (
       <Stack spacing={1.25}>
-        <ScopeSelect scope={scope} onChange={onScopeChange} />
+        <ApplicationMultiSelect
+          applications={applications}
+          selectedApplicationIris={selectedApplicationIris}
+          onChange={onApplicationSelectionChange}
+        />
         <ExploreEmptyState title="CVE Impact" message="Run OSV enrichment to discover vulnerabilities for this application." />
         <Box><Button variant="contained" onClick={onOpenEnrichment}>Open Vulnerability Enrichment</Button></Box>
       </Stack>
@@ -167,7 +212,11 @@ export function CveImpactView({
             inputProps={{ 'aria-label': 'Search CVE impact' }}
             sx={{ width: { sm: 380 } }}
           />
-          <ScopeSelect scope={scope} onChange={onScopeChange} />
+          <ApplicationMultiSelect
+            applications={applications}
+            selectedApplicationIris={selectedApplicationIris}
+            onChange={onApplicationSelectionChange}
+          />
         </Stack>
         <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
           <Chip size="small" variant="outlined" label={filteredItems.length.toLocaleString()} />
@@ -216,15 +265,23 @@ export function CveImpactView({
 }
 
 function ImpactDetail({
-  detail, loading, error, scope, onBack, onRetry, onScopeChange
+  detail,
+  loading,
+  error,
+  applications,
+  selectedApplicationIris,
+  onBack,
+  onRetry,
+  onApplicationSelectionChange
 }: {
   detail: CveImpactDetailResponse | null;
   loading: boolean;
   error: string | null;
-  scope: CveImpactScope;
+  applications: ApplicationSummary[];
+  selectedApplicationIris: string[];
   onBack: () => void;
   onRetry: () => void;
-  onScopeChange: (scope: CveImpactScope) => void;
+  onApplicationSelectionChange: (applicationIris: string[]) => void;
 }) {
   const [selectedExposureId, setSelectedExposureId] = useState<string | null>(null);
   const [detailDialogTab, setDetailDialogTab] = useState<number | null>(null);
@@ -242,8 +299,13 @@ function ImpactDetail({
         <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(0)}>Details</Button>
         <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(1)}>CVSS Vector</Button>
         <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(2)}>References</Button>
+        <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(3)}>Fixed versions</Button>
         <Box sx={{ flexGrow: 1 }} />
-        <ScopeSelect scope={scope} onChange={onScopeChange} />
+        <ApplicationMultiSelect
+          applications={applications}
+          selectedApplicationIris={selectedApplicationIris}
+          onChange={onApplicationSelectionChange}
+        />
       </Stack>
 
       <Box sx={{ minWidth: 0, width: '100%' }}>
@@ -346,13 +408,43 @@ function ImpactDetailsContent({ detail, tab }: { detail: CveImpactDetailResponse
       </Box>
     }) : <Typography color="text.secondary">No CVSS assessment listed.</Typography>}</Stack> : null}
     {tab === 2 ? <Stack spacing={1}>{detail.referenceUrls.length ? detail.referenceUrls.map((url) => <ExternalReference key={url} value={url} />) : <Typography color="text.secondary">No references listed.</Typography>}</Stack> : null}
+    {tab === 3 ? <FixedVersionsTable detail={detail} /> : null}
   </Box>;
 }
 
 function detailDialogTitle(tab: number | null): string {
   if (tab === 1) return 'CVSS vector';
   if (tab === 2) return 'References';
+  if (tab === 3) return 'Fixed versions';
   return 'Vulnerability details';
+}
+
+function FixedVersionsTable({ detail }: { detail: CveImpactDetailResponse }) {
+  if (detail.fixedVersions.length === 0) {
+    return <Typography color="text.secondary">No fixed version listed.</Typography>;
+  }
+  return (
+    <TableContainer component={Paper} variant="outlined">
+      <Table size="small" aria-label="Fixed dependency versions">
+        <TableHead>
+          <TableRow>
+            <TableCell>Dependency</TableCell>
+            <TableCell>Fixed version</TableCell>
+            <TableCell>PURL</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {detail.fixedVersions.map((fixed) => (
+            <TableRow key={fixed.iri}>
+              <TableCell>{fixed.packageName || 'Package'}</TableCell>
+              <TableCell><Chip size="small" variant="outlined" label={fixed.version} /></TableCell>
+              <TableCell sx={{ overflowWrap: 'anywhere' }}>{fixed.purl || '—'}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
 }
 
 function CvssVectorSummary({ cvss }: { cvss: PresentedCvss }) {
@@ -419,8 +511,78 @@ function SelectedNodeHeader({ node }: { node: ImpactGraphNode }) {
   </Alert>;
 }
 
-function ScopeSelect({ scope, onChange }: { scope: CveImpactScope; onChange: (scope: CveImpactScope) => void }) {
-  return <FormControl size="small" sx={{ minWidth: 190 }}><InputLabel id="cve-impact-scope-label">Scope</InputLabel><Select labelId="cve-impact-scope-label" label="Scope" value={scope} onChange={(event) => onChange(event.target.value as CveImpactScope)}><MenuItem value="selected">Selected application</MenuItem><MenuItem value="all">All applications</MenuItem></Select></FormControl>;
+const SELECT_ALL_APPLICATIONS = '__all_applications__';
+
+function ApplicationMultiSelect({
+  applications,
+  selectedApplicationIris,
+  onChange
+}: {
+  applications: ApplicationSummary[];
+  selectedApplicationIris: string[];
+  onChange: (applicationIris: string[]) => void;
+}) {
+  const selectableApplications = applications.filter(
+    (application): application is ApplicationSummary & { iri: string } =>
+      Boolean(application.iri?.trim())
+  );
+  const allSelected =
+    selectableApplications.length > 0
+    && selectedApplicationIris.length === selectableApplications.length;
+
+  function handleChange(event: SelectChangeEvent<string[]>) {
+    const values =
+      typeof event.target.value === 'string'
+        ? event.target.value.split(',')
+        : event.target.value;
+    if (values.at(-1) === SELECT_ALL_APPLICATIONS) {
+      onChange(allSelected ? [] : selectableApplications.map((application) => application.iri));
+      return;
+    }
+    const validIris = new Set(selectableApplications.map((application) => application.iri));
+    onChange(Array.from(new Set(values.filter((iri) => validIris.has(iri)))));
+  }
+
+  return (
+    <FormControl size="small" sx={{ minWidth: 220 }}>
+      <InputLabel id="cve-impact-applications-label">Applications</InputLabel>
+      <Select
+        multiple
+        labelId="cve-impact-applications-label"
+        label="Applications"
+        value={selectedApplicationIris}
+        onChange={handleChange}
+        renderValue={(selected) => {
+          if (selected.length === selectableApplications.length) {
+            return `All applications (${selected.length})`;
+          }
+          if (selected.length === 1) {
+            const application = selectableApplications.find(({ iri }) => iri === selected[0]);
+            return applicationLabel(application);
+          }
+          return `${selected.length} applications selected`;
+        }}
+      >
+        <MenuItem value={SELECT_ALL_APPLICATIONS}>
+          <Checkbox checked={allSelected} indeterminate={selectedApplicationIris.length > 0 && !allSelected} />
+          <ListItemText primary="Select all applications" />
+        </MenuItem>
+        {selectableApplications.map((application) => (
+          <MenuItem key={application.iri} value={application.iri}>
+            <Checkbox checked={selectedApplicationIris.includes(application.iri)} />
+            <ListItemText primary={applicationLabel(application)} />
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
+}
+
+function applicationLabel(application?: ApplicationSummary): string {
+  if (!application) {
+    return 'Selected application';
+  }
+  return `${application.name ?? 'Unknown'} · ${application.version ?? 'Unknown'}`;
 }
 
 function SeverityChip({ value }: { value: string | null }) {

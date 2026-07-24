@@ -65,11 +65,11 @@ export async function fetchApplicationReferences(
 
 export async function fetchCveImpactList(
   scope: CveImpactScope,
-  applicationIri: string
+  applicationIris: string[]
 ): Promise<CveImpactListResponse> {
   const params = new URLSearchParams({ scope });
   if (scope === 'selected') {
-    params.set('applicationIri', applicationIri);
+    appendApplicationIris(params, applicationIris);
   }
   const response = await fetch(`${EXPLORE_BASE_URL}/cve-impact?${params.toString()}`);
   if (!response.ok) {
@@ -81,17 +81,27 @@ export async function fetchCveImpactList(
 export async function fetchCveImpactDetail(
   vulnerabilityIri: string,
   scope: CveImpactScope,
-  applicationIri: string
+  applicationIris: string[]
 ): Promise<CveImpactDetailResponse> {
   const params = new URLSearchParams({ vulnerabilityIri, scope });
   if (scope === 'selected') {
-    params.set('applicationIri', applicationIri);
+    appendApplicationIris(params, applicationIris);
   }
   const response = await fetch(`${EXPLORE_BASE_URL}/cve-impact/detail?${params.toString()}`);
   if (!response.ok) {
     throw new Error(await readApiErrorMessage(response, 'Unable to load CVE impact data.'));
   }
   return (await response.json()) as CveImpactDetailResponse;
+}
+
+function appendApplicationIris(params: URLSearchParams, applicationIris: string[]) {
+  const normalizedIris = Array.from(
+    new Set(applicationIris.map((iri) => iri.trim()).filter(Boolean))
+  );
+  if (normalizedIris.length === 0) {
+    throw new Error('Select at least one application');
+  }
+  normalizedIris.forEach((iri) => params.append('applicationIri', iri));
 }
 
 async function fetchExploreResource(path: string, applicationIri: string, fallbackMessage: string): Promise<Response> {

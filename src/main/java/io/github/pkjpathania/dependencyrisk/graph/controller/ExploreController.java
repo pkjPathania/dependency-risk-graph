@@ -1,5 +1,6 @@
 package io.github.pkjpathania.dependencyrisk.graph.controller;
 
+import java.util.List;
 import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationOverview;
 import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationReferencesResponse;
 import io.github.pkjpathania.dependencyrisk.graph.model.ApplicationSummary;
@@ -58,15 +59,15 @@ public class ExploreController {
   @GetMapping("/cve-impact")
   public CveImpactListResponse cveImpact(
       @RequestParam(value = "scope", defaultValue = "selected") String scope,
-      @RequestParam(value = "applicationIri", required = false) String applicationIri) {
-    return cveImpactService.list(scope, applicationIri);
+      @RequestParam(value = "applicationIri", required = false) List<String> applicationIris) {
+    return cveImpactService.listForApplications(scope, applicationIris);
   }
 
   @GetMapping("/cve-impact/detail")
   public CveImpactDetailResponse cveImpactDetail(
       @RequestParam("vulnerabilityIri") String vulnerabilityIri,
       @RequestParam(value = "scope", defaultValue = "selected") String scope,
-      @RequestParam(value = "applicationIri", required = false) String applicationIri) {
-    return cveImpactService.detail(vulnerabilityIri, scope, applicationIri);
+      @RequestParam(value = "applicationIri", required = false) List<String> applicationIris) {
+    return cveImpactService.detailForApplications(vulnerabilityIri, scope, applicationIris);
   }
 }

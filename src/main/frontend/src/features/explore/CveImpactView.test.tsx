@@ -94,6 +94,17 @@ describe('CveImpactView', () => {
     expect(screen.getByText('not a url')).toBeInTheDocument();
   });
 
+  it('shows fixed dependency versions after references', async () => {
+    renderView();
+    await userEvent.click(screen.getByText('CVE-2026-1000'));
+    await screen.findByLabelText('CVE impact and fixes tree');
+    await userEvent.click(screen.getByRole('button', { name: 'Fixed versions' }));
+
+    const table = screen.getByRole('table', { name: 'Fixed dependency versions' });
+    expect(within(table).getByText('jackson-databind')).toBeInTheDocument();
+    expect(within(table).getByText('2.10.5')).toBeInTheDocument();
+  });
+
   it('projects the structured CVSS assessment into the details panel', async () => {
     renderView();
     await userEvent.click(screen.getByText('CVE-2026-1000'));
@@ -132,23 +143,29 @@ describe('CveImpactView', () => {
     expect(onOpenEnrichment).toHaveBeenCalledOnce();
   });
 
-  it('changes scope through the existing reload callback', async () => {
-    const onScopeChange = vi.fn();
-    renderView({ onScopeChange });
-    await userEvent.click(screen.getByLabelText('Scope'));
-    await userEvent.click(screen.getByRole('option', { name: 'All applications' }));
-    expect(onScopeChange).toHaveBeenCalledWith('all');
+  it('selects applications with checkboxes for graph projection', async () => {
+    const onApplicationSelectionChange = vi.fn();
+    renderView({ onApplicationSelectionChange });
+    await userEvent.click(screen.getByLabelText('Applications'));
+    await userEvent.click(screen.getByRole('option', { name: /Analytics/ }));
+    expect(onApplicationSelectionChange).toHaveBeenCalledWith([
+      'urn:test:app:0',
+      'urn:test:app:1'
+    ]);
   });
 });
 
 function renderView(overrides: Partial<ComponentProps<typeof CveImpactView>> = {}) {
   const props: ComponentProps<typeof CveImpactView> = {
-    applicationIri: 'urn:test:application',
-    scope: 'selected',
+    applications: [
+      { iri: 'urn:test:app:0', name: 'Orders', version: '1.0' },
+      { iri: 'urn:test:app:1', name: 'Analytics', version: '1.0' }
+    ],
+    selectedApplicationIris: ['urn:test:app:0'],
     response: listResponse([listItem()]),
     loading: false,
     error: null,
-    onScopeChange: vi.fn(),
+    onApplicationSelectionChange: vi.fn(),
     onRefresh: vi.fn(),
     onOpenEnrichment: vi.fn(),
     ...overrides
@@ -157,7 +174,13 @@ function renderView(overrides: Partial<ComponentProps<typeof CveImpactView>> = {
 }
 
 function listResponse(items: ReturnType<typeof listItem>[]): CveImpactListResponse {
-  return { scope: 'selected', applicationIri: 'urn:test:application', total: items.length, items };
+  return {
+    scope: 'selected',
+    applicationIri: 'urn:test:app:0',
+    applicationIris: ['urn:test:app:0'],
+    total: items.length,
+    items
+  };
 }
 
 function listItem(overrides: Partial<CveImpactListResponse['items'][number]> = {}) {

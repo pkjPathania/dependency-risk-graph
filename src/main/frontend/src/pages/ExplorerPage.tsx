@@ -4,8 +4,7 @@ import type {
   ApplicationReferencesResponse,
   ApplicationSummary,
   ApplicationVulnerabilitiesResponse,
-  CveImpactListResponse,
-  CveImpactScope
+  CveImpactListResponse
 } from '../api/types';
 import { RestCallProgress } from '../components/RestCallProgress';
 import { ApplicationSelector } from '../features/explore/ApplicationSelector';
@@ -45,7 +44,7 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
   const [referencesLoading, setReferencesLoading] = useState(false);
   const [referencesError, setReferencesError] = useState<string | null>(null);
   const [referencesReloadCounter, setReferencesReloadCounter] = useState(0);
-  const [cveImpactScope, setCveImpactScope] = useState<CveImpactScope>('selected');
+  const [cveImpactApplicationIris, setCveImpactApplicationIris] = useState<string[]>([]);
   const [cveImpact, setCveImpact] = useState<CveImpactListResponse | null>(null);
   const [cveImpactLoading, setCveImpactLoading] = useState(false);
   const [cveImpactError, setCveImpactError] = useState<string | null>(null);
@@ -240,17 +239,23 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
   useEffect(() => {
     setCveImpact(null);
     setCveImpactError(null);
-  }, [selectedApplication?.iri, cveImpactScope]);
+  }, [cveImpactApplicationIris, selectedApplication?.iri]);
+
+  useEffect(() => {
+    const applicationIri = selectedApplication?.iri?.trim() ?? '';
+    setCveImpactApplicationIris(applicationIri ? [applicationIri] : []);
+  }, [selectedApplication?.iri]);
 
   useEffect(() => {
     let active = true;
     const applicationIri = selectedApplication?.iri?.trim() ?? '';
-    if (activeTab !== 'cve-impact' || !applicationIri) {
+    if (activeTab !== 'cve-impact' || !applicationIri || cveImpactApplicationIris.length === 0) {
+      setCveImpactLoading(false);
       return () => { active = false; };
     }
     setCveImpactLoading(true);
     setCveImpactError(null);
-    void fetchCveImpactList(cveImpactScope, applicationIri)
+    void fetchCveImpactList('selected', cveImpactApplicationIris)
       .then((response) => { if (active) setCveImpact(response); })
       .catch((error: unknown) => {
         if (active) {
@@ -261,7 +266,7 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
       })
       .finally(() => { if (active) setCveImpactLoading(false); });
     return () => { active = false; };
-  }, [activeTab, cveImpactReloadCounter, cveImpactScope, selectedApplication?.iri]);
+  }, [activeTab, cveImpactApplicationIris, cveImpactReloadCounter, selectedApplication?.iri]);
 
   function handleApplicationSelect(applicationIri: string) {
     const nextApplication = selectableSummaries.find((summary) => summary.iri === applicationIri) ?? null;
@@ -374,12 +379,15 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
                 ) : null}
                 {activeTab === 'cve-impact' ? (
                   <CveImpactView
-                    applicationIri={selectedApplicationIri}
-                    scope={cveImpactScope}
+                    applications={selectableSummaries}
+                    selectedApplicationIris={cveImpactApplicationIris}
                     response={cveImpact}
-                    loading={cveImpactLoading || (!cveImpact && !cveImpactError)}
+                    loading={
+                      cveImpactApplicationIris.length > 0
+                      && (cveImpactLoading || (!cveImpact && !cveImpactError))
+                    }
                     error={cveImpactError}
-                    onScopeChange={setCveImpactScope}
+                    onApplicationSelectionChange={setCveImpactApplicationIris}
                     onRefresh={() => setCveImpactReloadCounter((current) => current + 1)}
                     onOpenEnrichment={() => onOpenVulnerabilityEnrichment(selectedApplicationIri)}
                   />

@@ -358,19 +358,21 @@ public class CveImpactService {
     add(item.referenceUrls, nodeValue(solution, "referenceUrl"));
   }
 
-  private static void bindApplication(
-      ParameterizedSparqlString query, Scope scope, String applicationIri) {
+  private static void bindApplications(
+      ParameterizedSparqlString query, Scope scope, List<String> applicationIris) {
     if (scope == Scope.SELECTED) {
-      query.setIri("applicationValue", applicationIri.trim());
+      for (int index = 0; index < applicationIris.size(); index++) {
+        query.setIri("applicationValue" + index, applicationIris.get(index));
+      }
     }
   }
 
-  private static String listQuery(Scope scope) {
-    return PREFIXES + LIST_QUERY.replace("#SCOPE#", scope.valuesClause());
+  private static String listQuery(Scope scope, int applicationCount) {
+    return PREFIXES + LIST_QUERY.replace("#SCOPE#", scope.valuesClause(applicationCount));
   }
 
-  private static String exposureQuery(Scope scope) {
-    return PREFIXES + EXPOSURE_QUERY.replace("#SCOPE#", scope.valuesClause());
+  private static String exposureQuery(Scope scope, int applicationCount) {
+    return PREFIXES + EXPOSURE_QUERY.replace("#SCOPE#", scope.valuesClause(applicationCount));
   }
 
   private static String resourceIri(QuerySolution solution, String variable) {
@@ -414,9 +416,18 @@ public class CveImpactService {
   }
 
   public CveImpactListResponse list(String scopeValue, String applicationIri) {
-    Scope scope = validateScope(scopeValue, applicationIri);
-    ParameterizedSparqlString query = new ParameterizedSparqlString(listQuery(scope));
-    bindApplication(query, scope, applicationIri);
+    return listForApplications(
+        scopeValue,
+        StringUtils.isBlank(applicationIri) ? List.of() : List.of(applicationIri));
+  }
+
+  public CveImpactListResponse listForApplications(
+      String scopeValue, List<String> applicationIris) {
+    List<String> normalizedApplicationIris = normalizeApplicationIris(applicationIris);
+    Scope scope = validateScope(scopeValue, normalizedApplicationIris);
+    ParameterizedSparqlString query =
+        new ParameterizedSparqlString(listQuery(scope, normalizedApplicationIris.size()));
+    bindApplications(query, scope, normalizedApplicationIris);
 
     Map<String, ListAccumulator> grouped = new LinkedHashMap<>();
     repository.execSelect(
@@ -440,15 +451,30 @@ public class CveImpactService {
                         Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
             .toList();
     return new CveImpactListResponse(
-        scope.value, scope == Scope.SELECTED ? applicationIri.trim() : null, items.size(), items);
+        scope.value,
+        scope == Scope.SELECTED && normalizedApplicationIris.size() == 1
+            ? normalizedApplicationIris.getFirst()
+            : null,
+        scope == Scope.SELECTED ? normalizedApplicationIris : List.of(),
+        items.size(),
+        items);
   }
 
   public CveImpactDetailResponse detail(
       String vulnerabilityIri, String scopeValue, String applicationIri) {
+    return detailForApplications(
+        vulnerabilityIri,
+        scopeValue,
+        StringUtils.isBlank(applicationIri) ? List.of() : List.of(applicationIri));
+  }
+
+  public CveImpactDetailResponse detailForApplications(
+      String vulnerabilityIri, String scopeValue, List<String> applicationIris) {
     if (StringUtils.isBlank(vulnerabilityIri)) {
       throw new IllegalArgumentException("vulnerabilityIri is required");
     }
-    Scope scope = validateScope(scopeValue, applicationIri);
+    List<String> normalizedApplicationIris = normalizeApplicationIris(applicationIris);
+    Scope scope = validateScope(scopeValue, normalizedApplicationIris);
     String normalizedVulnerabilityIri = vulnerabilityIri.trim();
 
     DetailAccumulator detail = loadVulnerability(normalizedVulnerabilityIri);
@@ -456,7 +482,8 @@ public class CveImpactService {
       throw new NoSuchElementException("Vulnerability not found: " + normalizedVulnerabilityIri);
     }
 
-    List<ExposureTarget> targets = loadExposureTargets(normalizedVulnerabilityIri, scope, applicationIri);
+    List<ExposureTarget> targets =
+        loadExposureTargets(normalizedVulnerabilityIri, scope, normalizedApplicationIris);
     List<ExposurePath> exposures =
         targets.stream()
             .map(target -> resolveExposure(target, normalizedVulnerabilityIri))
@@ -488,10 +515,11 @@ public class CveImpactService {
   }
 
   private List<ExposureTarget> loadExposureTargets(
-      String vulnerabilityIri, Scope scope, String applicationIri) {
-    ParameterizedSparqlString query = new ParameterizedSparqlString(exposureQuery(scope));
+      String vulnerabilityIri, Scope scope, List<String> applicationIris) {
+    ParameterizedSparqlString query =
+        new ParameterizedSparqlString(exposureQuery(scope, applicationIris.size()));
     query.setIri("vulnerabilityValue", vulnerabilityIri);
-    bindApplication(query, scope, applicationIri);
+    bindApplications(query, scope, applicationIris);
     return repository.execSelect(query.toString(), CveImpactService::toExposureTarget).stream()
         .distinct()
         .toList();
@@ -707,12 +735,24 @@ public class CveImpactService {
         List.copyOf(nodes.values()), edges.values().stream().map(EdgeAccumulator::toEdge).toList());
   }
 
-  private Scope validateScope(String value, String applicationIri) {
+  private Scope validateScope(String value, List<String> applicationIris) {
     Scope scope = Scope.from(value);
-    if (scope == Scope.SELECTED && StringUtils.isBlank(applicationIri)) {
-      throw new IllegalArgumentException("applicationIri is required for selected scope");
+    if (scope == Scope.SELECTED && applicationIris.isEmpty()) {
+      throw new IllegalArgumentException(
+          "At least one applicationIri is required for selected scope");
     }
     return scope;
+  }
+
+  private static List<String> normalizeApplicationIris(List<String> applicationIris) {
+    if (applicationIris == null) {
+      return List.of();
+    }
+    return applicationIris.stream()
+        .map(StringUtils::trimToNull)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .toList();
   }
 
   private enum Scope {
@@ -735,8 +775,15 @@ public class CveImpactService {
       throw new IllegalArgumentException("scope must be selected or all");
     }
 
-    private String valuesClause() {
-      return this == SELECTED ? "VALUES ?application { ?applicationValue }" : "";
+    private String valuesClause(int applicationCount) {
+      if (this != SELECTED) {
+        return "";
+      }
+      String values =
+          java.util.stream.IntStream.range(0, applicationCount)
+              .mapToObj(index -> "?applicationValue" + index)
+              .collect(java.util.stream.Collectors.joining(" "));
+      return "VALUES ?application { " + values + " }";
     }
   }
 

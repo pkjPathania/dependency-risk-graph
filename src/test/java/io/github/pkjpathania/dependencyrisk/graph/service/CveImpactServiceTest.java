@@ -10,6 +10,7 @@ import io.github.pkjpathania.dependencyrisk.graph.repo.JenaGraphRepository;
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaImportContextRepository;
 import io.github.pkjpathania.dependencyrisk.graph.repo.JenaPackageOccurrenceRepository;
 import io.github.pkjpathania.dependencyrisk.graph.vocabulary.RiskVocabulary;
+import java.util.List;
 import org.apache.jena.query.Dataset;
 import org.apache.jena.query.DatasetFactory;
 import org.apache.jena.rdf.model.Model;
@@ -107,6 +108,31 @@ class CveImpactServiceTest {
     assertEquals(
         fixture.vulnerabilityIri,
         detail.exposures().getFirst().path().getLast().iri());
+  }
+
+  @Test
+  void selectedScopeProjectsOnlyTheCheckedApplications() {
+    Fixture fixture = fixture();
+    String secondApplicationIri = "urn:test:impact:application:two";
+
+    CveImpactListResponse list =
+        fixture.service.listForApplications(
+            "selected", List.of(fixture.firstApplicationIri, secondApplicationIri));
+    CveImpactDetailResponse detail =
+        fixture.service.detailForApplications(
+            fixture.vulnerabilityIri,
+            "selected",
+            List.of(secondApplicationIri));
+
+    assertEquals(
+        List.of(fixture.firstApplicationIri, secondApplicationIri),
+        list.applicationIris());
+    assertEquals(2, list.items().getFirst().affectedApplicationCount());
+    assertEquals(1, detail.exposures().size());
+    assertEquals(secondApplicationIri, detail.exposures().getFirst().application().iri());
+    assertFalse(
+        detail.graph().nodes().stream()
+            .anyMatch(node -> node.iri().equals(fixture.firstApplicationIri)));
   }
 
   @Test
