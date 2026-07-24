@@ -54,7 +54,7 @@ The graph is the source of truth. Ingestion and enrichment write RDF; the Explor
 - Provides an application-level enrichment API and a read-only single-PURL lookup API.
 - Exposes application-centric Explore tabs for overview, dependencies, vulnerabilities, references, and CVE impact.
 - Provides unrestricted read-only SPARQL `SELECT` execution through the UI/API.
-- Renders application-to-vulnerability paths with React Flow and ELK.
+- Renders a responsive, CVE-centered impact-and-fixes tree with D3 and SVG.
 - Rebuilds an in-memory advisory evidence index from the RDF graph and exposes global semantic evidence search in AI Workbench.
 
 ## Current Architecture
@@ -94,7 +94,7 @@ flowchart LR
     PATH --> API
     API --> UI[React + Material UI]
     WORKBENCH --> UI
-    UI --> FLOW[React Flow + ELK CVE graph]
+    UI --> TREE[D3 + SVG CVE impact-and-fixes tree]
 ```
 
 ### Design principles
@@ -168,7 +168,11 @@ Vulnerability
   -> hasReference / hasSeverity / hasAffectedPackage
 ```
 
-The CVE Impact detail endpoint resolves the dependency path from the selected application occurrence to each affected package occurrence, appends the vulnerability, and returns a graph DTO for React Flow. Shared nodes and edges are deduplicated while exposure IDs preserve which application/package path each edge belongs to.
+The CVE Impact detail endpoint resolves the dependency path from the selected application occurrence to each affected package occurrence, appends the vulnerability, and returns exposures, fixes, CVSS assessments, references, and a graph projection. Shared nodes and edges are deduplicated while exposure IDs preserve which application/package path each edge belongs to.
+
+The frontend transforms that projection into a responsive D3/SVG tidy tree. The selected CVE is centered, impacted applications and dependency paths extend to the left, and provided fixes extend to the right. Node identities are merged consistently so the same dependency is not rendered repeatedly for equivalent paths.
+
+Persisted CVSS vectors are parsed into version-specific CVSS objects before they are returned. Each assessment includes its vector, implementation name, calculated severity, base/impact/exploitability scores, and the metrics available for that CVSS version.
 
 ### 4. Advisory evidence indexing and retrieval
 
@@ -285,11 +289,11 @@ The initial CVE Impact view groups one vulnerability across selected or all appl
 
 ![Cross-application CVE impact list](docs/sample/cve-impact.png)
 
-Selecting an advisory opens the focused application-to-package-to-vulnerability diagram. The diagram supports pan, zoom, fit view, layout reset, simplified/detailed modes, node selection, and exposure filtering.
+Selecting an advisory opens a focused CVE-centered tidy tree. Impacted applications and their dependency paths are placed to the left of the CVE, while provided fixes are placed to the right. The responsive SVG scales the complete graph to the available width and compacts circular node glyphs as the graph grows.
 
 ![CVE impact dependency graph](docs/sample/explore-cve-impacted-applications.png)
 
-The adjacent detail panel renders OSV advisory content, CVSS data, and complete reference URLs without leaving the dependency diagram.
+Selecting a graph node opens a compact anchored popover with that node's name, version, PURL, and application context. Selecting **View path** highlights the corresponding exposure with an animated dotted path. Small **Details**, **CVSS Vector**, and **References** actions open focused dialogs above the graph, while the exposure table remains available below it.
 
 ![CVE impact graph and advisory detail panel](docs/sample/explore-cve-jetty-all-direct.png)
 
@@ -346,6 +350,9 @@ Each result displays its global rank, evidence segment type, vulnerability and d
 
 | Method | Path | Purpose | Response |
 | --- | --- | --- | --- |
+| `GET` | `/api/workbench/evidence/source/{identifier}` | Load the RDF-backed advisory evidence source for one identifier. | `AdvisoryEvidenceSource` |
+| `POST` | `/api/workbench/evidence/index/{identifier}` | Generate and index evidence documents for one identifier. | `AdvisoryEvidenceDocument[]` |
+| `POST` | `/api/workbench/evidence/search` | Search the current in-memory evidence index without generating an assistant answer. | `AdvisoryEvidenceMatch[]` |
 | `POST` | `/api/workbench/evidence/rebuild` | Regenerate typed advisory documents and replace the complete in-memory vector index. | `AdvisoryEvidenceDocument[]` |
 | `POST` | `/api/workbench/assistant/evidence` | Retrieve global semantic evidence and generate Buggy's grounded summary. | `BuggyAnswerResponse` |
 
@@ -570,13 +577,12 @@ npm run build
 - Spring Boot 4.1
 - Apache Jena 6.1 with TDB2 and ARQ
 - CycloneDX Core Java 12.2
-- JGraphT 1.5
+- CVSS Calculator 1.5
 - React 19 and TypeScript
 - Material UI
+- D3 7 with responsive SVG rendering
 - LangChain4j with the quantized BGE-small-en-v1.5 embedding model
 - LangChain4j `InMemoryEmbeddingStore` for advisory evidence
-- React Flow (`@xyflow/react`)
-- ELK.js layered graph layout
 - Vite
 - OSV REST APIs through Spring `RestClient`
 
@@ -588,13 +594,16 @@ src/main/java/io/github/pkjpathania/dependencyrisk/
     controller/             RDF, Explore, SPARQL, and path APIs
     parser/assembler/       CycloneDX JSON-LD assembly
     repo/                   Jena persistence and graph projection
+    serialization/          native CVSS JSON serialization
     service/                Explore, CVE impact, SPARQL, and graph services
+    util/                   CVSS parsing and shared graph utilities
   vulnerability/
     assembler/              OSV JSON-LD assembly
     client/                 OSV request/response client
     service/                batching, advisory loading, and enrichment
   workbench/
     api/                    advisory evidence rebuild and search endpoints
+    assistant/              grounded Buggy response API and service
     config/                 local embedding model and in-memory store
     evidence/               RDF projection, chunking, indexing, and search
 
@@ -620,7 +629,7 @@ data/tdb2/                  local embedded RDF dataset
 - Only CycloneDX JSON is accepted by the new ingestion endpoint.
 - Ingestion and enrichment add triples to the default graph; they do not remove an older application snapshot or stale vulnerability links.
 - Only dependencies with usable PURLs can be sent to OSV.
-- OSV severity vectors are preserved, but the application does not infer a `CRITICAL`, `HIGH`, `MODERATE`, or `LOW` classification when OSV does not provide one.
+- Malformed or unsupported CVSS vectors cannot be projected into calculated scores and metrics.
 - SPARQL execution accepts `SELECT` queries only.
 - TDB2 is an embedded local dataset, not a distributed graph service.
 - The import-scoped dependency-path endpoint belongs to the older graph model and is not populated by `POST /rdf/new`.
