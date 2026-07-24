@@ -179,7 +179,7 @@ export function CveImpactView({
         <Table size="small" aria-label="CVE impact vulnerabilities">
           <TableHead><TableRow>
             <TableCell>Identifier</TableCell><TableCell>OSV ID</TableCell><TableCell>Summary</TableCell>
-            <TableCell>Severity</TableCell><TableCell>CVSS severity</TableCell><TableCell align="right">Affected applications</TableCell>
+            <TableCell>CVSS severity</TableCell><TableCell align="right">Affected applications</TableCell>
             <TableCell align="right">Package versions</TableCell><TableCell align="right">References</TableCell>
           </TableRow></TableHead>
           <TableBody>
@@ -195,7 +195,6 @@ export function CveImpactView({
                 <TableCell><Typography fontWeight={900} variant="body2">{item.preferredIdentifier}</Typography></TableCell>
                 <TableCell>{item.osvId}</TableCell>
                 <TableCell sx={{ minWidth: 260, maxWidth: 440 }}>{item.summary || 'No summary provided'}</TableCell>
-                <TableCell><SeverityChip value={item.severityLevel} /></TableCell>
                 <TableCell><SeverityChip value={item.cvssSeverity} /></TableCell>
                 <TableCell align="right">{item.affectedApplicationCount.toLocaleString()}</TableCell>
                 <TableCell align="right">{item.affectedPackageVersionCount.toLocaleString()}</TableCell>
@@ -293,7 +292,6 @@ function ImpactDetail({
           <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
             <Typography variant="subtitle1" fontWeight={950}>{detail.vulnerability.preferredIdentifier}</Typography>
             <Typography variant="subtitle2" fontWeight={900}>{detail.vulnerability.osvId}</Typography>
-            <SeverityChip value={detail.vulnerability.severityLevel} />
           </Stack>
           {selectedExposureId ? <Button size="small" onClick={() => setSelectedExposureId(null)}>Show all paths</Button> : null}
         </Stack>
@@ -322,7 +320,7 @@ function ImpactDetailsContent({ detail, tab }: { detail: CveImpactDetailResponse
     {tab === 0 ? <Stack spacing={1.5}>
       <Detail label="Summary" value={detail.vulnerability.summary} />
       <AdvisoryDetails value={detail.vulnerability.details} />
-      <Detail label="Severity" value={detail.vulnerability.severityLevel || 'UNRATED'} /><Detail label="Published" value={formatDate(detail.vulnerability.publishedAt)} />
+      <Detail label="Published" value={formatDate(detail.vulnerability.publishedAt)} />
       <Detail label="CVSS severity" value={cvssSeverities(detail)} />
       <Detail label="Modified" value={formatDate(detail.vulnerability.modifiedAt)} />
       <Detail label="Affected package versions" value={distinctPackageVersions(detail).join('\n')} pre />

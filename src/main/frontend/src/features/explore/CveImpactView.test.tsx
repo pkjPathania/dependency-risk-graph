@@ -19,6 +19,9 @@ describe('CveImpactView', () => {
     const row = screen.getByText('CVE-2026-1000').closest('tr');
     expect(row).not.toBeNull();
     expect(within(row!).getByText('CRITICAL')).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Severity' })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'CVSS severity' })).toBeInTheDocument();
+    expect(within(row!).queryByText('HIGH')).not.toBeInTheDocument();
   });
 
   it('shows vulnerabilities affecting the most applications first', () => {

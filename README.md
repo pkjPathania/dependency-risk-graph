@@ -283,7 +283,7 @@ References are stored as dedicated RDF resources. The UI groups them by advisory
 
 The initial CVE Impact view groups one vulnerability across selected or all applications.
 
-![Cross-application CVE impact list](docs/sample/cve-impact-1.png)
+![Cross-application CVE impact list](docs/sample/cve-impact.png)
 
 Selecting an advisory opens the focused application-to-package-to-vulnerability diagram. The diagram supports pan, zoom, fit view, layout reset, simplified/detailed modes, node selection, and exposure filtering.
 
