@@ -55,7 +55,7 @@ describe('CveImpactView', () => {
     expect(tree.querySelector('path[data-edge-relationship="FIXED_IN"]')).toBeInTheDocument();
   });
 
-  it('selects tree nodes into the existing details panel', async () => {
+  it('opens node-specific details from the graph', async () => {
     renderView();
     await userEvent.click(screen.getByText('CVE-2026-1000'));
     await screen.findByLabelText('CVE impact and fixes tree');
@@ -83,8 +83,7 @@ describe('CveImpactView', () => {
     renderView();
     await userEvent.click(screen.getByText('CVE-2026-1000'));
     await screen.findByLabelText('CVE impact and fixes tree');
-    await userEvent.click(screen.getByRole('button', { name: 'CVE-2026-1000' }));
-    await userEvent.click(screen.getByRole('tab', { name: 'References' }));
+    await userEvent.click(screen.getByRole('button', { name: 'References' }));
     const link = screen.getByRole('link', { name: 'NVD' });
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
@@ -96,8 +95,7 @@ describe('CveImpactView', () => {
     renderView();
     await userEvent.click(screen.getByText('CVE-2026-1000'));
     await screen.findByLabelText('CVE impact and fixes tree');
-    await userEvent.click(screen.getByRole('button', { name: 'CVE-2026-1000' }));
-    await userEvent.click(screen.getByRole('tab', { name: 'CVSS' }));
+    await userEvent.click(screen.getByRole('button', { name: 'CVSS Vector' }));
 
     expect(screen.getByText('Base 9.8')).toBeInTheDocument();
     expect(screen.getAllByText('CRITICAL').length).toBeGreaterThan(0);
@@ -114,7 +112,7 @@ describe('CveImpactView', () => {
     renderView();
     await userEvent.click(screen.getByText('CVE-2026-1000'));
     await screen.findByLabelText('CVE impact and fixes tree');
-    await userEvent.click(screen.getByRole('button', { name: 'CVE-2026-1000' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Details' }));
 
     expect(screen.getByText('Impact')).toBeInTheDocument();
     expect(screen.queryByText('## Impact')).not.toBeInTheDocument();

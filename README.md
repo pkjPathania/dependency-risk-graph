@@ -37,6 +37,7 @@ The graph is the source of truth. Ingestion and enrichment write RDF; the Explor
 - [Development](#development)
 - [Technology Stack](#technology-stack)
 - [Project Structure](#project-structure)
+- [TODO / Next Steps](#todo--next-steps)
 - [Current Limitations](#current-limitations)
 - [License](#license)
 
@@ -282,7 +283,7 @@ References are stored as dedicated RDF resources. The UI groups them by advisory
 
 The initial CVE Impact view groups one vulnerability across selected or all applications.
 
-![Cross-application CVE impact list](docs/sample/cve-impact.png)
+![Cross-application CVE impact list](docs/sample/cve-impact-1.png)
 
 Selecting an advisory opens the focused application-to-package-to-vulnerability diagram. The diagram supports pan, zoom, fit view, layout reset, simplified/detailed modes, node selection, and exposure filtering.
 
@@ -607,6 +608,12 @@ src/main/frontend/src/
 docs/sample/                README screenshots
 data/tdb2/                  local embedded RDF dataset
 ```
+
+## TODO / Next Steps
+
+- [ ] Fix remaining build issues and keep the backend and frontend builds stable.
+- [ ] Complete and validate deterministic dependency-path discovery and visualization.
+- [ ] **In progress — GraphRAG:** add graph-grounded retrieval for CVE, application, dependency-path, and remediation context.
 
 ## Current Limitations
 

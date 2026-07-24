@@ -8,17 +8,19 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
+  IconButton,
   InputLabel,
   Link,
   MenuItem,
-  IconButton,
   Paper,
   Popover,
   Select,
   Stack,
-  Tab,
   Table,
   TableBody,
   TableCell,
@@ -26,7 +28,6 @@ import {
   TableHead,
   TablePagination,
   TableRow,
-  Tabs,
   TextField,
   Typography
 } from '@mui/material';
@@ -227,7 +228,7 @@ function ImpactDetail({
   onScopeChange: (scope: CveImpactScope) => void;
 }) {
   const [selectedExposureId, setSelectedExposureId] = useState<string | null>(null);
-  const [detailTab, setDetailTab] = useState(0);
+  const [detailDialogTab, setDetailDialogTab] = useState<number | null>(null);
   const [selectedNode, setSelectedNode] = useState<ImpactGraphNode | null>(null);
   const [selectedNodeAnchor, setSelectedNodeAnchor] = useState<Element | null>(null);
   if (loading) return <CenteredProgress label="Loading CVE impact graph" />;
@@ -237,10 +238,12 @@ function ImpactDetail({
 
   return (
     <Stack spacing={2}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}>
-        <Stack direction="row" spacing={1.25} alignItems="center" useFlexGap flexWrap="wrap">
-          <Button size="small" startIcon={<ArrowBackOutlinedIcon />} onClick={onBack}>Back to CVE list</Button>
-        </Stack>
+      <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+        <Button size="small" startIcon={<ArrowBackOutlinedIcon />} onClick={onBack}>Back to CVE list</Button>
+        <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(0)}>Details</Button>
+        <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(1)}>CVSS Vector</Button>
+        <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(2)}>References</Button>
+        <Box sx={{ flexGrow: 1 }} />
         <ScopeSelect scope={scope} onChange={onScopeChange} />
       </Stack>
 
@@ -252,30 +255,38 @@ function ImpactDetail({
           onSelectNode={(node, anchor) => {
             setSelectedNode(node);
             setSelectedNodeAnchor(anchor);
-            if (node.nodeType === 'VULNERABILITY') setDetailTab(0);
           }}
         />
       </Box>
+
       <Popover
         open={Boolean(selectedNode && selectedNodeAnchor)}
         anchorEl={selectedNodeAnchor}
         onClose={() => setSelectedNodeAnchor(null)}
         anchorOrigin={{ vertical: 'center', horizontal: 'right' }}
         transformOrigin={{ vertical: 'center', horizontal: 'left' }}
-        slotProps={{ paper: { sx: { ml: 1, maxWidth: 460, width: 'min(460px, calc(100vw - 32px))', maxHeight: '80vh' } } }}
+        slotProps={{ paper: { sx: { ml: 1, width: 'min(420px, calc(100vw - 32px))' } } }}
       >
-        <Box aria-label="Selected node details" sx={{ position: 'relative' }}>
+        <Box aria-label="Selected node details" sx={{ position: 'relative', p: 1.5, pr: 5 }}>
           <IconButton
             size="small"
             aria-label="Close selected node details"
             onClick={() => setSelectedNodeAnchor(null)}
-            sx={{ position: 'absolute', top: 6, right: 6, zIndex: 2 }}
+            sx={{ position: 'absolute', top: 6, right: 6 }}
           >
             <CloseOutlinedIcon fontSize="small" />
           </IconButton>
-          <ImpactDetailsPanel detail={detail} selectedNode={selectedNode} tab={detailTab} onTabChange={setDetailTab} />
+          {selectedNode ? <SelectedNodeHeader node={selectedNode} /> : null}
         </Box>
       </Popover>
+
+      <Dialog open={detailDialogTab !== null} onClose={() => setDetailDialogTab(null)} fullWidth maxWidth="md">
+        <DialogTitle>{detailDialogTitle(detailDialogTab)}</DialogTitle>
+        <DialogContent dividers>
+          <ImpactDetailsContent detail={detail} tab={detailDialogTab ?? 0} />
+        </DialogContent>
+        <DialogActions><Button onClick={() => setDetailDialogTab(null)}>Close</Button></DialogActions>
+      </Dialog>
 
       <Paper variant="outlined">
         <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 1.5 }}>
@@ -306,11 +317,8 @@ function isResolvedPath(status: string): boolean {
   return status === 'AFFECTED_PATH_RESOLVED' || status === 'AVAILABLE';
 }
 
-function ImpactDetailsPanel({ detail, selectedNode, tab, onTabChange }: { detail: CveImpactDetailResponse; selectedNode: ImpactGraphNode | null; tab: number; onTabChange: (value: number) => void }) {
-  return <Paper variant="outlined" sx={{ p: 1.5, minHeight: 480, overflow: 'auto' }}>
-    {selectedNode ? <SelectedNodeHeader node={selectedNode} /> : null}
-    <Tabs value={tab} onChange={(_, value: number) => onTabChange(value)} variant="fullWidth"><Tab label="Details" /><Tab label="CVSS" /><Tab label="References" /></Tabs>
-    <Divider sx={{ mb: 1.5 }} />
+function ImpactDetailsContent({ detail, tab }: { detail: CveImpactDetailResponse; tab: number }) {
+  return <Box sx={{ py: 0.5 }}>
     {tab === 0 ? <Stack spacing={1.5}>
       <Detail label="Summary" value={detail.vulnerability.summary} />
       <AdvisoryDetails value={detail.vulnerability.details} />
@@ -340,7 +348,13 @@ function ImpactDetailsPanel({ detail, selectedNode, tab, onTabChange }: { detail
       </Box>
     }) : <Typography color="text.secondary">No CVSS assessment listed.</Typography>}</Stack> : null}
     {tab === 2 ? <Stack spacing={1}>{detail.referenceUrls.length ? detail.referenceUrls.map((url) => <ExternalReference key={url} value={url} />) : <Typography color="text.secondary">No references listed.</Typography>}</Stack> : null}
-  </Paper>;
+  </Box>;
+}
+
+function detailDialogTitle(tab: number | null): string {
+  if (tab === 1) return 'CVSS vector';
+  if (tab === 2) return 'References';
+  return 'Vulnerability details';
 }
 
 function CvssVectorSummary({ cvss }: { cvss: PresentedCvss }) {
