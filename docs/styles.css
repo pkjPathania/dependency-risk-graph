@@ -873,6 +873,39 @@ h3 {
   font-weight: 800;
 }
 
+.relationship-model {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
+  align-items: center;
+  gap: 36px;
+  margin-top: 18px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-elevated);
+}
+
+.relationship-model h3 {
+  margin: 7px 0 9px;
+}
+
+.relationship-model p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.relationship-model pre {
+  margin: 0;
+  padding: 22px;
+  overflow-x: auto;
+  border: 1px solid #bfdde2;
+  border-radius: var(--radius);
+  background: var(--teal-soft);
+  color: var(--teal-dark);
+  font: 700 0.76rem/1.45 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
 .principles {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1191,6 +1224,7 @@ h3 {
 
   .feature-grid,
   .architecture-board,
+  .relationship-model,
   .principles {
     grid-template-columns: 1fr;
   }

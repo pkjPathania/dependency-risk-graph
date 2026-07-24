@@ -379,6 +379,30 @@
           </div>
         </div>
 
+        <div class="relationship-model">
+          <div>
+            <span class="flow-type">Graph traversal</span>
+            <h3>Affected-package relationship</h3>
+            <p>
+              Explore follows direct and transitive dependency occurrences, then reads the
+              persisted vulnerability relationship on the affected package.
+            </p>
+          </div>
+          <pre aria-label="Application occurrence to vulnerability relationship">ApplicationOccurrence
+    │
+    └── risk:dependsOn
+            ▼
+     PackageOccurrence
+            │
+            ├── risk:dependsOn
+            │       ▼
+            │  PackageOccurrence
+            │
+            └── risk:affectedBy
+                    ▼
+              Vulnerability</pre>
+        </div>
+
         <div class="principles">
           <article><strong>RDF is authoritative</strong><p>No second vulnerability database is maintained for Explore.</p></article>
           <article><strong>Writes are explicit</strong><p>Opening an application never silently invokes OSV enrichment.</p></article>

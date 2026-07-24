@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   CardContent,
+  LinearProgress,
   Paper,
   Table,
   TableBody,
@@ -19,10 +20,22 @@ import {
 } from '@mui/material';
 import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
-import { useMemo, useState } from 'react';
+import {
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type SyntheticEvent,
+  type UIEvent
+} from 'react';
 import { executeSparqlQuery, formatSparqlQuery } from '../api/sparqlApi';
 import type { SparqlSelectResponse } from '../api/types';
 import { RestCallProgress } from '../components/RestCallProgress';
+import {
+  applySparqlCompletion,
+  sparqlCompletions
+} from '../features/sparql/autocomplete';
+import { completeBracket } from '../features/sparql/bracketCompletion';
 import {
   applySparqlPrefixPreset,
   DEFAULT_SPARQL_QUERY,
@@ -73,8 +86,19 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
   const [isExecuting, setIsExecuting] = useState(false);
   const [execResult, setExecResult] = useState<SparqlSelectResponse | null>(null);
   const [popupError, setPopupError] = useState<string | null>(null);
+  const [completionOpen, setCompletionOpen] = useState(false);
+  const [completionCursor, setCompletionCursor] = useState<number | null>(null);
+  const [selectedCompletionIndex, setSelectedCompletionIndex] = useState(0);
+  const [completionAnchor, setCompletionAnchor] = useState({ left: 8, top: 8 });
+  const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const editorContainerRef = useRef<HTMLDivElement | null>(null);
 
   const hasQuery = useMemo(() => query.trim().length > 0, [query]);
+  const completions = useMemo(
+    () => completionCursor === null ? [] : sparqlCompletions(query, completionCursor),
+    [completionCursor, query]
+  );
+  const visibleCompletions = completionOpen ? completions : [];
 
   function handlePrefixPresetSelect(presetId: SparqlPrefixPresetId) {
     onQueryChange(applySparqlPrefixPreset(query, presetId));
@@ -103,6 +127,97 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
     onQueryChange(exampleQuery);
     setPopupError(null);
     setExecResult(null);
+    setCompletionOpen(false);
+  }
+
+  function handleEditorKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+
+    const editor = event.currentTarget;
+    if (visibleCompletions.length > 0) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        setSelectedCompletionIndex((current) =>
+          (current + direction + visibleCompletions.length) % visibleCompletions.length
+        );
+        return;
+      }
+      if (event.key === 'Tab' || event.key === 'Enter') {
+        event.preventDefault();
+        applyCompletion(
+          visibleCompletions[selectedCompletionIndex] ?? visibleCompletions[0],
+          editor.selectionStart
+        );
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setCompletionOpen(false);
+        return;
+      }
+    }
+
+    const edit = completeBracket(
+      editor.value,
+      editor.selectionStart,
+      editor.selectionEnd,
+      event.key
+    );
+    if (!edit) {
+      return;
+    }
+
+    event.preventDefault();
+    onQueryChange(edit.value);
+    setCompletionOpen(false);
+    requestAnimationFrame(() => {
+      editor.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+    });
+  }
+
+  function handleEditorChange(value: string, cursorOffset: number) {
+    onQueryChange(value);
+    setCompletionCursor(cursorOffset);
+    setSelectedCompletionIndex(0);
+    setCompletionOpen(true);
+    if (editorRef.current) {
+      updateCompletionAnchor(editorRef.current);
+    }
+  }
+
+  function handleEditorSelection(editor: HTMLTextAreaElement) {
+    setCompletionCursor(editor.selectionStart);
+    setSelectedCompletionIndex(0);
+    setCompletionOpen(true);
+    updateCompletionAnchor(editor);
+  }
+
+  function updateCompletionAnchor(editor: HTMLTextAreaElement) {
+    const container = editorContainerRef.current;
+    if (!container) {
+      return;
+    }
+    setCompletionAnchor(caretPopupPosition(editor, container, editor.selectionStart));
+  }
+
+  function applyCompletion(
+    completion: { label: string },
+    cursorOffset = completionCursor
+  ) {
+    if (cursorOffset === null) {
+      return;
+    }
+    const edit = applySparqlCompletion(query, cursorOffset, completion.label);
+    onQueryChange(edit.value);
+    setCompletionOpen(false);
+    setCompletionCursor(edit.cursorOffset);
+    requestAnimationFrame(() => {
+      editorRef.current?.focus();
+      editorRef.current?.setSelectionRange(edit.cursorOffset, edit.cursorOffset);
+    });
   }
 
   async function handleExecuteQuery() {
@@ -167,6 +282,7 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
           }}
         >
           <Card sx={{ minWidth: 0 }}>
+            {isFormatting ? <LinearProgress aria-label="Formatting SPARQL query" /> : null}
             <CardContent sx={{ px: { xs: 2, md: 2.5 }, py: { xs: 2, md: 2.5 } }}>
               <Stack spacing={1.75}>
                 <Stack
@@ -193,22 +309,76 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
                   </Stack>
                 </Stack>
 
-                <TextField
-                  value={query}
-                  onChange={(event) => onQueryChange(event.target.value)}
-                  multiline
-                  minRows={18}
-                  fullWidth
-                  spellCheck={false}
-                  placeholder="PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>"
-                  inputProps={{
-                    style: {
-                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                      fontSize: '0.9rem',
-                      lineHeight: 1.6
+                <Box ref={editorContainerRef} sx={{ position: 'relative' }}>
+                  <TextField
+                    value={query}
+                    onChange={(event) =>
+                      handleEditorChange(
+                        event.target.value,
+                        event.target.selectionStart ?? event.target.value.length
+                      )
                     }
-                  }}
-                />
+                    multiline
+                    minRows={18}
+                    fullWidth
+                    spellCheck={false}
+                    inputRef={editorRef}
+                    placeholder="PREFIX risk: <urn:io-github-pkjpathania:dependency-risk-graph:schema:>"
+                    inputProps={{
+                      onKeyDown: handleEditorKeyDown,
+                      onSelect: (event: SyntheticEvent<HTMLTextAreaElement>) =>
+                        handleEditorSelection(event.currentTarget),
+                      onScroll: (event: UIEvent<HTMLTextAreaElement>) =>
+                        updateCompletionAnchor(event.currentTarget),
+                      style: {
+                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                        fontSize: '0.9rem',
+                        lineHeight: 1.6
+                      }
+                    }}
+                  />
+                  {visibleCompletions.length > 0 ? (
+                    <Paper
+                      variant="outlined"
+                      role="listbox"
+                      aria-label="SPARQL editor suggestions"
+                      sx={{
+                        position: 'absolute',
+                        zIndex: 5,
+                        top: completionAnchor.top,
+                        left: completionAnchor.left,
+                        width: 'max-content',
+                        maxWidth: 'calc(100% - 16px)',
+                        p: 0.75,
+                        boxShadow: 2
+                      }}
+                    >
+                      <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+                        {visibleCompletions.map((completion, index) => (
+                          <Button
+                            key={`${completion.source}-${completion.label}`}
+                            role="option"
+                            aria-selected={index === selectedCompletionIndex}
+                            size="small"
+                            variant={index === selectedCompletionIndex ? 'contained' : 'text'}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => applyCompletion(completion)}
+                            sx={{ minWidth: 0, px: 1, py: 0.35 }}
+                          >
+                            {completion.label}
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              sx={{ ml: 0.75, opacity: 0.7, textTransform: 'none' }}
+                            >
+                              {completion.source}
+                            </Typography>
+                          </Button>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  ) : null}
+                </Box>
 
                 <Stack
                   direction={{ xs: 'column', md: 'row' }}
@@ -243,6 +413,7 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
             </CardContent>
           </Card>
           <Card sx={{ minWidth: 0 }}>
+            {isExecuting ? <LinearProgress aria-label="Executing SPARQL query" /> : null}
             <CardContent sx={{ px: { xs: 2, md: 2.5 }, py: { xs: 2, md: 2.5 } }}>
               <Stack spacing={2}>
                 <Stack
@@ -385,4 +556,68 @@ function formatResultsForClipboard(result: SparqlSelectResponse): string {
 
 function sanitizeClipboardCell(value: string): string {
   return value.replaceAll('\t', ' ').replaceAll('\r', ' ').replaceAll('\n', ' ');
+}
+
+function caretPopupPosition(
+  editor: HTMLTextAreaElement,
+  container: HTMLDivElement,
+  cursorOffset: number
+): { left: number; top: number } {
+  const computed = window.getComputedStyle(editor);
+  const mirror = document.createElement('div');
+  const copiedProperties = [
+    'box-sizing',
+    'font-family',
+    'font-size',
+    'font-style',
+    'font-weight',
+    'letter-spacing',
+    'line-height',
+    'padding-top',
+    'padding-right',
+    'padding-bottom',
+    'padding-left',
+    'border-top-width',
+    'border-right-width',
+    'border-bottom-width',
+    'border-left-width'
+  ];
+  copiedProperties.forEach((property) => {
+    mirror.style.setProperty(property, computed.getPropertyValue(property));
+  });
+  Object.assign(mirror.style, {
+    position: 'fixed',
+    visibility: 'hidden',
+    left: '-9999px',
+    top: '0',
+    width: `${editor.getBoundingClientRect().width}px`,
+    height: 'auto',
+    overflow: 'hidden',
+    whiteSpace: 'pre-wrap',
+    overflowWrap: 'break-word'
+  });
+
+  mirror.textContent = editor.value.slice(0, cursorOffset);
+  const marker = document.createElement('span');
+  marker.textContent = '\u200b';
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+
+  const editorRect = editor.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const lineHeight = Number.parseFloat(computed.lineHeight) || 22;
+  const rawLeft =
+    editorRect.left - containerRect.left + marker.offsetLeft - editor.scrollLeft;
+  const rawTop =
+    editorRect.top -
+    containerRect.top +
+    marker.offsetTop -
+    editor.scrollTop +
+    lineHeight +
+    4;
+  const popupWidth = Math.min(520, Math.max(240, container.clientWidth - 16));
+  const left = Math.max(8, Math.min(rawLeft, container.clientWidth - popupWidth - 8));
+
+  mirror.remove();
+  return { left, top: Math.max(8, rawTop) };
 }

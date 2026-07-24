@@ -1,12 +1,12 @@
 # Dependency Risk Graph
 
+[Project Website](https://pkjpathania.github.io/dependency-risk-graph/)
+
 Dependency Risk Graph is a Java-first software supply-chain knowledge graph. It imports CycloneDX JSON SBOMs as RDF, enriches the imported package occurrences with complete OSV advisories, stores both datasets in Apache Jena TDB2, and provides a React interface for application, dependency, vulnerability, reference, CVE-impact, and SPARQL exploration.
 
 The graph is the source of truth. Ingestion and enrichment write RDF; the Explore and SPARQL APIs read the persisted model without making hidden OSV calls.
 
 ![Dependency Risk Graph](docs/assets/hero.png)
-
-[Project Website](https://pkjpathania.github.io/dependency-risk-graph/)
 
 [Explore Page Demo v1 (YouTube)](https://www.youtube.com/watch?v=0JgUOX8NOmY)
 
@@ -163,11 +163,18 @@ Explore reads the combined graph:
 
 ```text
 ApplicationOccurrence
-  -> dependsOn+
-Package occurrence
-  -> affectedBy
-Vulnerability
-  -> hasReference / hasSeverity / hasAffectedPackage
+    │
+    └── risk:dependsOn
+            ▼
+     PackageOccurrence
+            │
+            ├── risk:dependsOn
+            │       ▼
+            │  PackageOccurrence
+            │
+            └── risk:affectedBy
+                    ▼
+              Vulnerability
 ```
 
 The CVE Impact detail endpoint resolves the dependency path from the selected application occurrence to each affected package occurrence, appends the vulnerability, and returns exposures, fixes, CVSS assessments, references, and a graph projection. Shared nodes and edges are deduplicated while exposure IDs preserve which application/package path each edge belongs to.
