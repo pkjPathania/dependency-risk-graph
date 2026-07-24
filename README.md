@@ -372,6 +372,7 @@ Each result displays its global rank, evidence segment type, vulnerability and d
 - JDK 21 or newer
 - Internet access during the first Maven build and for live OSV enrichment
 - No separate Node installation is required for the Maven build; the frontend plugin installs the configured Node version
+- Docker, when using the container workflow
 
 ### Build
 
@@ -394,6 +395,33 @@ Or:
 ```
 
 Open `http://localhost:8080`.
+
+### Docker
+
+Build the image and run the application with the provided script:
+
+```bash
+./run.sh
+```
+
+The container publishes the application at `http://localhost:8080` and stores TDB2 and OSV data in the `dependency-risk-data` Docker volume.
+
+The equivalent commands are:
+
+```bash
+docker build -t dependency-risk-graph .
+docker run --rm \
+  --name dependency-risk-graph \
+  -p 8080:8080 \
+  -v dependency-risk-data:/app/data \
+  dependency-risk-graph
+```
+
+Set `PORT` when the default host port is already in use:
+
+```bash
+PORT=9090 ./run.sh
+```
 
 ### Import an SBOM
 

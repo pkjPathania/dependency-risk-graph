@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.vscode
+.DS_Store
+.env
+data
+target
+src/main/frontend/node_modules
+src/main/frontend/dist
+src/main/frontend/.vite
+docs
+*.iml

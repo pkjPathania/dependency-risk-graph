@@ -417,9 +417,10 @@
         <div>
           <p class="eyebrow"><span></span> Quick start</p>
           <h2>From clone to graph.</h2>
-          <p class="section-copy">The Maven build installs the configured frontend toolchain and bundles the static application into the Spring Boot JAR.</p>
+          <p class="section-copy">Build locally with Maven or use Docker to package the frontend, backend, and persistent graph-data configuration together.</p>
           <div class="requirements">
             <span>JDK 21+</span>
+            <span>Docker workflow</span>
             <span>Internet for first build</span>
             <span>No separate Node required</span>
           </div>
@@ -435,6 +436,9 @@
 
 <span class="comment"># Start the application</span>
 <span class="prompt">$</span> java -jar target/dependency-risk-graph-0.0.1-SNAPSHOT.jar
+
+<span class="comment"># Or build and run everything with Docker</span>
+<span class="prompt">$</span> ./run.sh
 
 <span class="comment"># Open the application</span>
 <span class="prompt">→</span> http://localhost:8080</code></pre>
