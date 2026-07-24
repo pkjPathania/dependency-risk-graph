@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Dependency Risk Graph turns CycloneDX SBOMs and OSV advisories into an explorable RDF software supply-chain knowledge graph.">
+  <meta name="theme-color" content="#56657a">
+  <title>Dependency Risk Graph</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="#top" aria-label="Dependency Risk Graph home">
+        <span class="app-logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="26" height="26">
+            <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <path d="M9 9.5 16 16m0 0 7-7m-7 7 7 7"></path>
+            </g>
+            <g fill="currentColor">
+              <circle cx="9" cy="9.5" r="2.7"></circle>
+              <circle cx="16" cy="16" r="2.7"></circle>
+              <circle cx="23" cy="9" r="2.7"></circle>
+              <circle cx="23" cy="23" r="2.7"></circle>
+            </g>
+          </svg>
+        </span>
+        <span>
+          <strong>Dependency Risk Graph</strong>
+          <small>Software supply-chain intelligence</small>
+        </span>
+      </a>
+
+      <nav class="primary-nav" aria-label="Primary navigation">
+        <a class="nav-featured" href="https://github.com/pkjPathania/ependency-risk-graph" target="_blank" rel="noopener noreferrer">
+          GitHub
+          <span aria-hidden="true">↗</span>
+        </a>
+        <a href="#product-tour">Documentation</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="#quick-start">Quick start</a>
+        <a href="#roadmap">Roadmap</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" id="top">
+      <div class="hero-grid shell">
+        <div class="hero-copy">
+          <h1>See the dependency path behind every software risk.</h1>
+          <p class="hero-lead">
+            Import CycloneDX SBOMs, enrich packages with complete OSV advisories, and explore
+            applications, vulnerabilities, fixes, evidence, and dependency paths from one
+            Apache Jena knowledge graph.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#quick-start">Get started</a>
+            <a class="button button-secondary" href="https://www.youtube.com/watch?v=0JgUOX8NOmY" target="_blank" rel="noopener noreferrer">
+              Watch Explore demo <span aria-hidden="true">▶</span>
+            </a>
+          </div>
+          <dl class="hero-facts" aria-label="Project highlights">
+            <div><dt>RDF</dt><dd>Source of truth</dd></div>
+            <div><dt>OSV</dt><dd>Advisory enrichment</dd></div>
+            <div><dt>CVSS</dt><dd>V2–V4 metrics</dd></div>
+          </dl>
+        </div>
+
+        <div class="hero-visual">
+          <img src="assets/hero.png" alt="Dependency Risk Graph application showing software supply-chain risk data">
+        </div>
+      </div>
+    </section>
+
+    <section class="trust-strip" aria-label="Technology summary">
+      <div class="shell trust-items">
+        <span>Java 21</span>
+        <span>Spring Boot 4.1.0</span>
+        <span>Apache Jena 6.1.0</span>
+        <span>CycloneDX 12.2.0</span>
+        <span>React 19.1</span>
+        <span>D3 7.9.0</span>
+        <span>LangChain4j 1.17.2</span>
+      </div>
+    </section>
+
+    <section class="section" id="documentation">
+      <div class="shell">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow"><span></span> What it does</p>
+            <h2>One graph, from SBOM to remediation.</h2>
+          </div>
+          <p>
+            Ingestion and enrichment write RDF. Explore, SPARQL, CVE Impact, and AI Workbench
+            read the persisted model without hidden OSV calls.
+          </p>
+        </div>
+
+        <div class="feature-grid" id="capabilities">
+          <article class="feature-card">
+            <span class="feature-number">01</span>
+            <div class="feature-icon icon-ingest" aria-hidden="true"></div>
+            <h3>Ingest CycloneDX</h3>
+            <p>Preserve component identities and declared dependency edges while assembling SBOM content into JSON-LD and RDF.</p>
+            <span class="feature-tag">CycloneDX JSON</span>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">02</span>
+            <div class="feature-icon icon-enrich" aria-hidden="true"></div>
+            <h3>Enrich with OSV</h3>
+            <p>Batch-query installed PURLs, load complete advisories, and connect affected package occurrences to normalized vulnerability resources.</p>
+            <span class="feature-tag">Explicit writes</span>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">03</span>
+            <div class="feature-icon icon-impact" aria-hidden="true"></div>
+            <h3>Explore CVE impact</h3>
+            <p>Center a CVE between impacted application paths and provided fixes, with merged nodes and animated exposure highlighting.</p>
+            <span class="feature-tag">D3 + SVG</span>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">04</span>
+            <div class="feature-icon icon-score" aria-hidden="true"></div>
+            <h3>Read complete CVSS</h3>
+            <p>Parse version-specific vectors into calculated severity, scores, and clean metric tables instead of displaying an opaque vector alone.</p>
+            <span class="feature-tag">V2 · V3 · V3.1 · V4</span>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">05</span>
+            <div class="feature-icon icon-query" aria-hidden="true"></div>
+            <h3>Query the graph</h3>
+            <p>Run read-only SPARQL SELECT queries with presets, formatting, tabular results, CSV export, and direct access to RDF relationships.</p>
+            <span class="feature-tag">SPARQL + ARQ</span>
+          </article>
+          <article class="feature-card">
+            <span class="feature-number">06</span>
+            <div class="feature-icon icon-evidence" aria-hidden="true"></div>
+            <h3>Inspect AI evidence</h3>
+            <p>Build typed advisory chunks, generate local BGE embeddings, and inspect the exact semantic evidence used by Buggy.</p>
+            <span class="feature-tag">Grounded retrieval</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tinted product-tour" id="product-tour">
+      <div class="shell">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow"><span></span> Product tour</p>
+            <h2>Follow risk from ingestion to evidence.</h2>
+          </div>
+        </div>
+
+        <article class="tour-feature">
+          <div class="tour-copy">
+            <span class="tour-step">01 · Build the graph</span>
+            <h3>Ingest an SBOM and inspect live graph totals.</h3>
+            <p>
+              Upload a CycloneDX JSON document, follow ingestion progress, and see application,
+              package, dependency-edge, statement, and graph-node totals from the persisted model.
+            </p>
+          </div>
+          <figure class="screenshot-frame screenshot-wide">
+            <img src="assets/overview.png" alt="Dependency Risk Graph overview and CycloneDX ingestion screen" loading="lazy">
+            <figcaption>Overview and CycloneDX ingestion</figcaption>
+          </figure>
+        </article>
+
+        <div class="tour-pair">
+          <article class="tour-card">
+            <div class="tour-copy">
+              <span class="tour-step">02 · Understand scope</span>
+              <h3>Application overview</h3>
+              <p>Review direct and transitive dependencies, graph size, vulnerable packages, and vulnerability totals for the selected application.</p>
+            </div>
+            <figure class="screenshot-frame">
+              <img src="assets/explore-overview.png" alt="Explore application overview screen" loading="lazy">
+              <figcaption>Application-scoped graph metrics</figcaption>
+            </figure>
+          </article>
+          <article class="tour-card">
+            <div class="tour-copy">
+              <span class="tour-step">03 · Inspect packages</span>
+              <h3>Dependency inventory</h3>
+              <p>Separate direct packages from transitive packages and inspect the immediate graph context of each installed dependency.</p>
+            </div>
+            <figure class="screenshot-frame">
+              <img src="assets/explore-dependencies.png" alt="Explore dependencies screen" loading="lazy">
+              <figcaption>Direct and transitive dependencies</figcaption>
+            </figure>
+          </article>
+        </div>
+
+        <article class="tour-feature tour-feature-reverse">
+          <div class="tour-copy">
+            <span class="tour-step">04 · Review advisories</span>
+            <h3>Move from vulnerability rows to complete advisory detail.</h3>
+            <p>
+              Join installed packages to normalized OSV advisories, then open the complete
+              advisory content, affected versions, fixes, CVSS data, timestamps, and references.
+            </p>
+          </div>
+          <div class="screenshot-stack">
+            <figure class="screenshot-frame">
+              <img src="assets/explore-vluns.png" alt="Explore vulnerabilities screen" loading="lazy">
+              <figcaption>Application vulnerability inventory</figcaption>
+            </figure>
+            <figure class="screenshot-frame stacked-frame">
+              <img src="assets/expore-vlun-detail.png" alt="Vulnerability advisory details dialog" loading="lazy">
+              <figcaption>Complete advisory details</figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <article class="tour-feature">
+          <div class="tour-copy">
+            <span class="tour-step">05 · Trace sources</span>
+            <h3>Keep advisory references connected to affected packages.</h3>
+            <p>
+              References remain dedicated graph resources and are grouped by advisory alongside
+              the installed package versions they describe.
+            </p>
+          </div>
+          <figure class="screenshot-frame screenshot-wide">
+            <img src="assets/explore-vluns-ref.png" alt="Explore vulnerability references screen" loading="lazy">
+            <figcaption>References grouped by advisory</figcaption>
+          </figure>
+        </article>
+
+        <article class="tour-impact">
+          <div class="tour-copy tour-impact-heading">
+            <span class="tour-step">06 · Explain CVE impact</span>
+            <h3>Start with cross-application scope, then follow the exact path to a fix.</h3>
+            <p>
+              Group one vulnerability across applications, center it between impacted dependency
+              paths and provided fixes, and open focused node or advisory detail without losing context.
+            </p>
+          </div>
+          <div class="impact-screenshots">
+            <figure class="screenshot-frame">
+              <img src="assets/cve-impact.png" alt="Cross-application CVE impact list" loading="lazy">
+              <figcaption>Grouped CVE impact list</figcaption>
+            </figure>
+            <figure class="screenshot-frame">
+              <img src="assets/explore-cve-impacted-applications.png" alt="CVE-centered impact and fixes tree" loading="lazy">
+              <figcaption>CVE-centered impact and fixes tree</figcaption>
+            </figure>
+            <figure class="screenshot-frame">
+              <img src="assets/explore-cve-jetty-all-direct.png" alt="CVE impact graph with vulnerability details" loading="lazy">
+              <figcaption>Graph context with focused advisory data</figcaption>
+            </figure>
+          </div>
+        </article>
+
+        <div class="tour-pair tour-pair-final">
+          <article class="tour-card">
+            <div class="tour-copy">
+              <span class="tour-step">07 · Query the graph</span>
+              <h3>SPARQL workbench</h3>
+              <span class="advanced-user-note">For developers, researchers, and graph practitioners</span>
+              <p>Run read-only SPARQL queries to inspect graph relationships, validate the RDF model, and export custom results.</p>
+            </div>
+            <figure class="screenshot-frame">
+              <img src="assets/sparql.png" alt="SPARQL query editor and result table" loading="lazy">
+              <figcaption>SPARQL query and results</figcaption>
+            </figure>
+          </article>
+          <article class="tour-card">
+            <div class="tour-copy">
+              <span class="tour-step">08 · Inspect grounding</span>
+              <h3>AI Workbench evidence</h3>
+              <p>Review Buggy's summary beside ranked advisory chunks, source identifiers, similarity scores, and complete evidence text.</p>
+            </div>
+            <figure class="screenshot-frame">
+              <img src="assets/workbench-Evidence.png" alt="AI Workbench advisory evidence screen" loading="lazy">
+              <figcaption>Inspectable semantic evidence</figcaption>
+            </figure>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="architecture">
+      <div class="shell">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow"><span></span> Current architecture</p>
+            <h2>Explicit writes. Graph-backed reads.</h2>
+          </div>
+          <p>
+            CycloneDX and OSV use separate assembly pipelines, then meet in the same embedded
+            TDB2 graph. Every exploration surface reads that shared model.
+          </p>
+        </div>
+
+        <div class="architecture-board">
+          <div class="architecture-column">
+            <div class="column-label">Write pipelines</div>
+            <div class="flow-card">
+              <span class="flow-type">SBOM</span>
+              <strong>CycloneDX JSON</strong>
+              <small>Multipart upload</small>
+            </div>
+            <span class="flow-arrow" aria-hidden="true">↓</span>
+            <div class="flow-card">
+              <span class="flow-type">Assemble</span>
+              <strong>CycloneDX JSON-LD</strong>
+              <small>Occurrences + dependsOn</small>
+            </div>
+          </div>
+
+          <div class="architecture-column">
+            <div class="column-label">Enrichment</div>
+            <div class="flow-card">
+              <span class="flow-type">Discover</span>
+              <strong>Application-scoped package PURLs</strong>
+              <small>Application-scoped scan plan</small>
+            </div>
+            <span class="flow-arrow" aria-hidden="true">↓</span>
+            <div class="flow-card">
+              <span class="flow-type">Enrich</span>
+              <strong>Complete OSV advisories</strong>
+              <small>Normalized JSON-LD</small>
+            </div>
+          </div>
+
+          <div class="graph-core">
+            <div class="core-orbit orbit-one"></div>
+            <div class="core-orbit orbit-two"></div>
+            <span class="core-dot dot-one"></span>
+            <span class="core-dot dot-two"></span>
+            <span class="core-dot dot-three"></span>
+            <div>
+              <strong>Graph DB</strong>
+            </div>
+          </div>
+
+          <div class="architecture-column read-column">
+            <div class="column-label">Read services</div>
+            <div class="read-list">
+              <span>Application Explore</span>
+              <span>CVE Impact</span>
+              <span>SPARQL</span>
+              <span>Graph metadata</span>
+              <span>Evidence projection</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="principles">
+          <article><strong>RDF is authoritative</strong><p>No second vulnerability database is maintained for Explore.</p></article>
+          <article><strong>Writes are explicit</strong><p>Opening an application never silently invokes OSV enrichment.</p></article>
+          <article><strong>Reads are scoped</strong><p>Application views follow persisted dependency relationships from the selected occurrence.</p></article>
+          <article><strong>Evidence is inspectable</strong><p>Semantic matches retain their source text, type, identifier, and score.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="quick-start">
+      <div class="shell quick-start-grid">
+        <div>
+          <p class="eyebrow"><span></span> Quick start</p>
+          <h2>From clone to graph.</h2>
+          <p class="section-copy">The Maven build installs the configured frontend toolchain and bundles the static application into the Spring Boot JAR.</p>
+          <div class="requirements">
+            <span>JDK 21+</span>
+            <span>Internet for first build</span>
+            <span>No separate Node required</span>
+          </div>
+        </div>
+
+        <div class="terminal" aria-label="Quick start commands">
+          <div class="terminal-bar">
+            <span></span><span></span><span></span>
+            <strong>terminal</strong>
+          </div>
+          <pre><code><span class="comment"># Build backend and frontend</span>
+<span class="prompt">$</span> ./mvnw clean package
+
+<span class="comment"># Start the application</span>
+<span class="prompt">$</span> java -jar target/dependency-risk-graph-0.0.1-SNAPSHOT.jar
+
+<span class="comment"># Open the application</span>
+<span class="prompt">→</span> http://localhost:8080</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section roadmap-section" id="roadmap">
+      <div class="shell roadmap-shell">
+        <div>
+          <p class="eyebrow eyebrow-light"><span></span> Next steps</p>
+          <h2>Building toward graph-grounded answers.</h2>
+          <p>The roadmap follows the project README and keeps implementation status visible.</p>
+        </div>
+        <div class="roadmap-list">
+          <article>
+            <span class="roadmap-state todo">Next</span>
+            <div><strong>Build stability</strong><p>Fix remaining build issues and keep backend and frontend builds stable.</p></div>
+          </article>
+          <article>
+            <span class="roadmap-state todo">Next</span>
+            <div><strong>Dependency paths</strong><p>Complete and validate deterministic dependency-path discovery and visualization.</p></div>
+          </article>
+          <article>
+            <span class="roadmap-state progress">In progress</span>
+            <div><strong>GraphRAG</strong><p>Add graph-grounded retrieval for CVE, application, dependency-path, and remediation context.</p></div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <div class="brand footer-brand">
+        <span class="app-logo" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="26" height="26">
+            <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+              <path d="M9 9.5 16 16m0 0 7-7m-7 7 7 7"></path>
+            </g>
+            <g fill="currentColor">
+              <circle cx="9" cy="9.5" r="2.7"></circle>
+              <circle cx="16" cy="16" r="2.7"></circle>
+              <circle cx="23" cy="9" r="2.7"></circle>
+              <circle cx="23" cy="23" r="2.7"></circle>
+            </g>
+          </svg>
+        </span>
+        <span><strong>Dependency Risk Graph</strong><small>Apache License 2.0</small></span>
+      </div>
+      <p>Built for transparent software supply-chain exploration.</p>
+      <div class="footer-links">
+        <a href="https://github.com/pkjPathania/ependency-risk-graph" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="#product-tour">Documentation</a>
+        <a href="#top">Back to top ↑</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

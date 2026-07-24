@@ -4,7 +4,7 @@ Dependency Risk Graph is a Java-first software supply-chain knowledge graph. It 
 
 The graph is the source of truth. Ingestion and enrichment write RDF; the Explore and SPARQL APIs read the persisted model without making hidden OSV calls.
 
-![Dependency Risk Graph](docs/sample/img.png)
+![Dependency Risk Graph](docs/website/assets/hero.png)
 
 [Explore Page Demo v1 (YouTube)](https://www.youtube.com/watch?v=0JgUOX8NOmY)
 
@@ -255,53 +255,53 @@ The frontend is a React 19 single-page application bundled into the Spring Boot 
 
 Upload one CycloneDX JSON file, inspect live graph totals, and open an imported application in Explore.
 
-![Overview and CycloneDX ingestion](docs/sample/overview.png)
+![Overview and CycloneDX ingestion](docs/website/assets/overview.png)
 
 ### Application overview
 
 The Overview tab summarizes direct and transitive dependencies, graph size, vulnerable packages, and vulnerability metrics for the selected application.
 
-![Explore application overview](docs/sample/explore-overview.png)
+![Explore application overview](docs/website/assets/explore-overview.png)
 
 ### Dependencies
 
 Dependencies are read by following `risk:dependsOn+` from the selected application. Direct dependencies are distinguished from transitive dependencies.
 
-![Explore dependencies](docs/sample/explore-dependencies.png)
+![Explore dependencies](docs/website/assets/explore-dependencies.png)
 
 ### Vulnerabilities and advisory detail
 
 The Vulnerabilities tab joins imported occurrences to OSV resources. It displays the installed package, dependency type, advisory identity, severity data, CVSS vector type, fixed range events, publication time, complete advisory content, and reference links.
 
-![Explore vulnerabilities](docs/sample/explore-vluns.png)
+![Explore vulnerabilities](docs/website/assets/explore-vluns.png)
 
-![Vulnerability advisory details](docs/sample/expore-vlun-detail.png)
+![Vulnerability advisory details](docs/website/assets/expore-vlun-detail.png)
 
 ### References
 
 References are stored as dedicated RDF resources. The UI groups them by advisory and displays affected installed packages.
 
-![Explore vulnerability references](docs/sample/explore-vluns-ref.png)
+![Explore vulnerability references](docs/website/assets/explore-vluns-ref.png)
 
 ### CVE impact
 
 The initial CVE Impact view groups one vulnerability across selected or all applications.
 
-![Cross-application CVE impact list](docs/sample/cve-impact.png)
+![Cross-application CVE impact list](docs/website/assets/cve-impact.png)
 
 Selecting an advisory opens a focused CVE-centered tidy tree. Impacted applications and their dependency paths are placed to the left of the CVE, while provided fixes are placed to the right. The responsive SVG scales the complete graph to the available width and compacts circular node glyphs as the graph grows.
 
-![CVE impact dependency graph](docs/sample/explore-cve-impacted-applications.png)
+![CVE impact dependency graph](docs/website/assets/explore-cve-impacted-applications.png)
 
 Selecting a graph node opens a compact anchored popover with that node's name, version, PURL, and application context. Selecting **View path** highlights the corresponding exposure with an animated dotted path. Small **Details**, **CVSS Vector**, and **References** actions open focused dialogs above the graph, while the exposure table remains available below it.
 
-![CVE impact graph and advisory detail panel](docs/sample/explore-cve-jetty-all-direct.png)
+![CVE impact graph and advisory detail panel](docs/website/assets/explore-cve-jetty-all-direct.png)
 
 ### SPARQL
 
 The SPARQL screen provides prefix presets, example queries, formatting, `SELECT` execution, results, and clipboard export.
 
-![SPARQL query editor](docs/sample/sparql.png)
+![SPARQL query editor](docs/website/assets/sparql.png)
 
 ### AI Workbench advisory evidence
 
@@ -309,7 +309,7 @@ The Evidence screen combines Buggy's generated summary with retrieval inspection
 
 Each result displays its global rank, evidence segment type, vulnerability and document identifiers, similarity score, and complete source text. Long chunks expand independently, and the copy action always copies the complete evidence. An exact-identifier marker distinguishes literal CVE/GHSA matches from merely related semantic results.
 
-![AI Workbench advisory evidence](docs/sample/workbench-Evidence.png)
+![AI Workbench advisory evidence](docs/website/assets/workbench-Evidence.png)
 
 ## API Reference
 
@@ -614,7 +614,8 @@ src/main/frontend/src/
   features/explore/         Explore tabs and CVE impact graph
   features/sparql/          SPARQL presets and helpers
 
-docs/sample/                README screenshots
+docs/website/               static project website
+  assets/                   shared website and README screenshots
 data/tdb2/                  local embedded RDF dataset
 ```
 
