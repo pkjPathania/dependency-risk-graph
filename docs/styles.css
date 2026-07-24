@@ -366,18 +366,23 @@ h3 {
   white-space: nowrap;
 }
 
-.video-frame {
-  position: relative;
+.demo-section .section-heading {
+  margin-bottom: 0;
+}
+
+.demo-section .video-frame {
   width: 100%;
+  max-width: none;
+  margin-top: 36px;
   overflow: hidden;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  background: var(--surface-elevated);
+  background: #000;
   box-shadow: var(--shadow);
   aspect-ratio: 16 / 9;
 }
 
-.video-frame iframe {
+.demo-section .video-frame iframe {
   display: block;
   width: 100%;
   height: 100%;
