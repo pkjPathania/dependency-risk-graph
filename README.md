@@ -6,6 +6,8 @@ The graph is the source of truth. Ingestion and enrichment write RDF; the Explor
 
 ![Dependency Risk Graph](docs/assets/hero.png)
 
+[Project Website](https://pkjpathania.github.io/dependency-risk-graph/)
+
 [Explore Page Demo v1 (YouTube)](https://www.youtube.com/watch?v=0JgUOX8NOmY)
 
 ## Table of Contents
