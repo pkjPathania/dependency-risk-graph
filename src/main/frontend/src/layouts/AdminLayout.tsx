@@ -111,7 +111,7 @@ export function AdminLayout({
       <Box
         component="main"
         sx={{
-          pt: 3,
+          pt: selectedPageId === 'explorer' ? 0 : 3,
           px: { xs: 1.5, sm: 2.5, md: 3 },
           pb: 3,
           bgcolor: designTokens.surface.app

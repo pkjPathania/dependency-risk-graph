@@ -143,29 +143,14 @@ describe('CveImpactView', () => {
     expect(onOpenEnrichment).toHaveBeenCalledOnce();
   });
 
-  it('selects applications with checkboxes for graph projection', async () => {
-    const onApplicationSelectionChange = vi.fn();
-    renderView({ onApplicationSelectionChange });
-    await userEvent.click(screen.getByLabelText('Applications'));
-    await userEvent.click(screen.getByRole('option', { name: /Analytics/ }));
-    expect(onApplicationSelectionChange).toHaveBeenCalledWith([
-      'urn:test:app:0',
-      'urn:test:app:1'
-    ]);
-  });
 });
 
 function renderView(overrides: Partial<ComponentProps<typeof CveImpactView>> = {}) {
   const props: ComponentProps<typeof CveImpactView> = {
-    applications: [
-      { iri: 'urn:test:app:0', name: 'Orders', version: '1.0' },
-      { iri: 'urn:test:app:1', name: 'Analytics', version: '1.0' }
-    ],
     selectedApplicationIris: ['urn:test:app:0'],
     response: listResponse([listItem()]),
     loading: false,
     error: null,
-    onApplicationSelectionChange: vi.fn(),
     onRefresh: vi.fn(),
     onOpenEnrichment: vi.fn(),
     ...overrides

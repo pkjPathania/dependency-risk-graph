@@ -6,22 +6,16 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControl,
   IconButton,
-  InputLabel,
   Link,
-  ListItemText,
-  MenuItem,
   Paper,
   Popover,
-  Select,
   Stack,
   Table,
   TableBody,
@@ -34,9 +28,7 @@ import {
   Typography
 } from '@mui/material';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { SelectChangeEvent } from '@mui/material/Select';
 import type {
-  ApplicationSummary,
   CveImpactDetailResponse,
   CveImpactListResponse,
   ImpactGraphNode
@@ -50,23 +42,19 @@ import { ExploreEmptyState } from './ExploreEmptyState';
 import { referenceLabel } from './ReferencesView';
 
 interface CveImpactViewProps {
-  applications: ApplicationSummary[];
   selectedApplicationIris: string[];
   response: CveImpactListResponse | null;
   loading: boolean;
   error: string | null;
-  onApplicationSelectionChange: (applicationIris: string[]) => void;
   onRefresh: () => void;
   onOpenEnrichment: () => void;
 }
 
 export function CveImpactView({
-  applications,
   selectedApplicationIris,
   response,
   loading,
   error,
-  onApplicationSelectionChange,
   onRefresh,
   onOpenEnrichment
 }: CveImpactViewProps) {
@@ -135,65 +123,32 @@ export function CveImpactView({
         detail={detail}
         loading={detailLoading}
         error={detailError}
-        applications={applications}
-        selectedApplicationIris={selectedApplicationIris}
         onBack={() => setSelectedVulnerabilityIri(null)}
         onRetry={() => setDetailReload((current) => current + 1)}
-        onApplicationSelectionChange={onApplicationSelectionChange}
       />
     );
   }
 
   if (selectedApplicationIris.length === 0) {
     return (
-      <Stack spacing={1.25}>
-        <ApplicationMultiSelect
-          applications={applications}
-          selectedApplicationIris={selectedApplicationIris}
-          onChange={onApplicationSelectionChange}
-        />
-        <ExploreEmptyState
-          title="Select applications"
-          message="Choose one or more applications to project their CVE impact graph."
-        />
-      </Stack>
+      <ExploreEmptyState
+        title="Select applications"
+        message="Choose one or more applications to project their CVE impact graph."
+      />
     );
   }
 
   if (loading) {
-    return (
-      <Stack spacing={1.25}>
-        <ApplicationMultiSelect
-          applications={applications}
-          selectedApplicationIris={selectedApplicationIris}
-          onChange={onApplicationSelectionChange}
-        />
-        <CenteredProgress label="Loading CVE impact data" />
-      </Stack>
-    );
+    return <CenteredProgress label="Loading CVE impact data" />;
   }
   if (error) {
-    return (
-      <Stack spacing={1.25}>
-        <ApplicationMultiSelect
-          applications={applications}
-          selectedApplicationIris={selectedApplicationIris}
-          onChange={onApplicationSelectionChange}
-        />
-        <Alert severity="error" action={<Button onClick={onRefresh}>Retry</Button>}>
-          Unable to load CVE impact data.
-        </Alert>
-      </Stack>
-    );
+    return <Alert severity="error" action={<Button onClick={onRefresh}>Retry</Button>}>
+      Unable to load CVE impact data.
+    </Alert>;
   }
   if (items.length === 0) {
     return (
       <Stack spacing={1.25}>
-        <ApplicationMultiSelect
-          applications={applications}
-          selectedApplicationIris={selectedApplicationIris}
-          onChange={onApplicationSelectionChange}
-        />
         <ExploreEmptyState title="CVE Impact" message="Run OSV enrichment to discover vulnerabilities for this application." />
         <Box><Button variant="contained" onClick={onOpenEnrichment}>Open Vulnerability Enrichment</Button></Box>
       </Stack>
@@ -211,11 +166,6 @@ export function CveImpactView({
             onChange={(event) => { setSearch(event.target.value); setPage(0); }}
             inputProps={{ 'aria-label': 'Search CVE impact' }}
             sx={{ width: { sm: 380 } }}
-          />
-          <ApplicationMultiSelect
-            applications={applications}
-            selectedApplicationIris={selectedApplicationIris}
-            onChange={onApplicationSelectionChange}
           />
         </Stack>
         <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
@@ -268,20 +218,14 @@ function ImpactDetail({
   detail,
   loading,
   error,
-  applications,
-  selectedApplicationIris,
   onBack,
-  onRetry,
-  onApplicationSelectionChange
+  onRetry
 }: {
   detail: CveImpactDetailResponse | null;
   loading: boolean;
   error: string | null;
-  applications: ApplicationSummary[];
-  selectedApplicationIris: string[];
   onBack: () => void;
   onRetry: () => void;
-  onApplicationSelectionChange: (applicationIris: string[]) => void;
 }) {
   const [selectedExposureId, setSelectedExposureId] = useState<string | null>(null);
   const [detailDialogTab, setDetailDialogTab] = useState<number | null>(null);
@@ -300,12 +244,6 @@ function ImpactDetail({
         <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(1)}>CVSS Vector</Button>
         <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(2)}>References</Button>
         <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(3)}>Fixed versions</Button>
-        <Box sx={{ flexGrow: 1 }} />
-        <ApplicationMultiSelect
-          applications={applications}
-          selectedApplicationIris={selectedApplicationIris}
-          onChange={onApplicationSelectionChange}
-        />
       </Stack>
 
       <Box sx={{ minWidth: 0, width: '100%' }}>
@@ -509,80 +447,6 @@ function SelectedNodeHeader({ node }: { node: ImpactGraphNode }) {
     {purl ? <Typography className="selected-package-purl" variant="caption" sx={{ display: 'block', color: designTokens.text.muted, fontWeight: 400, overflowWrap: 'anywhere' }}>{purl}</Typography> : null}
     <Typography variant="caption" sx={{ display: 'block', color: designTokens.text.muted }}>{nodeContext(node, Boolean(purl))}</Typography>
   </Alert>;
-}
-
-const SELECT_ALL_APPLICATIONS = '__all_applications__';
-
-function ApplicationMultiSelect({
-  applications,
-  selectedApplicationIris,
-  onChange
-}: {
-  applications: ApplicationSummary[];
-  selectedApplicationIris: string[];
-  onChange: (applicationIris: string[]) => void;
-}) {
-  const selectableApplications = applications.filter(
-    (application): application is ApplicationSummary & { iri: string } =>
-      Boolean(application.iri?.trim())
-  );
-  const allSelected =
-    selectableApplications.length > 0
-    && selectedApplicationIris.length === selectableApplications.length;
-
-  function handleChange(event: SelectChangeEvent<string[]>) {
-    const values =
-      typeof event.target.value === 'string'
-        ? event.target.value.split(',')
-        : event.target.value;
-    if (values.at(-1) === SELECT_ALL_APPLICATIONS) {
-      onChange(allSelected ? [] : selectableApplications.map((application) => application.iri));
-      return;
-    }
-    const validIris = new Set(selectableApplications.map((application) => application.iri));
-    onChange(Array.from(new Set(values.filter((iri) => validIris.has(iri)))));
-  }
-
-  return (
-    <FormControl size="small" sx={{ minWidth: 220 }}>
-      <InputLabel id="cve-impact-applications-label">Applications</InputLabel>
-      <Select
-        multiple
-        labelId="cve-impact-applications-label"
-        label="Applications"
-        value={selectedApplicationIris}
-        onChange={handleChange}
-        renderValue={(selected) => {
-          if (selected.length === selectableApplications.length) {
-            return `All applications (${selected.length})`;
-          }
-          if (selected.length === 1) {
-            const application = selectableApplications.find(({ iri }) => iri === selected[0]);
-            return applicationLabel(application);
-          }
-          return `${selected.length} applications selected`;
-        }}
-      >
-        <MenuItem value={SELECT_ALL_APPLICATIONS}>
-          <Checkbox checked={allSelected} indeterminate={selectedApplicationIris.length > 0 && !allSelected} />
-          <ListItemText primary="Select all applications" />
-        </MenuItem>
-        {selectableApplications.map((application) => (
-          <MenuItem key={application.iri} value={application.iri}>
-            <Checkbox checked={selectedApplicationIris.includes(application.iri)} />
-            <ListItemText primary={applicationLabel(application)} />
-          </MenuItem>
-        ))}
-      </Select>
-    </FormControl>
-  );
-}
-
-function applicationLabel(application?: ApplicationSummary): string {
-  if (!application) {
-    return 'Selected application';
-  }
-  return `${application.name ?? 'Unknown'} · ${application.version ?? 'Unknown'}`;
 }
 
 function SeverityChip({ value }: { value: string | null }) {

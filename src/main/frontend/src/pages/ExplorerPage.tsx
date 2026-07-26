@@ -1,13 +1,16 @@
-import { Alert, Box, Card, CardContent, Chip, Stack, Typography } from '@mui/material';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Alert, Box, Card, CardContent, Stack, Typography } from '@mui/material';
+import { useEffect, useState } from 'react';
 import type {
+  ApplicationOverview as ApplicationOverviewModel,
   ApplicationReferencesResponse,
   ApplicationSummary,
+  ApplicationVulnerabilityItem,
   ApplicationVulnerabilitiesResponse,
-  CveImpactListResponse
+  CveImpactListResponse,
+  DependencySummary
 } from '../api/types';
 import { RestCallProgress } from '../components/RestCallProgress';
-import { ApplicationSelector } from '../features/explore/ApplicationSelector';
+import { ApplicationMultiSelector } from '../features/explore/ApplicationMultiSelector';
 import { ApplicationOverview } from '../features/explore/ApplicationOverview';
 import { DependenciesView } from '../features/explore/DependenciesView';
 import { CveImpactView } from '../features/explore/CveImpactView';
@@ -21,7 +24,6 @@ import {
 } from '../features/explore/exploreApi';
 import type { ExploreTab } from '../features/explore/exploreTypes';
 import { ExploreTabs } from '../features/explore/ExploreTabs';
-import { IriValue } from '../features/explore/IriValue';
 import { ReferencesView } from '../features/explore/ReferencesView';
 import { VulnerabilitiesView } from '../features/explore/VulnerabilitiesView';
 
@@ -32,7 +34,7 @@ interface ExplorerPageProps {
 
 export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichment }: ExplorerPageProps) {
   const [summaries, setSummaries] = useState<ApplicationSummary[]>([]);
-  const [selectedApplication, setSelectedApplication] = useState<ApplicationSummary | null>(null);
+  const [selectedApplicationIris, setSelectedApplicationIris] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<ExploreTab>('overview');
   const [overview, setOverview] = useState<Awaited<ReturnType<typeof fetchApplicationOverview>> | null>(null);
   const [dependencies, setDependencies] = useState<Awaited<ReturnType<typeof fetchApplicationDependencies>>>([]);
@@ -44,7 +46,6 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
   const [referencesLoading, setReferencesLoading] = useState(false);
   const [referencesError, setReferencesError] = useState<string | null>(null);
   const [referencesReloadCounter, setReferencesReloadCounter] = useState(0);
-  const [cveImpactApplicationIris, setCveImpactApplicationIris] = useState<string[]>([]);
   const [cveImpact, setCveImpact] = useState<CveImpactListResponse | null>(null);
   const [cveImpactLoading, setCveImpactLoading] = useState(false);
   const [cveImpactError, setCveImpactError] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
   const selectableSummaries = summaries.filter(
     (summary): summary is ApplicationSummary & { iri: string } => Boolean(summary.iri?.trim())
   );
+  const selectionKey = selectedApplicationIris.join('\u0000');
 
   useEffect(() => {
     let active = true;
@@ -72,7 +74,7 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
         }
 
         setSummaries(nextSummaries);
-        setSelectedApplication((current) => preserveSelection(current, nextSummaries, initialApplicationIri));
+        setSelectedApplicationIris((current) => preserveSelection(current, nextSummaries, initialApplicationIri));
       } catch (error) {
         if (!active) {
           return;
@@ -80,7 +82,7 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
 
         console.error('Failed to load application summaries.', error);
         setSummaries([]);
-        setSelectedApplication(null);
+        setSelectedApplicationIris([]);
         setSummariesError('Unable to load applications.');
       } finally {
         if (active) {
@@ -98,9 +100,9 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
 
   useEffect(() => {
     let active = true;
-    const applicationIri = selectedApplication?.iri?.trim() ?? '';
+    const applicationIris = selectedApplicationIris;
 
-    if (!applicationIri) {
+    if (applicationIris.length === 0) {
       setOverview(null);
       setDependencies([]);
       setWorkspaceError(null);
@@ -117,22 +119,26 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
 
     async function loadWorkspace() {
       try {
-        const [nextOverview, nextDependencies] = await Promise.all([
-          fetchApplicationOverview(applicationIri),
-          fetchApplicationDependencies(applicationIri)
-        ]);
+        const workspaces = await Promise.all(applicationIris.map(async (applicationIri) => {
+          const [nextOverview, nextDependencies] = await Promise.all([
+            fetchApplicationOverview(applicationIri),
+            fetchApplicationDependencies(applicationIri)
+          ]);
+          return { overview: nextOverview, dependencies: nextDependencies };
+        }));
         if (!active) {
           return;
         }
 
-        setOverview(nextOverview);
+        const nextDependencies = mergeDependencies(workspaces.flatMap(({ dependencies }) => dependencies));
+        setOverview(mergeOverviews(workspaces.map(({ overview }) => overview), nextDependencies));
         setDependencies(nextDependencies);
       } catch (error) {
         if (!active) {
           return;
         }
 
-        console.error(`Failed to load application workspace for ${applicationIri}.`, error);
+        console.error(`Failed to load application workspace for ${applicationIris.join(', ')}.`, error);
         setOverview(null);
         setDependencies([]);
         setWorkspaceError('Unable to load application summary.');
@@ -148,17 +154,17 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
     return () => {
       active = false;
     };
-  }, [reloadCounter, selectedApplication?.iri]);
+  }, [reloadCounter, selectionKey]);
 
   useEffect(() => {
     setVulnerabilities(null);
     setVulnerabilitiesError(null);
-  }, [selectedApplication?.iri]);
+  }, [selectionKey]);
 
   useEffect(() => {
     let active = true;
-    const applicationIri = selectedApplication?.iri?.trim() ?? '';
-    if (activeTab !== 'vulnerabilities' || !applicationIri) {
+    const applicationIris = selectedApplicationIris;
+    if (activeTab !== 'vulnerabilities' || applicationIris.length === 0) {
       return () => {
         active = false;
       };
@@ -169,13 +175,13 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
 
     async function loadVulnerabilities() {
       try {
-        const response = await fetchApplicationVulnerabilities(applicationIri);
+        const responses = await Promise.all(applicationIris.map(fetchApplicationVulnerabilities));
         if (active) {
-          setVulnerabilities(response);
+          setVulnerabilities(mergeVulnerabilityResponses(applicationIris, responses));
         }
       } catch (error) {
         if (active) {
-          console.error(`Failed to load vulnerabilities for ${applicationIri}.`, error);
+          console.error(`Failed to load vulnerabilities for ${applicationIris.join(', ')}.`, error);
           setVulnerabilities(null);
           setVulnerabilitiesError(
             error instanceof Error ? error.message : 'Unable to load application vulnerabilities.'
@@ -192,17 +198,17 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
     return () => {
       active = false;
     };
-  }, [activeTab, selectedApplication?.iri, vulnerabilitiesReloadCounter]);
+  }, [activeTab, selectionKey, vulnerabilitiesReloadCounter]);
 
   useEffect(() => {
     setReferences(null);
     setReferencesError(null);
-  }, [selectedApplication?.iri]);
+  }, [selectionKey]);
 
   useEffect(() => {
     let active = true;
-    const applicationIri = selectedApplication?.iri?.trim() ?? '';
-    if (activeTab !== 'references' || !applicationIri) {
+    const applicationIris = selectedApplicationIris;
+    if (activeTab !== 'references' || applicationIris.length === 0) {
       return () => {
         active = false;
       };
@@ -213,13 +219,13 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
 
     async function loadReferences() {
       try {
-        const response = await fetchApplicationReferences(applicationIri);
+        const responses = await Promise.all(applicationIris.map(fetchApplicationReferences));
         if (active) {
-          setReferences(response);
+          setReferences(mergeReferenceResponses(applicationIris, responses));
         }
       } catch (error) {
         if (active) {
-          console.error(`Failed to load advisory references for ${applicationIri}.`, error);
+          console.error(`Failed to load advisory references for ${applicationIris.join(', ')}.`, error);
           setReferences(null);
           setReferencesError('Unable to load advisory references.');
         }
@@ -234,100 +240,64 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
     return () => {
       active = false;
     };
-  }, [activeTab, referencesReloadCounter, selectedApplication?.iri]);
+  }, [activeTab, referencesReloadCounter, selectionKey]);
 
   useEffect(() => {
     setCveImpact(null);
     setCveImpactError(null);
-  }, [cveImpactApplicationIris, selectedApplication?.iri]);
-
-  useEffect(() => {
-    const applicationIri = selectedApplication?.iri?.trim() ?? '';
-    setCveImpactApplicationIris(applicationIri ? [applicationIri] : []);
-  }, [selectedApplication?.iri]);
+  }, [selectionKey]);
 
   useEffect(() => {
     let active = true;
-    const applicationIri = selectedApplication?.iri?.trim() ?? '';
-    if (activeTab !== 'cve-impact' || !applicationIri || cveImpactApplicationIris.length === 0) {
+    const applicationIris = selectedApplicationIris;
+    if (activeTab !== 'cve-impact' || applicationIris.length === 0) {
       setCveImpactLoading(false);
       return () => { active = false; };
     }
     setCveImpactLoading(true);
     setCveImpactError(null);
-    void fetchCveImpactList('selected', cveImpactApplicationIris)
+    void fetchCveImpactList('selected', applicationIris)
       .then((response) => { if (active) setCveImpact(response); })
       .catch((error: unknown) => {
         if (active) {
-          console.error(`Failed to load CVE impact for ${applicationIri}.`, error);
+          console.error(`Failed to load CVE impact for ${applicationIris.join(', ')}.`, error);
           setCveImpact(null);
           setCveImpactError('Unable to load CVE impact data.');
         }
       })
       .finally(() => { if (active) setCveImpactLoading(false); });
     return () => { active = false; };
-  }, [activeTab, cveImpactApplicationIris, cveImpactReloadCounter, selectedApplication?.iri]);
-
-  function handleApplicationSelect(applicationIri: string) {
-    const nextApplication = selectableSummaries.find((summary) => summary.iri === applicationIri) ?? null;
-    setSelectedApplication(nextApplication);
-  }
+  }, [activeTab, selectionKey, cveImpactReloadCounter]);
 
   function handleRefreshWorkspace() {
     setReloadCounter((current) => current + 1);
   }
 
-  const hasApplications = selectableSummaries.length > 0 && selectedApplication !== null;
-  const selectedApplicationIri = selectedApplication?.iri ?? '';
+  const hasApplications = selectableSummaries.length > 0 && selectedApplicationIris.length > 0;
+  const primaryApplicationIri = selectedApplicationIris[0] ?? '';
 
   return (
-    <Stack spacing={3}>
+    <Card sx={{ overflow: 'hidden' }}>
       <RestCallProgress visible={summariesLoading || workspaceLoading} />
-
-      {summariesError ? <Alert severity="error">{summariesError}</Alert> : null}
-
-      <Card>
-        <CardContent sx={{ p: 1.5 }}>
-          <Stack spacing={1}>
-            <Box
-              sx={{
-                display: 'grid',
-                gap: 0.75,
-                gridTemplateColumns: { xs: '1fr', md: '3fr 6fr 3fr' },
-                alignItems: 'stretch'
-              }}
-            >
-              <FieldShell label="APPLICATION">
-                <ApplicationSelector
-                  summaries={selectableSummaries}
-                  selectedApplicationIri={selectedApplicationIri}
-                  loading={summariesLoading}
-                  onSelectApplication={handleApplicationSelect}
-                />
-              </FieldShell>
-
-              <FieldShell label="IRI">
-                <IriValue value={selectedApplicationIri} />
-              </FieldShell>
-
-              <FieldShell label="VERSION">
-                <Chip
-                  size="small"
-                  label={selectedApplication?.version ?? 'Unknown'}
-                  variant="outlined"
-                  sx={chipSx}
-                />
-              </FieldShell>
-            </Box>
-          </Stack>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent sx={{ p: 2 }}>
-          <Stack spacing={2}>
+      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+        <Stack spacing={2}>
+            {summariesError ? <Alert severity="error">{summariesError}</Alert> : null}
             {workspaceError ? <Alert severity="error">{workspaceError}</Alert> : null}
-            <ExploreTabs value={activeTab} onChange={setActiveTab} disabled={!hasApplications} />
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={1.25}
+              alignItems={{ xs: 'stretch', md: 'center' }}
+            >
+              <ApplicationMultiSelector
+                applications={selectableSummaries}
+                selectedApplicationIris={selectedApplicationIris}
+                loading={summariesLoading}
+                onChange={setSelectedApplicationIris}
+              />
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <ExploreTabs value={activeTab} onChange={setActiveTab} disabled={!hasApplications} />
+              </Box>
+            </Stack>
 
             {!hasApplications ? (
               <Box
@@ -341,11 +311,13 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
                 }}
               >
                 <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>
-                  No applications have been ingested yet. Upload a CycloneDX SBOM to begin.
+                  {selectableSummaries.length === 0
+                    ? 'No applications have been ingested yet. Upload a CycloneDX SBOM to begin.'
+                    : 'Select one or more applications to explore.'}
                 </Typography>
               </Box>
             ) : workspaceError ? null : (
-              <Box sx={{ pt: 0.5 }} key={selectedApplicationIri || 'no-application'}>
+              <Box sx={{ pt: 0.5 }} key={selectionKey || 'no-application'}>
                 {activeTab === 'overview' ? (
                   <ApplicationOverview overview={overview} loading={workspaceLoading} />
                 ) : null}
@@ -365,7 +337,7 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
                     loading={vulnerabilitiesLoading || (!vulnerabilities && !vulnerabilitiesError)}
                     error={vulnerabilitiesError}
                     onRefresh={() => setVulnerabilitiesReloadCounter((current) => current + 1)}
-                    onOpenEnrichment={() => onOpenVulnerabilityEnrichment(selectedApplicationIri)}
+                    onOpenEnrichment={() => onOpenVulnerabilityEnrichment(primaryApplicationIri)}
                   />
                 ) : null}
                 {activeTab === 'references' ? (
@@ -374,38 +346,35 @@ export function ExplorerPage({ initialApplicationIri, onOpenVulnerabilityEnrichm
                     loading={referencesLoading || (!references && !referencesError)}
                     error={referencesError}
                     onRefresh={() => setReferencesReloadCounter((current) => current + 1)}
-                    onOpenEnrichment={() => onOpenVulnerabilityEnrichment(selectedApplicationIri)}
+                    onOpenEnrichment={() => onOpenVulnerabilityEnrichment(primaryApplicationIri)}
                   />
                 ) : null}
                 {activeTab === 'cve-impact' ? (
                   <CveImpactView
-                    applications={selectableSummaries}
-                    selectedApplicationIris={cveImpactApplicationIris}
+                    selectedApplicationIris={selectedApplicationIris}
                     response={cveImpact}
                     loading={
-                      cveImpactApplicationIris.length > 0
+                      selectedApplicationIris.length > 0
                       && (cveImpactLoading || (!cveImpact && !cveImpactError))
                     }
                     error={cveImpactError}
-                    onApplicationSelectionChange={setCveImpactApplicationIris}
                     onRefresh={() => setCveImpactReloadCounter((current) => current + 1)}
-                    onOpenEnrichment={() => onOpenVulnerabilityEnrichment(selectedApplicationIri)}
+                    onOpenEnrichment={() => onOpenVulnerabilityEnrichment(primaryApplicationIri)}
                   />
                 ) : null}
               </Box>
             )}
-          </Stack>
-        </CardContent>
-      </Card>
-    </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 
 function preserveSelection(
-  current: ApplicationSummary | null,
+  current: string[],
   nextSummaries: ApplicationSummary[],
   preferredIri?: string | null
-): ApplicationSummary | null {
+): string[] {
   const selectableSummaries = nextSummaries.filter(
     (summary): summary is ApplicationSummary & { iri: string } => Boolean(summary.iri?.trim())
   );
@@ -414,51 +383,97 @@ function preserveSelection(
   if (normalizedPreferredIri) {
     const preferred = selectableSummaries.find((summary) => summary.iri === normalizedPreferredIri);
     if (preferred) {
-      return preferred;
+      return [preferred.iri];
     }
   }
 
-  if (current?.iri) {
-    const preserved = selectableSummaries.find((summary) => summary.iri === current.iri);
-    if (preserved) {
-      return preserved;
+  const validIris = new Set(selectableSummaries.map(({ iri }) => iri));
+  const preserved = current.filter((iri) => validIris.has(iri));
+  if (preserved.length > 0) {
+    return preserved;
+  }
+
+  return selectableSummaries[0] ? [selectableSummaries[0].iri] : [];
+}
+
+function mergeDependencies(dependencies: DependencySummary[]): DependencySummary[] {
+  const merged = new Map<string, DependencySummary>();
+  dependencies.forEach((dependency) => {
+    const current = merged.get(dependency.iri);
+    merged.set(dependency.iri, current
+      ? { ...current, ...dependency, direct: Boolean(current.direct || dependency.direct) }
+      : dependency);
+  });
+  return Array.from(merged.values());
+}
+
+function mergeOverviews(
+  overviews: ApplicationOverviewModel[],
+  dependencies: DependencySummary[]
+): ApplicationOverviewModel {
+  const sum = (field: keyof ApplicationOverviewModel) => overviews.reduce((total, overview) => {
+    const value = overview[field];
+    return total + (typeof value === 'number' ? value : 0);
+  }, 0);
+  const enrichedDates = overviews
+    .map(({ lastEnrichedAt }) => lastEnrichedAt)
+    .filter((value): value is string => Boolean(value))
+    .sort();
+
+  return {
+    directDependencyCount: sum('directDependencyCount'),
+    transitiveDependencyCount: sum('transitiveDependencyCount'),
+    uniquePackageCount: dependencies.length,
+    graphNodeCount: sum('graphNodeCount'),
+    graphEdgeCount: sum('graphEdgeCount'),
+    vulnerablePackages: sum('vulnerablePackages'),
+    criticalVulnerabilities: sum('criticalVulnerabilities'),
+    lastEnrichedAt: enrichedDates.at(-1) ?? null
+  };
+}
+
+function mergeVulnerabilityResponses(
+  applicationIris: string[],
+  responses: ApplicationVulnerabilitiesResponse[]
+): ApplicationVulnerabilitiesResponse {
+  const items = new Map<string, ApplicationVulnerabilityItem>();
+  responses.flatMap(({ items: responseItems }) => responseItems).forEach((item) => {
+    items.set(`${item.packageIri}\u0000${item.vulnerabilityIri}`, item);
+  });
+  return {
+    applicationIri: applicationIris.length === 1 ? applicationIris[0] : '',
+    total: items.size,
+    items: Array.from(items.values())
+  };
+}
+
+function mergeReferenceResponses(
+  applicationIris: string[],
+  responses: ApplicationReferencesResponse[]
+): ApplicationReferencesResponse {
+  const items = new Map<string, ApplicationReferencesResponse['items'][number]>();
+  responses.flatMap(({ items: responseItems }) => responseItems).forEach((item) => {
+    const key = item.vulnerabilityIri || item.osvId;
+    const current = items.get(key);
+    if (!current) {
+      items.set(key, item);
+      return;
     }
-  }
-
-  return selectableSummaries[0] ?? null;
+    items.set(key, {
+      ...current,
+      aliases: Array.from(new Set([...current.aliases, ...item.aliases])),
+      referenceUrls: Array.from(new Set([...current.referenceUrls, ...item.referenceUrls])),
+      affectedPackages: Array.from(
+        new Map(
+          [...current.affectedPackages, ...item.affectedPackages]
+            .map((pkg) => [`${pkg.packageIri}\u0000${pkg.installedVersion}`, pkg])
+        ).values()
+      )
+    });
+  });
+  return {
+    applicationIri: applicationIris.length === 1 ? applicationIris[0] : '',
+    total: items.size,
+    items: Array.from(items.values())
+  };
 }
-
-function FieldShell({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <Box
-      sx={{
-        border: '1px solid',
-        borderColor: 'divider',
-        borderRadius: 2,
-        px: 1.1,
-        py: 0.9,
-        bgcolor: 'background.paper',
-        minWidth: 0
-      }}
-    >
-      <Stack spacing={0.25}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800, fontSize: '0.67rem' }}
-        >
-          {label}
-        </Typography>
-        {children}
-      </Stack>
-    </Box>
-  );
-}
-
-const chipSx = {
-  alignSelf: 'flex-start',
-  fontWeight: 800,
-  '& .MuiChip-label': {
-    px: 1
-  }
-};

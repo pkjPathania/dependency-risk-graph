@@ -403,7 +403,7 @@ public class ExplorerService {
         new ParameterizedSparqlString(
             PREFIXES
                 + """
-                SELECT DISTINCT
+                                     SELECT DISTINCT
                                        ?package
                                        ?name
                                        ?version
