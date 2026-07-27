@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
@@ -230,7 +231,7 @@ public class JenaAdvisoryEvidenceSourceRepository implements AdvisoryEvidenceSou
         rows.stream()
             .map(AdvisoryEvidenceRow::alias)
             .map(StringUtils::trimToNull)
-            .filter(value -> value != null)
+            .filter(Objects::nonNull)
             .distinct()
             .sorted()
             .toList();
@@ -299,7 +300,7 @@ public class JenaAdvisoryEvidenceSourceRepository implements AdvisoryEvidenceSou
         rows.stream()
             .map(AdvisoryEvidenceRow::vulnerabilityIri)
             .map(StringUtils::trimToNull)
-            .filter(value -> value != null)
+            .filter(Objects::nonNull)
             .distinct()
             .limit(2)
             .toList();
@@ -320,7 +321,7 @@ public class JenaAdvisoryEvidenceSourceRepository implements AdvisoryEvidenceSou
     return rows.stream()
         .map(extractor)
         .map(StringUtils::trimToNull)
-        .filter(value -> value != null)
+        .filter(Objects::nonNull)
         .findFirst()
         .orElse(null);
   }

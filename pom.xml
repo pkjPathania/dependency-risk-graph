@@ -51,6 +51,7 @@
     <jgrapht-core.version>1.5.3</jgrapht-core.version>
     <langchain4j.version>1.17.2</langchain4j.version>
     <cvss-calculator.version>1.5.1</cvss-calculator.version>
+    <langgraph4j.version>1.8.20</langgraph4j.version>
   </properties>
 
   <dependencyManagement>
@@ -62,6 +63,14 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+      <dependency>
+        <groupId>org.bsc.langgraph4j</groupId>
+        <artifactId>langgraph4j-bom</artifactId>
+        <version>${langgraph4j.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -69,9 +78,9 @@
   <dependencies>
     <dependency>
       <groupId>org.bsc.langgraph4j</groupId>
-      <artifactId>langgraph4j-core</artifactId>
-      <version>1.8.20</version>
+      <artifactId>langgraph4j-agent-executor</artifactId>
     </dependency>
+
     <dependency>
       <groupId>us.springett</groupId>
       <artifactId>cvss-calculator</artifactId>

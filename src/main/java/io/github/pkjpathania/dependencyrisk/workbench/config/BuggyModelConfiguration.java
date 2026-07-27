@@ -18,6 +18,8 @@ public class BuggyModelConfiguration {
         .modelName(properties.modelName())
         .temperature(properties.temperature())
         .timeout(properties.timeout())
+        .logRequests(true)
+        .logResponses(true)
         .build();
   }
 }
