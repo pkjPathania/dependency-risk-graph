@@ -4,9 +4,9 @@
 
 [Project Website](https://pkjpathania.github.io/dependency-risk-graph/) · [Contributing](CONTRIBUTING.md)
 
-Dependency Risk Graph is a Java-first software supply-chain knowledge graph. It imports CycloneDX JSON SBOMs as RDF, enriches the imported package occurrences with complete OSV advisories, stores both datasets in Apache Jena TDB2, and provides a React interface for application, dependency, vulnerability, reference, CVE-impact, and SPARQL exploration.
+Dependency Risk Graph is a Java-first software supply-chain knowledge graph evolving into a **neuro-symbolic AI platform**. It imports CycloneDX JSON SBOMs as RDF, enriches the imported package occurrences with complete OSV advisories, stores both datasets in Apache Jena TDB2, and provides a React interface for application, dependency, vulnerability, reference, CVE-impact, and SPARQL exploration.
 
-The graph is the source of truth. Ingestion and enrichment write RDF; the Explore and SPARQL APIs read the persisted model without making hidden OSV calls.
+The graph remains the source of truth. Deterministic graph traversal and SPARQL provide the symbolic reasoning layer, while embeddings and grounded language models provide the neural layer. Together, they are being developed to produce security answers that are explainable, evidence-backed, and constrained by the software supply-chain graph.
 
 ![Dependency Risk Graph](docs/assets/hero.png)
 
@@ -15,13 +15,16 @@ The graph is the source of truth. Ingestion and enrichment write RDF; the Explor
 ## Table of Contents
 
 - [What the Application Does](#what-the-application-does)
+- [Neuro-Symbolic AI Direction](#neuro-symbolic-ai-direction)
 - [Current Architecture](#current-architecture)
+  - [Implemented neuro-symbolic paths](#implemented-neuro-symbolic-paths)
   - [Design principles](#design-principles)
 - [End-to-End Data Flow](#end-to-end-data-flow)
   - [CycloneDX ingestion](#1-cyclonedx-ingestion)
   - [Application OSV enrichment](#2-application-osv-enrichment)
   - [Explore and CVE impact](#3-explore-and-cve-impact)
   - [Advisory evidence indexing and retrieval](#4-advisory-evidence-indexing-and-retrieval)
+  - [Buggy graph-agent execution](#5-buggy-graph-agent-execution)
 - [RDF Model](#rdf-model)
   - [CycloneDX occurrence graph](#cyclonedx-occurrence-graph)
   - [OSV enrichment graph](#osv-enrichment-graph)
@@ -34,6 +37,7 @@ The graph is the source of truth. Ingestion and enrichment write RDF; the Explor
   - [CVE impact](#cve-impact)
   - [SPARQL](#sparql)
   - [AI Workbench advisory evidence](#ai-workbench-advisory-evidence)
+  - [GraphQL Playground](#graphql-playground)
 - [API Reference](#api-reference)
 - [Quick Start](#quick-start)
 - [SPARQL Examples](#sparql-examples)
@@ -58,48 +62,104 @@ The graph is the source of truth. Ingestion and enrichment write RDF; the Explor
 - Provides an application-level enrichment API and a read-only single-PURL lookup API.
 - Exposes application-centric Explore tabs for overview, dependencies, vulnerabilities, references, and CVE impact.
 - Provides unrestricted read-only SPARQL `SELECT` execution through the UI/API.
+- Exposes application occurrences through Spring GraphQL and an embedded GraphiQL Playground.
 - Renders a responsive, CVE-centered impact-and-fixes tree with D3 and SVG.
 - Rebuilds an in-memory advisory evidence index from the RDF graph and exposes global semantic evidence search in AI Workbench.
+- Runs Buggy as a LangGraph4j agent that can call authoritative graph-backed tools before answering.
+
+## Neuro-Symbolic AI Direction
+
+Dependency Risk Graph is moving beyond standalone GraphRAG toward a neuro-symbolic architecture:
+
+- **Symbolic layer:** RDF identities, typed relationships, SPARQL, dependency-path traversal, CVE impact analysis, and deterministic remediation context.
+- **Neural layer:** semantic evidence retrieval, local embeddings, natural-language interaction, and grounded answer generation.
+- **Integration layer:** graph-resolved context and ranked evidence are combined so generated answers can be traced back to dependency paths, advisories, fixes, and source records.
+
+The goal is not to replace graph reasoning with a language model. The model should interpret and communicate facts established by the knowledge graph, expose the evidence behind its conclusions, and state when the graph does not contain enough information.
 
 ## Current Architecture
 
 ```mermaid
-flowchart LR
-    subgraph Write[Write pipelines]
-        SBOM[CycloneDX JSON] -->|POST /rdf/new| CDX[CycloneDX assemblers]
-        CDX --> CDXJSONLD[CycloneDX JSON-LD]
-        CDXJSONLD --> RDFParser[Jena JSON-LD parser]
-
-        APP[Application IRI] -->|GET /api/v1/vulnerabilities/enrich| PLAN[Dependency scan plan]
-        PLAN --> BATCH[OSV /querybatch]
-        BATCH --> DETAIL[OSV advisory detail calls]
-        DETAIL --> OSVJSONLD[OSV JSON-LD assemblers]
-        OSVJSONLD --> RDFParser
+flowchart TB
+    subgraph Sources[Supply-chain sources]
+        SBOM[CycloneDX JSON SBOM]
+        APP[Application IRI]
+        OSV[OSV API]
     end
 
-    RDFParser --> TDB[(Apache Jena TDB2)]
-
-    subgraph Read[Read pipelines]
-        TDB --> EXPLORE[Explore services]
-        TDB --> SPARQL[SPARQL service]
-        TDB --> META[Graph metadata]
-        TDB --> PATH[Dependency-path projection]
-        TDB --> EVIDENCE[Advisory evidence projection]
+    subgraph Writes[Explicit write pipelines]
+        CDX[CycloneDX assemblers]
+        CDXJSONLD[CycloneDX JSON-LD]
+        PLAN[Application dependency scan plan]
+        OSVCLIENT[Batch query and advisory detail loading]
+        OSVJSONLD[OSV JSON-LD assemblers]
+        RDFPARSER[Jena JSON-LD parser]
     end
 
-    EVIDENCE --> CHUNKS[Typed evidence chunks]
-    CHUNKS --> BGE[BGE-small embeddings]
-    BGE --> VECTOR[(In-memory evidence index)]
-    VECTOR --> WORKBENCH[Workbench assistant evidence API]
+    SBOM -->|POST /rdf/new| CDX --> CDXJSONLD --> RDFPARSER
+    APP -->|Enrich| PLAN --> OSVCLIENT
+    OSVCLIENT <--> OSV
+    OSVCLIENT --> OSVJSONLD --> RDFPARSER
 
-    EXPLORE --> API[Spring MVC APIs]
-    SPARQL --> API
-    META --> API
-    PATH --> API
-    API --> UI[React + Material UI]
-    WORKBENCH --> UI
-    UI --> TREE[D3 + SVG CVE impact-and-fixes tree]
+    subgraph Symbolic[Symbolic knowledge and reasoning]
+        TDB[(Apache Jena TDB2)]
+        EXPLORE[Explore and CVE-impact services]
+        SPARQL[Read-only SPARQL service]
+        PATH[Dependency-path and graph projections]
+        TOOL[Graph-backed impacted-applications tool]
+        GQLSERVICE[Application occurrence GraphQL service]
+    end
+
+    RDFPARSER --> TDB
+    TDB --> EXPLORE
+    TDB --> SPARQL
+    TDB --> PATH
+    TDB --> TOOL
+    TDB --> GQLSERVICE
+
+    subgraph Neural[Neural retrieval and generation]
+        EVIDENCE[RDF advisory evidence projection]
+        CHUNKS[Typed evidence chunks]
+        BGE[Quantized BGE-small-en-v1.5 embeddings]
+        VECTOR[(In-memory embedding store)]
+        EVIDENCEANSWER[Evidence-grounded answer service]
+        AGENT[LangGraph4j Buggy AgentExecutor]
+        CHAT[OpenAI-compatible chat model / Groq]
+    end
+
+    TDB --> EVIDENCE --> CHUNKS --> BGE --> VECTOR
+    VECTOR --> EVIDENCEANSWER --> CHAT
+    AGENT -->|Tool call| TOOL
+    AGENT <--> CHAT
+
+    subgraph Interfaces[Application interfaces]
+        REST[Spring MVC APIs]
+        GRAPHQL[Spring GraphQL /graphql]
+        UI[React + Material UI]
+        PLAYGROUND[Embedded GraphiQL Playground]
+        TREE[D3/SVG CVE impact tree]
+    end
+
+    EXPLORE --> REST
+    SPARQL --> REST
+    PATH --> REST
+    EVIDENCEANSWER --> REST
+    AGENT --> REST
+    GQLSERVICE --> GRAPHQL
+    REST <--> UI
+    GRAPHQL <--> PLAYGROUND
+    UI --> PLAYGROUND
+    UI --> TREE
 ```
+
+### Implemented neuro-symbolic paths
+
+- **Deterministic graph path:** Explore, CVE Impact, dependency projections, SPARQL, and GraphQL read the persisted Jena model directly.
+- **Tool-using agent path:** the Buggy UI calls a compiled LangGraph4j `AgentExecutor`; the model can invoke the implemented impacted-applications tool, which executes authoritative SPARQL through `JenaGraphRepository`.
+- **Evidence-grounded generation path:** advisory RDF is projected into typed chunks, embedded locally with BGE-small-en-v1.5, stored in memory, retrieved by similarity, and supplied to the configured chat model with the matching evidence returned to the UI.
+- **Developer query path:** Spring GraphQL currently exposes `applicationOccurrences`, and the AI Workbench Playground embeds GraphiQL for schema discovery and query execution.
+
+The agent and evidence-answer services currently remain separate orchestration paths. The next integration step is to let the agent combine deterministic graph tools with retrieved advisory evidence in one traceable workflow.
 
 ### Design principles
 
@@ -111,6 +171,7 @@ flowchart LR
 6. **Reads are application-scoped.** Explore begins at an `ApplicationOccurrence` and follows `risk:dependsOn+` to its reachable packages.
 7. **Single-PURL lookup is non-persistent.** `/enrich/purl` returns complete OSV DTO responses but does not patch RDF.
 8. **Evidence search is diagnostic and global.** AI Workbench ranks all indexed advisory chunks by semantic similarity; it does not treat a CVE or GHSA mentioned in the query as a retrieval scope.
+9. **AI answers have explicit grounding paths.** Buggy uses registered graph tools, while the evidence answer service receives only the advisory chunks returned by semantic retrieval.
 
 ## End-to-End Data Flow
 
@@ -204,6 +265,22 @@ Jena vulnerability resources
 `POST /api/workbench/assistant/evidence` embeds the natural-language question and searches across every indexed evidence chunk. `maxResults` controls the result limit and `minScore` applies the similarity threshold. The retrieved chunks are supplied to Buggy's configured chat model, and the response contains the question, generated answer summary, evidence matches, final-snitch metadata, and model identity.
 
 This screen intentionally performs **global semantic discovery**. A query that names a CVE can return related advisories when their chunks are semantically similar. The UI shows Buggy's summary after the match count and marks an exact CVE or GHSA only when that identifier actually occurs in the returned vulnerability ID or evidence text. Identifier-scoped graph resolution is not part of this workflow.
+
+### 5. Buggy graph-agent execution
+
+The main Buggy assistant uses a compiled LangGraph4j agent rather than the evidence-answer pipeline:
+
+```text
+User question
+  -> GET /api/workbench/buggy/ask
+  -> LangGraph4j AgentExecutor
+  -> configured OpenAI-compatible chat model
+  -> optional impacted-applications tool call
+  -> authoritative SPARQL against Jena TDB2
+  -> final natural-language response
+```
+
+The currently registered `impactedServices` tool answers which applications are affected by known vulnerabilities and returns an authoritative total plus application identities. The agent decides when to invoke it based on the tool description and system prompt. Additional graph, dependency-path, CVE, remediation, and evidence tools remain planned.
 
 ## RDF Model
 
@@ -322,6 +399,10 @@ Each result displays its global rank, evidence segment type, vulnerability and d
 
 ![AI Workbench advisory evidence](docs/assets/workbench-Evidence.png)
 
+### GraphQL Playground
+
+AI Workbench includes a full-size GraphiQL interface backed by `POST /graphql`. The current schema exposes `applicationOccurrences` and its RDF-derived scalar fields. GraphiQL performs schema introspection, query completion, documentation browsing, execution, history, and response inspection directly inside the application UI.
+
 ## API Reference
 
 ### Primary new flow
@@ -366,6 +447,13 @@ Each result displays its global rank, evidence segment type, vulnerability and d
 | `POST` | `/api/workbench/evidence/search` | Search the current in-memory evidence index without generating an assistant answer. | `AdvisoryEvidenceMatch[]` |
 | `POST` | `/api/workbench/evidence/rebuild` | Regenerate typed advisory documents and replace the complete in-memory vector index. | `AdvisoryEvidenceDocument[]` |
 | `POST` | `/api/workbench/assistant/evidence` | Retrieve global semantic evidence and generate Buggy's grounded summary. | `BuggyAnswerResponse` |
+
+### Buggy Agent and GraphQL APIs
+
+| Method | Path | Purpose | Response |
+| --- | --- | --- | --- |
+| `GET` | `/api/workbench/buggy/ask?question=...` | Run the LangGraph4j Buggy agent, including any graph-tool calls selected by the model. | Grounded answer text |
+| `POST` | `/graphql` | Execute GraphQL queries against the RDF-backed application occurrence service. | GraphQL response |
 
 ## Quick Start
 
@@ -620,8 +708,11 @@ npm run build
 - React 19 and TypeScript
 - Material UI
 - D3 7 with responsive SVG rendering
+- Spring GraphQL with an embedded GraphiQL 5 Playground
 - LangChain4j with the quantized BGE-small-en-v1.5 embedding model
 - LangChain4j `InMemoryEmbeddingStore` for advisory evidence
+- LangGraph4j `AgentExecutor` for Buggy's tool-using workflow
+- OpenAI-compatible chat integration configured for Groq
 - Vite
 - OSV REST APIs through Spring `RestClient`
 
@@ -642,12 +733,14 @@ src/main/java/io/github/pkjpathania/dependencyrisk/
     service/                batching, advisory loading, and enrichment
   workbench/
     api/                    advisory evidence rebuild and search endpoints
-    assistant/              grounded Buggy response API and service
-    config/                 local embedding model and in-memory store
+    assistant/              Buggy agent tools and evidence-grounded answer services
+    config/                 LangGraph4j agent, chat model, embeddings, and in-memory store
     evidence/               RDF projection, chunking, indexing, and search
+    graphql/                Spring GraphQL queries, services, models, and RDF mapping
 
 src/main/frontend/src/
   pages/                    top-level application screens
+  pages/workbench/          Buggy, Evidence, GraphiQL, analysis, and trace views
   components/workbench/     Workbench shell and Evidence result components
   api/workbenchEvidence.ts  typed Evidence HTTP integration
   features/explore/         Explore tabs and CVE impact graph
@@ -663,9 +756,8 @@ data/tdb2/                  local embedded RDF dataset
 
 ## TODO / Next Steps
 
-- [ ] Fix remaining build issues and keep the backend and frontend builds stable.
 - [ ] Complete and validate deterministic dependency-path discovery and visualization.
-- [ ] **In progress — GraphRAG:** add graph-grounded retrieval for CVE, application, dependency-path, and remediation context.
+- [ ] **In progress — Neuro-symbolic AI:** expand Buggy's graph-tool coverage and combine the current agent and evidence-retrieval paths into one inspectable workflow.
 
 ## Current Limitations
 
@@ -680,7 +772,8 @@ data/tdb2/                  local embedded RDF dataset
 - Authentication and authorization are not implemented.
 - Advisory evidence retrieval is global semantic discovery, not CVE/GHSA-scoped retrieval through the knowledge graph.
 - The advisory embedding store is in memory and must be rebuilt after each application restart.
-- AI Workbench summaries use global semantic evidence; identifier-scoped graph retrieval, conversation memory, and agent workflows are not yet implemented.
+- Buggy's agent currently exposes one graph-backed tool for impacted applications; broader CVE, dependency-path, remediation, and evidence tools are still in progress.
+- The agent and evidence-grounded answer service are separate flows, and conversation memory is not persisted.
 
 ## License
 
