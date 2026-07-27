@@ -1,0 +1,13 @@
+type Query {
+    applicationOccurrences : [ApplicationOccurrence]
+}
+
+type ApplicationOccurrence {
+    id: ID!
+    name: String
+    rdfType: String
+    bomRef: String
+    componentType: String
+    group: String
+    version: String
+}

@@ -26,6 +26,7 @@ export function WorkbenchLayout({
   const theme = useTheme();
   const smallScreen = useMediaQuery(theme.breakpoints.down('sm'));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const playgroundSelected = selectedSection === 'playground';
 
   function handleSectionSelect(section: WorkbenchNavigationId) {
     onSectionSelect(section);
@@ -37,7 +38,7 @@ export function WorkbenchLayout({
       sx={{
         display: 'flex',
         alignItems: 'stretch',
-        gap: 2,
+        gap: playgroundSelected ? 1 : 2,
         minHeight: { md: 'calc(100dvh - 112px)' }
       }}
     >
@@ -90,13 +91,14 @@ export function WorkbenchLayout({
           flexDirection: 'column',
           minWidth: 0,
           minHeight: { xs: 520, md: 'auto' },
-          px: { xs: 2, sm: 3, md: 3.5 },
-          py: 3,
+          px: playgroundSelected ? 0 : { xs: 2, sm: 3, md: 3.5 },
+          py: playgroundSelected ? 0 : 3,
           bgcolor: designTokens.surface.panel,
           border: '1px solid',
           borderColor: designTokens.border.default,
           borderRadius: workbenchStyles.panelRadius,
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative'
         }}
       >
         {smallScreen && (
@@ -104,7 +106,17 @@ export function WorkbenchLayout({
             variant="outlined"
             startIcon={<MenuRoundedIcon />}
             onClick={() => setDrawerOpen(true)}
-            sx={{ alignSelf: 'flex-start', mb: 2 }}
+            sx={{
+              alignSelf: 'flex-start',
+              mb: playgroundSelected ? 0 : 2,
+              ...(playgroundSelected && {
+                position: 'absolute',
+                top: 8,
+                left: 8,
+                zIndex: 2,
+                bgcolor: designTokens.surface.panel
+              })
+            }}
           >
             Workbench sections
           </Button>

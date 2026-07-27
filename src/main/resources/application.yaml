@@ -10,7 +10,9 @@ spring:
     multipart:
       max-file-size: 20MB
       max-request-size: 20MB
-
+  graphql:
+    http:
+          path: /graphql
 server:
   port: 8080
 
@@ -249,4 +251,4 @@ dependency-risk:
         - If a tool returns an error, explain the error instead of repeatedly
           calling the same tool.
         - If evidence is insufficient, state exactly what evidence is missing.        
-      
+

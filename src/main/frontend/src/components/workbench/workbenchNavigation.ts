@@ -3,6 +3,7 @@ export const workbenchNavigation = [
   { id: 'dependency-analysis', label: 'Dependency Analysis' },
   { id: 'cve-analysis', label: 'CVE Analysis' },
   { id: 'evidence', label: 'Evidence' },
+  { id: 'playground', label: 'Playground' },
   { id: 'workflow-trace', label: 'Workflow Trace' }
 ] as const;
 
