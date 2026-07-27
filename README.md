@@ -1,5 +1,7 @@
 # Dependency Risk Graph
 
+[![Build](https://github.com/pkjPathania/dependency-risk-graph/actions/workflows/build.yml/badge.svg)](https://github.com/pkjPathania/dependency-risk-graph/actions/workflows/build.yml)
+
 [Project Website](https://pkjpathania.github.io/dependency-risk-graph/)
 
 Dependency Risk Graph is a Java-first software supply-chain knowledge graph. It imports CycloneDX JSON SBOMs as RDF, enriches the imported package occurrences with complete OSV advisories, stores both datasets in Apache Jena TDB2, and provides a React interface for application, dependency, vulnerability, reference, CVE-impact, and SPARQL exploration.
