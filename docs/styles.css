@@ -208,6 +208,30 @@ a {
   gap: 58px;
 }
 
+.hero-direction {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 20px;
+  padding: 7px 12px;
+  border: 1px solid rgba(15, 127, 145, 0.25);
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal-dark);
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-direction-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 0 4px rgba(15, 127, 145, 0.12);
+}
+
 .eyebrow {
   display: flex;
   align-items: center;
