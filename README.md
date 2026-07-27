@@ -369,7 +369,7 @@ Each result displays its global rank, evidence segment type, vulnerability and d
 
 ### Requirements
 
-- JDK 21 or newer
+- JDK 25 or newer
 - Internet access during the first Maven build and for live OSV enrichment
 - No separate Node installation is required for the Maven build; the frontend plugin installs the configured Node version
 - Docker, when using the container workflow
@@ -610,7 +610,7 @@ npm run build
 
 ## Technology Stack
 
-- Java 21
+- Java 25
 - Spring Boot 4.1
 - Apache Jena 6.1 with TDB2 and ARQ
 - CycloneDX Core Java 12.2

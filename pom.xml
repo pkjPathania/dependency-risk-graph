@@ -41,7 +41,7 @@
     <url/>
   </scm>
   <properties>
-    <java.version>21</java.version>
+    <java.version>25</java.version>
     <cyclonedx.version>12.2.0</cyclonedx.version>
     <commons-lang.version>3.20.0</commons-lang.version>
     <commons-collections4.version>4.4</commons-collections4.version>
@@ -276,9 +276,7 @@
               <outputDirectory>${project.build.outputDirectory}</outputDirectory>
               <resources>
                 <resource>
-                  <directory>
-                    /private/tmp/dependency-risk-graph-frontend/generated-resources/frontend
-                  </directory>
+                  <directory>${project.build.directory}/generated-resources/frontend</directory>
                   <includes>
                     <include>static/**</include>
                   </includes>
