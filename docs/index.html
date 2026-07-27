@@ -323,66 +323,106 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow"><span></span> Current architecture</p>
-            <h2>Explicit writes. Graph-backed reads.</h2>
+            <h2>Symbolic reasoning meets grounded AI.</h2>
+            <p class="architecture-progress"><span aria-hidden="true"></span>Neuro-symbolic integration · In progress</p>
           </div>
           <p>
-            CycloneDX and OSV use separate assembly pipelines, then meet in the same embedded
-            TDB2 graph. Every exploration surface reads that shared model.
+            Explicit ingestion builds one authoritative RDF graph. Deterministic services,
+            neural retrieval, and a tool-using agent expose that shared model through the UI.
           </p>
         </div>
 
-        <div class="architecture-board">
-          <div class="architecture-column">
-            <div class="column-label">Write pipelines</div>
-            <div class="flow-card">
-              <span class="flow-type">SBOM</span>
-              <strong>CycloneDX JSON</strong>
-              <small>Multipart upload</small>
+        <div class="architecture-map" aria-label="Current neuro-symbolic system architecture">
+          <article class="architecture-layer write-layer">
+            <header class="architecture-layer-heading">
+              <span>01</span>
+              <div><strong>Explicit write pipelines</strong><small>Supply-chain sources become normalized RDF</small></div>
+            </header>
+            <div class="architecture-node-grid architecture-node-grid-three">
+              <div class="architecture-node">
+                <span class="flow-type">CycloneDX</span>
+                <strong>SBOM ingestion</strong>
+                <small>JSON → assemblers → JSON-LD</small>
+              </div>
+              <div class="architecture-node">
+                <span class="flow-type">OSV</span>
+                <strong>Advisory enrichment</strong>
+                <small>Scan plan → batch + detail → JSON-LD</small>
+              </div>
+              <div class="architecture-node architecture-node-accent">
+                <span class="flow-type">Converge</span>
+                <strong>Jena JSON-LD parser</strong>
+                <small>Explicit writes into one default graph</small>
+              </div>
             </div>
-            <span class="flow-arrow" aria-hidden="true">↓</span>
-            <div class="flow-card">
-              <span class="flow-type">Assemble</span>
-              <strong>CycloneDX JSON-LD</strong>
-              <small>Occurrences + dependsOn</small>
-            </div>
-          </div>
+          </article>
 
-          <div class="architecture-column">
-            <div class="column-label">Enrichment</div>
-            <div class="flow-card">
-              <span class="flow-type">Discover</span>
-              <strong>Application-scoped package PURLs</strong>
-              <small>Application-scoped scan plan</small>
-            </div>
-            <span class="flow-arrow" aria-hidden="true">↓</span>
-            <div class="flow-card">
-              <span class="flow-type">Enrich</span>
-              <strong>Complete OSV advisories</strong>
-              <small>Normalized JSON-LD</small>
-            </div>
-          </div>
+          <div class="architecture-connector" aria-hidden="true"><span>Persist</span>↓</div>
 
-          <div class="graph-core">
-            <div class="core-orbit orbit-one"></div>
-            <div class="core-orbit orbit-two"></div>
-            <span class="core-dot dot-one"></span>
-            <span class="core-dot dot-two"></span>
-            <span class="core-dot dot-three"></span>
-            <div>
-              <strong>Graph DB</strong>
+          <article class="architecture-layer symbolic-layer">
+            <header class="architecture-layer-heading">
+              <span>02</span>
+              <div><strong>Symbolic knowledge and reasoning</strong><small>Authoritative identities, relationships, and deterministic traversal</small></div>
+            </header>
+            <div class="symbolic-layout">
+              <div class="architecture-graph-core">
+                <span>RDF source of truth</span>
+                <strong>Apache Jena TDB2</strong>
+                <small>Embedded persistent graph</small>
+              </div>
+              <div class="architecture-service-grid">
+                <span>Explore + CVE Impact</span>
+                <span>Read-only SPARQL</span>
+                <span>Dependency-path projections</span>
+                <span>Application GraphQL service</span>
+                <span>Impacted-applications tool</span>
+                <span>Advisory evidence projection</span>
+              </div>
             </div>
-          </div>
+          </article>
 
-          <div class="architecture-column read-column">
-            <div class="column-label">Read services</div>
-            <div class="read-list">
-              <span>Application Explore</span>
-              <span>CVE Impact</span>
-              <span>SPARQL</span>
-              <span>Graph metadata</span>
-              <span>Evidence projection</span>
+          <div class="architecture-connector architecture-connector-split" aria-hidden="true"><span>Ground</span>↙ <b>Neural paths</b> ↘</div>
+
+          <article class="architecture-layer neural-layer">
+            <header class="architecture-layer-heading">
+              <span>03</span>
+              <div><strong>Neural retrieval and generation</strong><small>Two implemented, independently callable AI paths</small></div>
+            </header>
+            <div class="neural-paths">
+              <div class="neural-path">
+                <span class="architecture-path-label">Evidence path</span>
+                <strong>Typed chunks → quantized BGE embeddings</strong>
+                <p>In-memory similarity search supplies ranked advisory evidence to the configured chat model.</p>
+                <small>Evidence-grounded answer service</small>
+              </div>
+              <div class="neural-path">
+                <span class="architecture-path-label">Agent path</span>
+                <strong>LangGraph4j Buggy AgentExecutor</strong>
+                <p>The model can call the graph-backed impacted-applications tool and receive authoritative SPARQL results.</p>
+                <small>OpenAI-compatible chat model · Groq</small>
+              </div>
             </div>
-          </div>
+            <p class="architecture-boundary">
+              Current boundary: the agent and evidence-answer service are separate flows. Their
+              integration into one traceable neuro-symbolic workflow is in progress.
+            </p>
+          </article>
+
+          <div class="architecture-connector" aria-hidden="true"><span>Expose</span>↓</div>
+
+          <article class="architecture-layer interface-layer">
+            <header class="architecture-layer-heading">
+              <span>04</span>
+              <div><strong>Application interfaces</strong><small>Human and developer access to the same graph-backed services</small></div>
+            </header>
+            <div class="architecture-interface-list">
+              <span>Spring MVC APIs</span>
+              <span>Spring GraphQL</span>
+              <span>React + Material UI</span>
+              <span>GraphiQL Playground</span>
+              <span>D3/SVG impact tree</span>
+            </div>
+          </article>
         </div>
 
         <div class="relationship-model">
@@ -413,7 +453,7 @@
           <article><strong>RDF is authoritative</strong><p>No second vulnerability database is maintained for Explore.</p></article>
           <article><strong>Writes are explicit</strong><p>Opening an application never silently invokes OSV enrichment.</p></article>
           <article><strong>Reads are scoped</strong><p>Application views follow persisted dependency relationships from the selected occurrence.</p></article>
-          <article><strong>Evidence is inspectable</strong><p>Semantic matches retain their source text, type, identifier, and score.</p></article>
+          <article><strong>Grounding is explicit</strong><p>Buggy uses graph tools, while evidence answers retain source text, identifiers, and scores.</p></article>
         </div>
       </div>
     </section>
