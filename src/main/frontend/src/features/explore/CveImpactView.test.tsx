@@ -40,6 +40,7 @@ describe('CveImpactView', () => {
     await userEvent.click(screen.getByText('CVE-2026-1000'));
     await waitFor(() => expect(fetchCveImpactDetail).toHaveBeenCalledOnce());
     expect(screen.getByLabelText('CVE impact and fixes tree')).toBeInTheDocument();
+    expect(screen.getByText('* Bird’s-eye view of the shortest dependency paths.')).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Dependency graph' })).not.toBeInTheDocument();
   });
 

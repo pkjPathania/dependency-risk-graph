@@ -244,6 +244,14 @@ function ImpactDetail({
         <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(1)}>CVSS Vector</Button>
         <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(2)}>References</Button>
         <Button size="small" variant="outlined" onClick={() => setDetailDialogTab(3)}>Fixed versions</Button>
+        <Typography
+          component="span"
+          variant="caption"
+          color="text.secondary"
+          sx={{ fontStyle: 'italic' }}
+        >
+          * Bird’s-eye view of the shortest dependency paths.
+        </Typography>
       </Stack>
 
       <Box sx={{ minWidth: 0, width: '100%' }}>

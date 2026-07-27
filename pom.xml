@@ -67,7 +67,11 @@
 
 
   <dependencies>
-
+    <dependency>
+      <groupId>org.bsc.langgraph4j</groupId>
+      <artifactId>langgraph4j-core</artifactId>
+      <version>1.8.20</version>
+    </dependency>
     <dependency>
       <groupId>us.springett</groupId>
       <artifactId>cvss-calculator</artifactId>
