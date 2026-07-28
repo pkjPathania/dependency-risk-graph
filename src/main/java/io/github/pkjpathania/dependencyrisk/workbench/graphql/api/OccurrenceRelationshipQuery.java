@@ -35,6 +35,21 @@ public class OccurrenceRelationshipQuery {
     return result;
   }
 
+  @BatchMapping(typeName = "ApplicationOccurrence", field = "vulnerabilities", maxBatchSize = 256)
+  public Map<ApplicationOccurrence, List<Vulnerability>> vulnerabilitiesByApplication(
+      List<ApplicationOccurrence> applications) {
+    Map<String, List<Vulnerability>> vulnerabilitiesByApplication =
+        vulnerabilityService.findByApplications(
+            applications.stream().map(ApplicationOccurrence::getId).toList());
+    Map<ApplicationOccurrence, List<Vulnerability>> result = new LinkedHashMap<>();
+    applications.forEach(
+        application ->
+            result.put(
+                application,
+                vulnerabilitiesByApplication.getOrDefault(application.getId(), List.of())));
+    return result;
+  }
+
   @BatchMapping(typeName = "PackageOccurrence", field = "applications", maxBatchSize = 256)
   public Map<PackageOccurrence, List<ApplicationOccurrence>> applications(
       List<PackageOccurrence> packages) {
@@ -77,6 +92,21 @@ public class OccurrenceRelationshipQuery {
             result.put(
                 vulnerability,
                 packagesByVulnerability.getOrDefault(vulnerability.getId(), List.of())));
+    return result;
+  }
+
+  @BatchMapping(typeName = "Vulnerability", field = "applications", maxBatchSize = 256)
+  public Map<Vulnerability, List<ApplicationOccurrence>> applicationsByVulnerability(
+      List<Vulnerability> vulnerabilities) {
+    Map<String, List<ApplicationOccurrence>> applicationsByVulnerability =
+        applicationOccurrenceService.findByVulnerabilities(
+            vulnerabilities.stream().map(Vulnerability::getId).toList());
+    Map<Vulnerability, List<ApplicationOccurrence>> result = new LinkedHashMap<>();
+    vulnerabilities.forEach(
+        vulnerability ->
+            result.put(
+                vulnerability,
+                applicationsByVulnerability.getOrDefault(vulnerability.getId(), List.of())));
     return result;
   }
 }

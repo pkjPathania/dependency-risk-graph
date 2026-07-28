@@ -86,6 +86,15 @@ class GraphQlTraversalServiceTest {
   }
 
   @Test
+  void traversesDirectlyBetweenApplicationsAndVulnerabilities() {
+    assertEquals(
+        List.of(VULNERABILITY), ids(vulnerabilityService.findByApplication(FIRST_APPLICATION)));
+    assertEquals(
+        List.of(FIRST_APPLICATION, SECOND_APPLICATION),
+        ids(applicationService.findByVulnerability(VULNERABILITY)));
+  }
+
+  @Test
   void loadsPackagesForMultipleApplicationsWithOneSelect() {
     repository.resetSelectCount();
 
@@ -122,6 +131,34 @@ class GraphQlTraversalServiceTest {
     assertEquals(1, repository.selectCount());
     assertEquals(List.of(VULNERABILITY), ids(vulnerabilities.get(DIRECT_PACKAGE)));
     assertEquals(List.of(), vulnerabilities.get(TRANSITIVE_PACKAGE));
+  }
+
+  @Test
+  void loadsDistinctVulnerabilitiesForMultipleApplicationsWithOneSelect() {
+    repository.resetSelectCount();
+
+    Map<String, List<Vulnerability>> vulnerabilities =
+        vulnerabilityService.findByApplications(
+            List.of(FIRST_APPLICATION, SECOND_APPLICATION, "urn:test:application:missing"));
+
+    assertEquals(1, repository.selectCount());
+    assertEquals(List.of(VULNERABILITY), ids(vulnerabilities.get(FIRST_APPLICATION)));
+    assertEquals(List.of(VULNERABILITY), ids(vulnerabilities.get(SECOND_APPLICATION)));
+    assertEquals(List.of(), vulnerabilities.get("urn:test:application:missing"));
+  }
+
+  @Test
+  void loadsDistinctApplicationsForMultipleVulnerabilitiesWithOneSelect() {
+    repository.resetSelectCount();
+
+    Map<String, List<ApplicationOccurrence>> applications =
+        applicationService.findByVulnerabilities(
+            List.of(VULNERABILITY, "urn:test:vulnerability:missing"));
+
+    assertEquals(1, repository.selectCount());
+    assertEquals(
+        List.of(FIRST_APPLICATION, SECOND_APPLICATION), ids(applications.get(VULNERABILITY)));
+    assertEquals(List.of(), applications.get("urn:test:vulnerability:missing"));
   }
 
   @Test

@@ -69,6 +69,29 @@ public final class QueryUtil {
           """;
     }
 
+    public static String getByVulnerabilities(int batchSize) {
+      return PREFIXES
+          + """
+          SELECT DISTINCT
+            ?vulnerability ?applicationOccurrence ?rdfType ?bomRef ?componentType ?group ?name ?version
+          WHERE {
+          """
+          + values("vulnerability", "vulnerabilityValue", batchSize)
+          + """
+            ?applicationOccurrence rdf:type risk:ApplicationOccurrence ;
+                                   risk:dependsOn+ ?packageOccurrence .
+            ?packageOccurrence risk:affectedBy ?vulnerability .
+            BIND(risk:ApplicationOccurrence AS ?rdfType)
+            OPTIONAL { ?applicationOccurrence risk:bomRef ?bomRef . }
+            OPTIONAL { ?applicationOccurrence risk:componentType ?componentType . }
+            OPTIONAL { ?applicationOccurrence risk:group ?group . }
+            OPTIONAL { ?applicationOccurrence risk:name ?name . }
+            OPTIONAL { ?applicationOccurrence risk:version ?version . }
+          }
+          ORDER BY ?vulnerability ?applicationOccurrence
+          """;
+    }
+
     private ApplicationOccurrence() {}
   }
 
@@ -161,11 +184,15 @@ public final class QueryUtil {
       return osvQuery(values("packageOccurrence", "packageValue", batchSize));
     }
 
+    public static String getByApplications(int batchSize) {
+      return osvQuery(values("application", "applicationValue", batchSize));
+    }
+
     private static String osvQuery(String constraint) {
       return PREFIXES
           + """
           SELECT DISTINCT
-            ?packageOccurrence ?vulnerability ?rdfType ?osvId ?alias ?summary ?details
+            ?application ?packageOccurrence ?vulnerability ?rdfType ?osvId ?alias ?summary ?details
             ?publishedAt ?modifiedAt ?withdrawnAt
             ?fixedPackage ?fixedPackageName ?fixedVersion ?fixedPurl
           WHERE {

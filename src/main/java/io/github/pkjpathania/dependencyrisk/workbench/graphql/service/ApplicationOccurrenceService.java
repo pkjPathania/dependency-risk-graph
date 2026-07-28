@@ -40,6 +40,11 @@ public class ApplicationOccurrenceService {
     return findByPackages(List.of(normalizedId)).get(normalizedId);
   }
 
+  public List<ApplicationOccurrence> findByVulnerability(String vulnerabilityId) {
+    String normalizedId = requireId(vulnerabilityId, "vulnerabilityId");
+    return findByVulnerabilities(List.of(normalizedId)).get(normalizedId);
+  }
+
   public Map<String, List<ApplicationOccurrence>> findByPackages(Collection<String> packageIds) {
     List<String> ids = normalizeIds(packageIds, "packageIds");
     Map<String, List<ApplicationOccurrence>> result = emptyLists(ids);
@@ -59,6 +64,28 @@ public class ApplicationOccurrenceService {
     for (Relationship<ApplicationOccurrence> row : rows) {
       result.get(row.parentId()).add(row.value());
     }
+    return immutableLists(result);
+  }
+
+  public Map<String, List<ApplicationOccurrence>> findByVulnerabilities(
+      Collection<String> vulnerabilityIds) {
+    List<String> ids = normalizeIds(vulnerabilityIds, "vulnerabilityIds");
+    Map<String, List<ApplicationOccurrence>> result = emptyLists(ids);
+    if (ids.isEmpty()) {
+      return result;
+    }
+    ParameterizedSparqlString query =
+        new ParameterizedSparqlString(
+            QueryUtil.ApplicationOccurrence.getByVulnerabilities(ids.size()));
+    bindIris(query, "vulnerabilityValue", ids);
+    List<Relationship<ApplicationOccurrence>> rows =
+        jenaGraphRepository.execSelect(
+            query.toString(),
+            solution ->
+                new Relationship<>(
+                    SparqlUtil.get(solution, "vulnerability"),
+                    ApplicationOccurrenceMapper.map().apply(solution)));
+    rows.forEach(row -> result.get(row.parentId()).add(row.value()));
     return immutableLists(result);
   }
 

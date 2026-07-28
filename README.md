@@ -24,7 +24,7 @@ The graph remains the source of truth. Deterministic graph traversal and SPARQL 
   - [Application OSV enrichment](#2-application-osv-enrichment)
   - [Explore and CVE impact](#3-explore-and-cve-impact)
   - [Advisory evidence indexing and retrieval](#4-advisory-evidence-indexing-and-retrieval)
-  - [Buggy graph-agent execution](#5-buggy-graph-agent-execution)
+  - [Buggy schema-driven GraphQL execution](#5-buggy-schema-driven-graphql-execution)
 - [Knowledge Graph Model](#knowledge-graph-model)
   - [CycloneDX occurrence graph](#cyclonedx-occurrence-graph)
   - [OSV enrichment graph](#osv-enrichment-graph)
@@ -65,7 +65,7 @@ The graph remains the source of truth. Deterministic graph traversal and SPARQL 
 - Exposes application occurrences through Spring GraphQL and a built-in GraphiQL Playground.
 - Renders a responsive, CVE-centered impact-and-fixes tree with D3 and SVG.
 - Rebuilds an in-memory advisory evidence index from the knowledge graph and exposes global semantic evidence search in AI Workbench.
-- Runs Buggy as a LangGraph4j agent that can call authoritative graph-backed tools before answering.
+- Runs Buggy as a schema-driven assistant that generates and executes read-only GraphQL before answering.
 
 ## Neuro-Symbolic AI Direction
 
@@ -106,15 +106,13 @@ flowchart TB
         EXPLORE[Explore and CVE-impact services]
         SPARQL[Read-only SPARQL service]
         PATH[Dependency-path and graph projections]
-        TOOL[Graph-backed impacted-applications tool]
-        GQLSERVICE[Application occurrence GraphQL service]
+        GQLSERVICE[Occurrence GraphQL services]
     end
 
     GRAPHPARSER --> STORE
     STORE --> EXPLORE
     STORE --> SPARQL
     STORE --> PATH
-    STORE --> TOOL
     STORE --> GQLSERVICE
 
     subgraph Neural[Neural retrieval and generation]
@@ -123,14 +121,14 @@ flowchart TB
         BGE[Quantized BGE-small-en-v1.5 embeddings]
         VECTOR[(In-memory embedding store)]
         EVIDENCEANSWER[Evidence-grounded answer service]
-        AGENT[LangGraph4j Buggy AgentExecutor]
+        BUGGY[Schema-driven Buggy GraphQL assistant]
         CHAT[OpenAI-compatible chat model / Groq]
     end
 
     STORE --> EVIDENCE --> CHUNKS --> BGE --> VECTOR
     VECTOR --> EVIDENCEANSWER --> CHAT
-    AGENT -->|Tool call| TOOL
-    AGENT <--> CHAT
+    BUGGY -->|Generated read-only query| GQLSERVICE
+    BUGGY <--> CHAT
 
     subgraph Interfaces[Application interfaces]
         REST[Spring MVC APIs]
@@ -144,7 +142,7 @@ flowchart TB
     SPARQL --> REST
     PATH --> REST
     EVIDENCEANSWER --> REST
-    AGENT --> REST
+    BUGGY --> REST
     GQLSERVICE --> GRAPHQL
     REST <--> UI
     GRAPHQL <--> PLAYGROUND
@@ -155,11 +153,11 @@ flowchart TB
 ### Implemented neuro-symbolic paths
 
 - **Deterministic graph path:** Explore, CVE Impact, dependency projections, SPARQL, and GraphQL read the shared knowledge graph directly.
-- **Tool-using agent path:** the Buggy UI calls a compiled LangGraph4j `AgentExecutor`; the model can invoke the implemented impacted-applications tool, which executes authoritative SPARQL through the graph repository.
+- **Schema-driven assistant path:** Buggy sends the GraphQL schema and question to the chat model, validates and executes the generated read-only query, and grounds a second model call in the GraphQL result.
 - **Evidence-grounded generation path:** advisory graph data is projected into typed chunks, encoded locally with BGE-small-en-v1.5, stored in memory, retrieved by similarity, and supplied to the configured chat model with the matching evidence returned to the UI.
-- **Developer query path:** Spring GraphQL currently exposes `applicationOccurrences`, and the AI Workbench Playground embeds GraphiQL for schema discovery and query execution.
+- **Developer query path:** Spring GraphQL exposes applications, packages, vulnerabilities, and their relationships; the AI Workbench Playground embeds GraphiQL for schema discovery and query execution.
 
-The agent and evidence-answer services currently remain separate orchestration paths. The next integration step is to let the agent combine deterministic graph tools with retrieved advisory evidence in one traceable workflow.
+The schema-driven assistant and evidence-answer services remain separate grounded workflows.
 
 ### Design principles
 
@@ -171,7 +169,7 @@ The agent and evidence-answer services currently remain separate orchestration p
 6. **Reads are application-scoped.** Explore begins at an `ApplicationOccurrence` and follows `risk:dependsOn+` to its reachable packages.
 7. **Single-PURL lookup is non-persistent.** `/enrich/purl` returns complete OSV DTO responses but does not modify the knowledge graph.
 8. **Evidence search is diagnostic and global.** AI Workbench ranks all indexed advisory chunks by semantic similarity; it does not treat a CVE or GHSA mentioned in the query as a retrieval scope.
-9. **AI answers have explicit grounding paths.** Buggy uses registered graph tools, while the evidence answer service receives only the advisory chunks returned by semantic retrieval.
+9. **AI answers have explicit grounding paths.** Buggy answers from executed GraphQL results, while the evidence answer service receives only the advisory chunks returned by semantic retrieval.
 
 ## End-to-End Data Flow
 
@@ -266,21 +264,22 @@ Vulnerability graph records
 
 This screen intentionally performs **global semantic discovery**. A query that names a CVE can return related advisories when their chunks are semantically similar. The UI shows Buggy's summary after the match count and marks an exact CVE or GHSA only when that identifier actually occurs in the returned vulnerability ID or evidence text. Identifier-scoped graph resolution is not part of this workflow.
 
-### 5. Buggy graph-agent execution
+### 5. Buggy schema-driven GraphQL execution
 
-The main Buggy assistant uses a compiled LangGraph4j agent rather than the evidence-answer pipeline:
+The main Buggy assistant uses the GraphQL schema and graph-backed resolvers rather than the evidence-answer pipeline:
 
 ```text
 User question
   -> GET /api/workbench/buggy/ask
-  -> LangGraph4j AgentExecutor
-  -> configured OpenAI-compatible chat model
-  -> optional impacted-applications tool call
-  -> authoritative SPARQL against the persistent graph
-  -> final natural-language response
+  -> GraphQL schema plus question sent to the configured chat model
+  -> generated query validated as one read-only operation
+  -> Spring GraphQL execution
+  -> batched authoritative SPARQL against the persistent graph
+  -> GraphQL result plus question sent to the chat model
+  -> grounded natural-language response
 ```
 
-The currently registered `impactedServices` tool answers which applications are affected by known vulnerabilities and returns an authoritative total plus application identities. The agent decides when to invoke it based on the tool description and system prompt. Additional graph, dependency-path, CVE, remediation, and evidence tools remain planned.
+Generated `id` arguments are accepted only for complete RDF IRIs explicitly present in the user's question. Human-readable names use plural collection fields so the final answer can select the matching entity from authoritative graph results.
 
 ## Knowledge Graph Model
 
@@ -452,7 +451,7 @@ AI Workbench includes a full-size GraphiQL interface backed by `POST /graphql`. 
 
 | Method | Path | Purpose | Response |
 | --- | --- | --- | --- |
-| `GET` | `/api/workbench/buggy/ask?question=...` | Run the LangGraph4j Buggy agent, including any graph-tool calls selected by the model. | Grounded answer text |
+| `GET` | `/api/workbench/buggy/ask?question=...` | Generate, validate, and execute read-only GraphQL, then answer from its result. | Grounded answer text |
 | `POST` | `/graphql` | Execute GraphQL queries against the graph-backed application occurrence service. | GraphQL response |
 
 ## Quick Start
@@ -711,7 +710,7 @@ npm run build
 - Spring GraphQL with a built-in GraphiQL 5 Playground
 - LangChain4j with the quantized BGE-small-en-v1.5 embedding model
 - LangChain4j `InMemoryEmbeddingStore` for advisory evidence
-- LangGraph4j `AgentExecutor` for Buggy's tool-using workflow
+- Schema-driven GraphQL query generation for Buggy
 - OpenAI-compatible chat integration configured for Groq
 - Vite
 - OSV REST APIs through Spring `RestClient`
@@ -733,8 +732,8 @@ src/main/java/io/github/pkjpathania/dependencyrisk/
     service/                batching, advisory loading, and enrichment
   workbench/
     api/                    advisory evidence rebuild and search endpoints
-    assistant/              Buggy agent tools and evidence-grounded answer services
-    config/                 LangGraph4j agent, chat model, embeddings, and in-memory store
+    assistant/              GraphQL-driven Buggy and evidence-grounded answer services
+    config/                 chat model, embeddings, and in-memory store
     evidence/               graph projection, chunking, indexing, and search
     graphql/                Spring GraphQL queries, services, models, and graph mapping
 
@@ -757,7 +756,7 @@ data/                       local knowledge-graph data
 ## TODO / Next Steps
 
 - [ ] Complete and validate deterministic dependency-path discovery and visualization.
-- [ ] **In progress — Neuro-symbolic AI:** expand Buggy's graph-tool coverage and combine the current agent and evidence-retrieval paths into one inspectable workflow.
+- [ ] **In progress — Neuro-symbolic AI:** combine GraphQL-grounded answers and evidence retrieval into one inspectable workflow.
 
 ## Current Limitations
 
@@ -772,8 +771,8 @@ data/                       local knowledge-graph data
 - Authentication and authorization are not implemented.
 - Advisory evidence retrieval is global semantic discovery, not CVE/GHSA-scoped retrieval through the knowledge graph.
 - The advisory embedding store is in memory and must be rebuilt after each application restart.
-- Buggy's agent currently exposes one graph-backed tool for impacted applications; broader CVE, dependency-path, remediation, and evidence tools are still in progress.
-- The agent and evidence-grounded answer service are separate flows, and conversation memory is not persisted.
+- Buggy's generated queries are limited to the relationships exposed by the GraphQL schema.
+- The GraphQL-grounded and evidence-grounded answer services are separate flows, and conversation memory is not persisted.
 
 ## License
 

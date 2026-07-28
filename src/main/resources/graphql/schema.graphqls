@@ -16,6 +16,7 @@ type ApplicationOccurrence {
     group: String
     version: String
     packages: [PackageOccurrence!]!
+    vulnerabilities: [Vulnerability!]!
 }
 
 type PackageOccurrence {
@@ -35,6 +36,7 @@ type Vulnerability {
     id: ID!
     rdfType: String
     osv: Osv!
+    applications: [ApplicationOccurrence!]!
     packages: [PackageOccurrence!]!
     fixedVersions: [FixedVersion!]!
 }

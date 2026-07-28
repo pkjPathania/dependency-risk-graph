@@ -45,6 +45,10 @@ class GraphQlSchemaTest {
                 query {
                   applicationOccurrence(id: "urn:test:graphql:application") {
                     id
+                    vulnerabilities {
+                      id
+                      applications { id }
+                    }
                     packages {
                       id
                       applications { id }
@@ -78,6 +82,10 @@ class GraphQlSchemaTest {
     Map<String, Object> data = result.getData();
     Map<?, ?> application = (Map<?, ?>) data.get("applicationOccurrence");
     assertEquals(APPLICATION, application.get("id"));
+
+    Map<?, ?> applicationVulnerability = first(application, "vulnerabilities");
+    assertEquals(VULNERABILITY, applicationVulnerability.get("id"));
+    assertEquals(APPLICATION, first(applicationVulnerability, "applications").get("id"));
 
     Map<?, ?> packageOccurrence = first(application, "packages");
     assertEquals(PACKAGE, packageOccurrence.get("id"));
