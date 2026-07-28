@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Dependency Risk Graph is evolving into a neuro-symbolic AI platform that combines RDF knowledge-graph reasoning with grounded AI for software supply-chain risk.">
+  <meta name="description" content="Dependency Risk Graph is evolving into a neuro-symbolic AI platform that combines deterministic knowledge-graph reasoning with grounded AI for software supply-chain risk.">
   <meta name="theme-color" content="#56657a">
   <title>Dependency Risk Graph</title>
   <link rel="stylesheet" href="styles.css">
@@ -60,7 +60,7 @@
           <p class="hero-lead">
             Import CycloneDX SBOMs, enrich packages with complete OSV advisories, and explore
             applications, vulnerabilities, fixes, evidence, and dependency paths from one
-            Apache Jena knowledge graph. The platform is moving toward neuro-symbolic AI—combining
+            shared knowledge graph. The platform is moving toward neuro-symbolic AI—combining
             deterministic graph reasoning with grounded language-model intelligence.
           </p>
           <div class="hero-actions">
@@ -70,7 +70,7 @@
             </a>
           </div>
           <dl class="hero-facts" aria-label="Project highlights">
-            <div><dt>RDF</dt><dd>Source of truth</dd></div>
+            <div><dt>Graph</dt><dd>Source of truth</dd></div>
             <div><dt>OSV</dt><dd>Advisory enrichment</dd></div>
             <div><dt>Neuro-symbolic</dt><dd>AI direction</dd></div>
           </dl>
@@ -86,7 +86,7 @@
       <div class="shell trust-items">
         <span>Java 25</span>
         <span>Spring Boot 4.1.0</span>
-        <span>Apache Jena 6.1.0</span>
+        <span>Knowledge graph</span>
         <span>CycloneDX 12.2.0</span>
         <span>React 19.1</span>
         <span>D3 7.9.0</span>
@@ -128,7 +128,7 @@
             <h2>One graph, from SBOM to remediation.</h2>
           </div>
           <p>
-            Ingestion and enrichment write RDF. Explore, SPARQL, CVE Impact, and AI Workbench
+            Ingestion and enrichment build the graph. Explore, SPARQL, CVE Impact, and AI Workbench
             read the persisted model without hidden OSV calls.
           </p>
         </div>
@@ -138,7 +138,7 @@
             <span class="feature-number">01</span>
             <div class="feature-icon icon-ingest" aria-hidden="true"></div>
             <h3>Ingest CycloneDX</h3>
-            <p>Preserve component identities and declared dependency edges while assembling SBOM content into JSON-LD and RDF.</p>
+            <p>Preserve component identities and declared dependency edges while transforming SBOM content into connected graph data.</p>
             <span class="feature-tag">CycloneDX JSON</span>
           </article>
           <article class="feature-card">
@@ -166,7 +166,7 @@
             <span class="feature-number">05</span>
             <div class="feature-icon icon-query" aria-hidden="true"></div>
             <h3>Query the graph</h3>
-            <p>Run read-only SPARQL SELECT queries with presets, formatting, tabular results, CSV export, and direct access to RDF relationships.</p>
+            <p>Run read-only SPARQL SELECT queries with presets, formatting, tabular results, CSV export, and direct access to graph relationships.</p>
             <span class="feature-tag">SPARQL + ARQ</span>
           </article>
           <article class="feature-card">
@@ -296,7 +296,7 @@
               <span class="tour-step">07 · Query the graph</span>
               <h3>SPARQL workbench</h3>
               <span class="advanced-user-note">For developers, researchers, and graph practitioners</span>
-              <p>Run read-only SPARQL queries to inspect graph relationships, validate the RDF model, and export custom results.</p>
+              <p>Run read-only SPARQL queries to inspect relationships, validate the graph model, and export custom results.</p>
             </div>
             <figure class="screenshot-frame">
               <img src="assets/sparql.png" alt="SPARQL query editor and result table" loading="lazy">
@@ -327,7 +327,7 @@
             <p class="architecture-progress"><span aria-hidden="true"></span>Neuro-symbolic integration · In progress</p>
           </div>
           <p>
-            Explicit ingestion builds one authoritative RDF graph. Deterministic services,
+            Explicit ingestion builds one authoritative knowledge graph. Deterministic services,
             neural retrieval, and a tool-using agent expose that shared model through the UI.
           </p>
         </div>
@@ -336,22 +336,22 @@
           <article class="architecture-layer write-layer">
             <header class="architecture-layer-heading">
               <span>01</span>
-              <div><strong>Explicit write pipelines</strong><small>Supply-chain sources become normalized RDF</small></div>
+              <div><strong>Explicit write pipelines</strong><small>Supply-chain sources become connected graph data</small></div>
             </header>
             <div class="architecture-node-grid architecture-node-grid-three">
               <div class="architecture-node">
                 <span class="flow-type">CycloneDX</span>
                 <strong>SBOM ingestion</strong>
-                <small>JSON → assemblers → JSON-LD</small>
+                <small>JSON → assemblers → graph document</small>
               </div>
               <div class="architecture-node">
                 <span class="flow-type">OSV</span>
                 <strong>Advisory enrichment</strong>
-                <small>Scan plan → batch + detail → JSON-LD</small>
+                <small>Scan plan → batch + detail → advisory graph</small>
               </div>
               <div class="architecture-node architecture-node-accent">
                 <span class="flow-type">Converge</span>
-                <strong>Jena JSON-LD parser</strong>
+                <strong>Graph document parser</strong>
                 <small>Explicit writes into one default graph</small>
               </div>
             </div>
@@ -366,9 +366,9 @@
             </header>
             <div class="symbolic-layout">
               <div class="architecture-graph-core">
-                <span>RDF source of truth</span>
-                <strong>Apache Jena TDB2</strong>
-                <small>Embedded persistent graph</small>
+                <span>Shared source of truth</span>
+                <strong>Knowledge graph</strong>
+                <small>Connected supply-chain intelligence</small>
               </div>
               <div class="architecture-service-grid">
                 <span>Explore + CVE Impact</span>
@@ -450,7 +450,7 @@
         </div>
 
         <div class="principles">
-          <article><strong>RDF is authoritative</strong><p>No second vulnerability database is maintained for Explore.</p></article>
+          <article><strong>The graph is authoritative</strong><p>No second vulnerability database is maintained for Explore.</p></article>
           <article><strong>Writes are explicit</strong><p>Opening an application never silently invokes OSV enrichment.</p></article>
           <article><strong>Reads are scoped</strong><p>Application views follow persisted dependency relationships from the selected occurrence.</p></article>
           <article><strong>Grounding is explicit</strong><p>Buggy uses graph tools, while evidence answers retain source text, identifiers, and scores.</p></article>

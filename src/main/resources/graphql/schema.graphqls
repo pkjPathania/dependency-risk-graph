@@ -1,5 +1,10 @@
 type Query {
-    applicationOccurrences : [ApplicationOccurrence]
+    applicationOccurrences: [ApplicationOccurrence!]!
+    applicationOccurrence(id: ID!): ApplicationOccurrence
+    packageOccurrences: [PackageOccurrence!]!
+    packageOccurrence(id: ID!): PackageOccurrence
+    vulnerabilities: [Vulnerability!]!
+    vulnerability(id: ID!): Vulnerability
 }
 
 type ApplicationOccurrence {
@@ -10,4 +15,43 @@ type ApplicationOccurrence {
     componentType: String
     group: String
     version: String
+    packages: [PackageOccurrence!]!
+}
+
+type PackageOccurrence {
+    id: ID!
+    name: String
+    rdfType: String
+    bomRef: String
+    componentType: String
+    group: String
+    purl: String
+    version: String
+    applications: [ApplicationOccurrence!]!
+    vulnerabilities: [Vulnerability!]!
+}
+
+type Vulnerability {
+    id: ID!
+    rdfType: String
+    osv: Osv!
+    packages: [PackageOccurrence!]!
+    fixedVersions: [FixedVersion!]!
+}
+
+type FixedVersion {
+    id: ID!
+    packageName: String
+    version: String!
+    purl: String
+}
+
+type Osv {
+    osvId: String
+    aliases: [String!]!
+    summary: String
+    details: String
+    publishedAt: String
+    modifiedAt: String
+    withdrawnAt: String
 }

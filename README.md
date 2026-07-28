@@ -4,7 +4,7 @@
 
 [Project Website](https://pkjpathania.github.io/dependency-risk-graph/) · [Contributing](CONTRIBUTING.md)
 
-Dependency Risk Graph is a Java-first software supply-chain knowledge graph evolving into a **neuro-symbolic AI platform**. It imports CycloneDX JSON SBOMs as RDF, enriches the imported package occurrences with complete OSV advisories, stores both datasets in Apache Jena TDB2, and provides a React interface for application, dependency, vulnerability, reference, CVE-impact, and SPARQL exploration.
+Dependency Risk Graph is a Java-first software supply-chain knowledge graph evolving into a **neuro-symbolic AI platform**. It imports CycloneDX JSON SBOMs, enriches package occurrences with complete OSV advisories, connects both datasets in one knowledge graph, and provides a React interface for application, dependency, vulnerability, reference, CVE-impact, and SPARQL exploration.
 
 The graph remains the source of truth. Deterministic graph traversal and SPARQL provide the symbolic reasoning layer, while embeddings and grounded language models provide the neural layer. Together, they are being developed to produce security answers that are explainable, evidence-backed, and constrained by the software supply-chain graph.
 
@@ -25,7 +25,7 @@ The graph remains the source of truth. Deterministic graph traversal and SPARQL 
   - [Explore and CVE impact](#3-explore-and-cve-impact)
   - [Advisory evidence indexing and retrieval](#4-advisory-evidence-indexing-and-retrieval)
   - [Buggy graph-agent execution](#5-buggy-graph-agent-execution)
-- [RDF Model](#rdf-model)
+- [Knowledge Graph Model](#knowledge-graph-model)
   - [CycloneDX occurrence graph](#cyclonedx-occurrence-graph)
   - [OSV enrichment graph](#osv-enrichment-graph)
 - [User Interface](#user-interface)
@@ -52,26 +52,26 @@ The graph remains the source of truth. Deterministic graph traversal and SPARQL 
 ## What the Application Does
 
 - Accepts a CycloneDX JSON SBOM as multipart form data at `POST /rdf/new`.
-- Preserves CycloneDX component `bom-ref` values as RDF resource identities.
+- Preserves CycloneDX component `bom-ref` values as stable graph identities.
 - Stores application and package occurrences plus declared `risk:dependsOn` edges.
 - Finds application dependencies from the persisted occurrence graph.
 - Queries OSV in batches and loads the complete advisory for every returned OSV ID.
-- Assembles OSV responses into a separate JSON-LD graph and adds it to Jena.
+- Converts OSV responses into normalized graph data and adds them to the shared knowledge graph.
 - Links each scanned package occurrence to vulnerabilities with `risk:affectedBy`.
 - Stores advisory aliases, details, timestamps, references, severity vectors, affected packages, version ranges, and range events.
 - Provides an application-level enrichment API and a read-only single-PURL lookup API.
 - Exposes application-centric Explore tabs for overview, dependencies, vulnerabilities, references, and CVE impact.
 - Provides unrestricted read-only SPARQL `SELECT` execution through the UI/API.
-- Exposes application occurrences through Spring GraphQL and an embedded GraphiQL Playground.
+- Exposes application occurrences through Spring GraphQL and a built-in GraphiQL Playground.
 - Renders a responsive, CVE-centered impact-and-fixes tree with D3 and SVG.
-- Rebuilds an in-memory advisory evidence index from the RDF graph and exposes global semantic evidence search in AI Workbench.
+- Rebuilds an in-memory advisory evidence index from the knowledge graph and exposes global semantic evidence search in AI Workbench.
 - Runs Buggy as a LangGraph4j agent that can call authoritative graph-backed tools before answering.
 
 ## Neuro-Symbolic AI Direction
 
 Dependency Risk Graph is moving beyond standalone GraphRAG toward a neuro-symbolic architecture:
 
-- **Symbolic layer:** RDF identities, typed relationships, SPARQL, dependency-path traversal, CVE impact analysis, and deterministic remediation context.
+- **Symbolic layer:** stable identities, typed relationships, SPARQL, dependency-path traversal, CVE impact analysis, and deterministic remediation context.
 - **Neural layer:** semantic evidence retrieval, local embeddings, natural-language interaction, and grounded answer generation.
 - **Integration layer:** graph-resolved context and ranked evidence are combined so generated answers can be traced back to dependency paths, advisories, fixes, and source records.
 
@@ -89,20 +89,20 @@ flowchart TB
 
     subgraph Writes[Explicit write pipelines]
         CDX[CycloneDX assemblers]
-        CDXJSONLD[CycloneDX JSON-LD]
+        CDXGRAPH[CycloneDX graph document]
         PLAN[Application dependency scan plan]
         OSVCLIENT[Batch query and advisory detail loading]
-        OSVJSONLD[OSV JSON-LD assemblers]
-        RDFPARSER[Jena JSON-LD parser]
+        OSVGRAPH[OSV graph assemblers]
+        GRAPHPARSER[Graph document parser]
     end
 
-    SBOM -->|POST /rdf/new| CDX --> CDXJSONLD --> RDFPARSER
+    SBOM -->|POST /rdf/new| CDX --> CDXGRAPH --> GRAPHPARSER
     APP -->|Enrich| PLAN --> OSVCLIENT
     OSVCLIENT <--> OSV
-    OSVCLIENT --> OSVJSONLD --> RDFPARSER
+    OSVCLIENT --> OSVGRAPH --> GRAPHPARSER
 
     subgraph Symbolic[Symbolic knowledge and reasoning]
-        TDB[(Apache Jena TDB2)]
+        STORE[(Authoritative knowledge graph)]
         EXPLORE[Explore and CVE-impact services]
         SPARQL[Read-only SPARQL service]
         PATH[Dependency-path and graph projections]
@@ -110,15 +110,15 @@ flowchart TB
         GQLSERVICE[Application occurrence GraphQL service]
     end
 
-    RDFPARSER --> TDB
-    TDB --> EXPLORE
-    TDB --> SPARQL
-    TDB --> PATH
-    TDB --> TOOL
-    TDB --> GQLSERVICE
+    GRAPHPARSER --> STORE
+    STORE --> EXPLORE
+    STORE --> SPARQL
+    STORE --> PATH
+    STORE --> TOOL
+    STORE --> GQLSERVICE
 
     subgraph Neural[Neural retrieval and generation]
-        EVIDENCE[RDF advisory evidence projection]
+        EVIDENCE[Advisory evidence projection]
         CHUNKS[Typed evidence chunks]
         BGE[Quantized BGE-small-en-v1.5 embeddings]
         VECTOR[(In-memory embedding store)]
@@ -127,7 +127,7 @@ flowchart TB
         CHAT[OpenAI-compatible chat model / Groq]
     end
 
-    TDB --> EVIDENCE --> CHUNKS --> BGE --> VECTOR
+    STORE --> EVIDENCE --> CHUNKS --> BGE --> VECTOR
     VECTOR --> EVIDENCEANSWER --> CHAT
     AGENT -->|Tool call| TOOL
     AGENT <--> CHAT
@@ -136,7 +136,7 @@ flowchart TB
         REST[Spring MVC APIs]
         GRAPHQL[Spring GraphQL /graphql]
         UI[React + Material UI]
-        PLAYGROUND[Embedded GraphiQL Playground]
+        PLAYGROUND[Built-in GraphiQL Playground]
         TREE[D3/SVG CVE impact tree]
     end
 
@@ -154,22 +154,22 @@ flowchart TB
 
 ### Implemented neuro-symbolic paths
 
-- **Deterministic graph path:** Explore, CVE Impact, dependency projections, SPARQL, and GraphQL read the persisted Jena model directly.
-- **Tool-using agent path:** the Buggy UI calls a compiled LangGraph4j `AgentExecutor`; the model can invoke the implemented impacted-applications tool, which executes authoritative SPARQL through `JenaGraphRepository`.
-- **Evidence-grounded generation path:** advisory RDF is projected into typed chunks, embedded locally with BGE-small-en-v1.5, stored in memory, retrieved by similarity, and supplied to the configured chat model with the matching evidence returned to the UI.
+- **Deterministic graph path:** Explore, CVE Impact, dependency projections, SPARQL, and GraphQL read the shared knowledge graph directly.
+- **Tool-using agent path:** the Buggy UI calls a compiled LangGraph4j `AgentExecutor`; the model can invoke the implemented impacted-applications tool, which executes authoritative SPARQL through the graph repository.
+- **Evidence-grounded generation path:** advisory graph data is projected into typed chunks, encoded locally with BGE-small-en-v1.5, stored in memory, retrieved by similarity, and supplied to the configured chat model with the matching evidence returned to the UI.
 - **Developer query path:** Spring GraphQL currently exposes `applicationOccurrences`, and the AI Workbench Playground embeds GraphiQL for schema discovery and query execution.
 
 The agent and evidence-answer services currently remain separate orchestration paths. The next integration step is to let the agent combine deterministic graph tools with retrieved advisory evidence in one traceable workflow.
 
 ### Design principles
 
-1. **RDF is authoritative.** Explore does not maintain a second vulnerability database.
+1. **The knowledge graph is authoritative.** Explore does not maintain a second vulnerability database.
 2. **Writes are explicit.** Selecting an application in Explore does not invoke OSV. The user starts enrichment from the Vulnerability Enrichment screen or API.
-3. **CycloneDX and OSV have separate JSON-LD contexts.** Each source is assembled according to its own shape before Jena parses it.
+3. **CycloneDX and OSV retain separate mappings.** Each source is normalized according to its own shape before it is added to the graph.
 4. **Occurrences retain source identity.** The new importer uses CycloneDX `bom-ref` values directly rather than mapping them back into a separate canonical package layer.
-5. **OSV data stays normalized.** References, severities, affected packages, ranges, and events are RDF resources connected to one vulnerability resource.
+5. **OSV data stays normalized.** References, severities, affected packages, ranges, and events remain connected to one vulnerability record.
 6. **Reads are application-scoped.** Explore begins at an `ApplicationOccurrence` and follows `risk:dependsOn+` to its reachable packages.
-7. **Single-PURL lookup is non-persistent.** `/enrich/purl` returns complete OSV DTO responses but does not patch RDF.
+7. **Single-PURL lookup is non-persistent.** `/enrich/purl` returns complete OSV DTO responses but does not modify the knowledge graph.
 8. **Evidence search is diagnostic and global.** AI Workbench ranks all indexed advisory chunks by semantic similarity; it does not treat a CVE or GHSA mentioned in the query as a retrieval scope.
 9. **AI answers have explicit grounding paths.** Buggy uses registered graph tools, while the evidence answer service receives only the advisory chunks returned by semantic retrieval.
 
@@ -181,9 +181,9 @@ The agent and evidence-answer services currently remain separate orchestration p
 MultipartFile
   -> CycloneDX parser
   -> metadata/component/dependency assemblers
-  -> CycloneDX JSON-LD
-  -> Jena Model
-  -> default TDB2 graph
+  -> normalized graph document
+  -> graph model
+  -> persistent graph
 ```
 
 `CycloneDxMetadataAssembler` creates the root `risk:ApplicationOccurrence`. `CycloneDxComponentAssembler` creates supported application and library occurrences. `CycloneDxDependencyAssembler` writes only dependency relationships declared in the SBOM.
@@ -199,9 +199,9 @@ Application IRI
   -> OSV batch query
   -> distinct advisory detail loading
   -> Enriched(packageIri, complete OSV responses)
-  -> OSV JSON-LD
-  -> Jena Model
-  -> default TDB2 graph
+  -> normalized advisory graph
+  -> graph model
+  -> persistent graph
 ```
 
 The package identifier in `Enriched` is the imported package occurrence IRI. The enrichment pipeline adds `risk:affectedBy` to that resource. It does not translate the result back into a legacy package-version/import-run model.
@@ -216,7 +216,7 @@ The package identifier in `Enriched` is the imported package occurrence IRI. The
 }
 ```
 
-- `parsed`: triples parsed from the generated OSV JSON-LD document.
+- `parsed`: triples parsed from the generated advisory graph document.
 - `added`: triples that were not already present in the dataset.
 - `total`: triples in the default graph after the write.
 
@@ -248,10 +248,10 @@ Persisted CVSS vectors are parsed into version-specific CVSS objects before they
 
 ### 4. Advisory evidence indexing and retrieval
 
-AI Workbench builds retrieval evidence from the advisory data already stored in Jena:
+AI Workbench builds retrieval evidence from advisory data already stored in the knowledge graph:
 
 ```text
-Jena vulnerability resources
+Vulnerability graph records
   -> advisory source projection
   -> overview / technical details / impact / remediation / severity / upstream-fix chunks
   -> BGE-small-en-v1.5 quantized embeddings
@@ -276,13 +276,13 @@ User question
   -> LangGraph4j AgentExecutor
   -> configured OpenAI-compatible chat model
   -> optional impacted-applications tool call
-  -> authoritative SPARQL against Jena TDB2
+  -> authoritative SPARQL against the persistent graph
   -> final natural-language response
 ```
 
 The currently registered `impactedServices` tool answers which applications are affected by known vulnerabilities and returns an authoritative total plus application identities. The agent decides when to invoke it based on the tool description and system prompt. Additional graph, dependency-path, CVE, remediation, and evidence tools remain planned.
 
-## RDF Model
+## Knowledge Graph Model
 
 The vocabulary namespace is:
 
@@ -367,7 +367,7 @@ The Vulnerabilities tab joins imported occurrences to OSV resources. It displays
 
 ### References
 
-References are stored as dedicated RDF resources. The UI groups them by advisory and displays affected installed packages.
+References are stored as dedicated graph records. The UI groups them by advisory and displays affected installed packages.
 
 ![Explore vulnerability references](docs/assets/explore-vluns-ref.png)
 
@@ -401,7 +401,7 @@ Each result displays its global rank, evidence segment type, vulnerability and d
 
 ### GraphQL Playground
 
-AI Workbench includes a full-size GraphiQL interface backed by `POST /graphql`. The current schema exposes `applicationOccurrences` and its RDF-derived scalar fields. GraphiQL performs schema introspection, query completion, documentation browsing, execution, history, and response inspection directly inside the application UI.
+AI Workbench includes a full-size GraphiQL interface backed by `POST /graphql`. The current schema exposes `applicationOccurrences` and its graph-derived scalar fields. GraphiQL performs schema introspection, query completion, documentation browsing, execution, history, and response inspection directly inside the application UI.
 
 ## API Reference
 
@@ -410,14 +410,14 @@ AI Workbench includes a full-size GraphiQL interface backed by `POST /graphql`. 
 | Method | Path | Purpose | Response |
 | --- | --- | --- | --- |
 | `POST` | `/rdf/new` | Import and persist a multipart CycloneDX JSON file (`file`). | `GraphMetadata` |
-| `GET` | `/api/v1/vulnerabilities/enrich?applicationIri=...` | Batch-query OSV, load complete advisories, assemble OSV JSON-LD, and persist it. | `OsvStoreResult` |
-| `GET` | `/api/v1/vulnerabilities/enrich/purl?purl=...` | Return complete OSV advisory DTOs for one PURL without writing RDF. | `PurlEnrichment` |
+| `GET` | `/api/v1/vulnerabilities/enrich?applicationIri=...` | Batch-query OSV, load complete advisories, assemble normalized graph data, and persist it. | `OsvStoreResult` |
+| `GET` | `/api/v1/vulnerabilities/enrich/purl?purl=...` | Return complete OSV advisory DTOs for one PURL without modifying the graph. | `PurlEnrichment` |
 
 ### Graph and Explore APIs
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/v1/metadata` | Return graph counts and the JSON-LD representation of the current graph. |
+| `GET` | `/api/v1/metadata` | Return graph counts and the structured representation of the current graph. |
 | `GET` | `/api/v1/explore/applications` | List imported applications. |
 | `GET` | `/api/v1/explore/overview?applicationIri=...` | Return application graph metrics. |
 | `GET` | `/api/v1/explore/dependencies?applicationIri=...` | List reachable dependency occurrences. |
@@ -442,7 +442,7 @@ AI Workbench includes a full-size GraphiQL interface backed by `POST /graphql`. 
 
 | Method | Path | Purpose | Response |
 | --- | --- | --- | --- |
-| `GET` | `/api/workbench/evidence/source/{identifier}` | Load the RDF-backed advisory evidence source for one identifier. | `AdvisoryEvidenceSource` |
+| `GET` | `/api/workbench/evidence/source/{identifier}` | Load the graph-backed advisory evidence source for one identifier. | `AdvisoryEvidenceSource` |
 | `POST` | `/api/workbench/evidence/index/{identifier}` | Generate and index evidence documents for one identifier. | `AdvisoryEvidenceDocument[]` |
 | `POST` | `/api/workbench/evidence/search` | Search the current in-memory evidence index without generating an assistant answer. | `AdvisoryEvidenceMatch[]` |
 | `POST` | `/api/workbench/evidence/rebuild` | Regenerate typed advisory documents and replace the complete in-memory vector index. | `AdvisoryEvidenceDocument[]` |
@@ -453,7 +453,7 @@ AI Workbench includes a full-size GraphiQL interface backed by `POST /graphql`. 
 | Method | Path | Purpose | Response |
 | --- | --- | --- | --- |
 | `GET` | `/api/workbench/buggy/ask?question=...` | Run the LangGraph4j Buggy agent, including any graph-tool calls selected by the model. | Grounded answer text |
-| `POST` | `/graphql` | Execute GraphQL queries against the RDF-backed application occurrence service. | GraphQL response |
+| `POST` | `/graphql` | Execute GraphQL queries against the graph-backed application occurrence service. | GraphQL response |
 
 ## Quick Start
 
@@ -494,7 +494,7 @@ Build the image and run the application with the provided script:
 ./run.sh
 ```
 
-The container publishes the application at `http://localhost:8080` and stores TDB2 and OSV data in the `dependency-risk-data` Docker volume.
+The container publishes the application at `http://localhost:8080` and stores knowledge-graph and OSV data in the `dependency-risk-data` Docker volume.
 
 The equivalent commands are:
 
@@ -538,7 +538,7 @@ curl -sS -G http://localhost:8080/api/v1/vulnerabilities/enrich/purl \
   --data-urlencode 'purl=pkg:maven/org.apache.commons/commons-lang3@3.18.0'
 ```
 
-This endpoint returns the PURL and complete OSV advisory responses. It does not modify the RDF graph.
+This endpoint returns the PURL and complete OSV advisory responses. It does not modify the knowledge graph.
 
 ### Rebuild and search advisory evidence
 
@@ -560,7 +560,7 @@ curl -sS -X POST http://localhost:8080/api/workbench/assistant/evidence \
   }'
 ```
 
-The evidence index is process-local and is not persisted to TDB2. Rebuild it after an application restart before searching.
+The evidence index is process-local and is not stored permanently. Rebuild it after an application restart before searching.
 
 ## SPARQL Examples
 
@@ -660,15 +660,15 @@ dependency-risk:
     read-timeout: 45s
 ```
 
-The TDB2 location defaults to `./data/tdb2` and can be overridden with:
+The knowledge-graph data directory can be configured with:
 
 ```yaml
 dependency-risk:
   graph-db:
-    path: /path/to/tdb2
+    path: /path/to/graph-data
 ```
 
-The same configuration file contains the CycloneDX and OSV JSON-LD contexts. When adding a new RDF property, update the relevant context and its assembler together.
+The same configuration file contains source-to-graph mappings for CycloneDX and OSV. When adding a new graph property, update the relevant mapping and assembler together.
 
 ## Development
 
@@ -702,13 +702,13 @@ npm run build
 
 - Java 25
 - Spring Boot 4.1
-- Apache Jena 6.1 with TDB2 and ARQ
+- Knowledge-graph persistence and SPARQL query processing
 - CycloneDX Core Java 12.2
 - CVSS Calculator 1.5
 - React 19 and TypeScript
 - Material UI
 - D3 7 with responsive SVG rendering
-- Spring GraphQL with an embedded GraphiQL 5 Playground
+- Spring GraphQL with a built-in GraphiQL 5 Playground
 - LangChain4j with the quantized BGE-small-en-v1.5 embedding model
 - LangChain4j `InMemoryEmbeddingStore` for advisory evidence
 - LangGraph4j `AgentExecutor` for Buggy's tool-using workflow
@@ -721,22 +721,22 @@ npm run build
 ```text
 src/main/java/io/github/pkjpathania/dependencyrisk/
   graph/
-    controller/             RDF, Explore, SPARQL, and path APIs
-    parser/assembler/       CycloneDX JSON-LD assembly
-    repo/                   Jena persistence and graph projection
+    controller/             ingestion, Explore, SPARQL, and path APIs
+    parser/assembler/       CycloneDX graph assembly
+    repo/                   knowledge-graph persistence and projection
     serialization/          native CVSS JSON serialization
     service/                Explore, CVE impact, SPARQL, and graph services
     util/                   CVSS parsing and shared graph utilities
   vulnerability/
-    assembler/              OSV JSON-LD assembly
+    assembler/              OSV graph assembly
     client/                 OSV request/response client
     service/                batching, advisory loading, and enrichment
   workbench/
     api/                    advisory evidence rebuild and search endpoints
     assistant/              Buggy agent tools and evidence-grounded answer services
     config/                 LangGraph4j agent, chat model, embeddings, and in-memory store
-    evidence/               RDF projection, chunking, indexing, and search
-    graphql/                Spring GraphQL queries, services, models, and RDF mapping
+    evidence/               graph projection, chunking, indexing, and search
+    graphql/                Spring GraphQL queries, services, models, and graph mapping
 
 src/main/frontend/src/
   pages/                    top-level application screens
@@ -751,7 +751,7 @@ docs/                       static project website
 cyclonedx-import.md         CycloneDX import implementation notes
 dependency-path-osv-reliability-implementation-note.md
                             dependency-path and OSV reliability notes
-data/tdb2/                  local embedded RDF dataset
+data/                       local knowledge-graph data
 ```
 
 ## TODO / Next Steps
@@ -766,7 +766,7 @@ data/tdb2/                  local embedded RDF dataset
 - Only dependencies with usable PURLs can be sent to OSV.
 - Malformed or unsupported CVSS vectors cannot be projected into calculated scores and metrics.
 - SPARQL execution accepts `SELECT` queries only.
-- TDB2 is an embedded local dataset, not a distributed graph service.
+- Graph data is stored locally and is not provided as a distributed service.
 - The import-scoped dependency-path endpoint belongs to the older graph model and is not populated by `POST /rdf/new`.
 - The UI uses in-memory page navigation rather than routable browser URLs.
 - Authentication and authorization are not implemented.

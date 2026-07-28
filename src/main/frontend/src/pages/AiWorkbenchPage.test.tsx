@@ -4,9 +4,25 @@ import { describe, expect, it, vi } from 'vitest';
 import { AiWorkbenchPage } from './AiWorkbenchPage';
 
 vi.mock('graphiql', () => ({
-  GraphiQL: Object.assign(() => <div data-testid="graphiql-interface" />, {
-    Logo: () => null
-  })
+  GraphiQL: Object.assign(
+    ({
+      schema,
+      schemaDescription,
+      inputValueDeprecation
+    }: {
+      schema?: unknown;
+      schemaDescription?: boolean;
+      inputValueDeprecation?: boolean;
+    }) => (
+      <div
+        data-testid="graphiql-interface"
+        data-auto-import-schema={schema === undefined}
+        data-schema-description={schemaDescription}
+        data-input-value-deprecation={inputValueDeprecation}
+      />
+    ),
+    { Logo: () => null }
+  )
 }));
 
 describe('AiWorkbenchPage', () => {
@@ -19,6 +35,10 @@ describe('AiWorkbenchPage', () => {
     expect(
       await screen.findByRole('region', { name: 'GraphQL Playground' })
     ).toBeInTheDocument();
-    expect(await screen.findByTestId('graphiql-interface')).toBeInTheDocument();
+    const graphiql = await screen.findByTestId('graphiql-interface');
+    expect(graphiql).toBeInTheDocument();
+    expect(graphiql).toHaveAttribute('data-auto-import-schema', 'true');
+    expect(graphiql).toHaveAttribute('data-schema-description', 'true');
+    expect(graphiql).toHaveAttribute('data-input-value-deprecation', 'true');
   });
 });

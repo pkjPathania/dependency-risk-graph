@@ -5,6 +5,7 @@ import io.github.pkjpathania.dependencyrisk.workbench.graphql.models.Application
 import io.github.pkjpathania.dependencyrisk.workbench.graphql.service.ApplicationOccurrenceService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
 
 @GraphQlController
@@ -16,5 +17,10 @@ public class ApplicationOccurrenceQuery {
   @QueryMapping
   public List<ApplicationOccurrence> applicationOccurrences() {
     return applicationOccurrenceService.getAll();
+  }
+
+  @QueryMapping
+  public ApplicationOccurrence applicationOccurrence(@Argument String id) {
+    return applicationOccurrenceService.findById(id).orElse(null);
   }
 }

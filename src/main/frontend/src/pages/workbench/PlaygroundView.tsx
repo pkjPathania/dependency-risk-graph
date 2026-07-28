@@ -20,7 +20,14 @@ export function PlaygroundView() {
         '& .graphiql-container': { height: '100%' }
       }}
     >
-      <GraphiQL fetcher={graphQlFetcher} forcedTheme="light">
+      <GraphiQL
+        fetcher={graphQlFetcher}
+        forcedTheme="light"
+        // An undefined schema makes GraphiQL import it from /graphql via introspection.
+        schema={undefined}
+        schemaDescription
+        inputValueDeprecation
+      >
         <GraphiQL.Logo>Dependency Risk Graph</GraphiQL.Logo>
       </GraphiQL>
     </Box>
