@@ -49,6 +49,7 @@
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
     <jgrapht-core.version>1.5.3</jgrapht-core.version>
     <langchain4j.version>1.17.2</langchain4j.version>
+    <langgraph4j.version>1.8.20</langgraph4j.version>
     <cvss-calculator.version>1.5.1</cvss-calculator.version>
   </properties>
 
@@ -61,12 +62,23 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <dependency>
+        <groupId>org.bsc.langgraph4j</groupId>
+        <artifactId>langgraph4j-bom</artifactId>
+        <version>${langgraph4j.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
 
     </dependencies>
   </dependencyManagement>
 
 
   <dependencies>
+    <dependency>
+      <groupId>org.bsc.langgraph4j</groupId>
+      <artifactId>langgraph4j-core</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-graphql</artifactId>

@@ -2,6 +2,7 @@ package io.github.pkjpathania.dependencyrisk.graph.util;
 
 import com.github.packageurl.MalformedPackageURLException;
 import com.github.packageurl.PackageURL;
+import io.github.pkjpathania.dependencyrisk.util.ArqAlgebraUtil;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jena.query.Query;
@@ -50,5 +51,9 @@ public class SparqlUtil {
     if (node.isAnon()) return "_" + node.asResource().getId().getLabelString();
 
     return node.toString();
+  }
+
+  public ArqAlgebraUtil.ArqAlgebra of(String query){
+    return ArqAlgebraUtil.inspect(query);
   }
 }

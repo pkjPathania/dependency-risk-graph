@@ -711,6 +711,7 @@ npm run build
 - LangChain4j with the quantized BGE-small-en-v1.5 embedding model
 - LangChain4j `InMemoryEmbeddingStore` for advisory evidence
 - Schema-driven GraphQL query generation for Buggy
+- LangGraph4j conditional routing for token-bounded Buggy prompts and chunked JSONL evidence
 - OpenAI-compatible chat integration configured for Groq
 - Vite
 - OSV REST APIs through Spring `RestClient`

@@ -1,5 +1,6 @@
 package io.github.pkjpathania.dependencyrisk.graph.controller;
 
+import io.github.pkjpathania.dependencyrisk.graph.model.SparqlStatsResponse;
 import io.github.pkjpathania.dependencyrisk.graph.service.SparqlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -28,6 +29,15 @@ public class SparqlController {
     return ResponseEntity.ok()
         .contentType(MediaType.parseMediaType("application/sparql-query"))
         .body(formattedQuery);
+  }
+
+  @PostMapping(
+      path = "/stats",
+      consumes = {
+        MediaType.TEXT_PLAIN_VALUE,
+      })
+  public ResponseEntity<SparqlStatsResponse> stats(@RequestBody String sparql) {
+    return ResponseEntity.ok(sparqlService.stats(sparql));
   }
 
   @PostMapping("/exec")

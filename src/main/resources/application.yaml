@@ -226,3 +226,10 @@ dependency-risk:
       api-key: ${AI_API_KEY:}
       temperature: 0.1
       timeout: 60s
+    orchestration:
+      # Groq model names are not known to jtokkit; use a local compatible tokenizer estimate.
+      tokenizer-model-name: gpt-4
+      max-input-tokens: 128000
+      reserved-output-tokens: 4096
+      chunk-input-tokens: 24000
+      chunk-summary-tokens: 768

@@ -28,8 +28,8 @@ import {
   type SyntheticEvent,
   type UIEvent
 } from 'react';
-import { executeSparqlQuery, formatSparqlQuery } from '../api/sparqlApi';
-import type { SparqlSelectResponse } from '../api/types';
+import { executeSparqlQuery, fetchSparqlStats, formatSparqlQuery } from '../api/sparqlApi';
+import type { SparqlSelectResponse, SparqlStatsResponse } from '../api/types';
 import { RestCallProgress } from '../components/RestCallProgress';
 import {
   applySparqlCompletion,
@@ -43,6 +43,7 @@ import {
   type SparqlPrefixPresetId
 } from '../features/sparql/prefixPresets';
 import { downloadSparqlResultsCsv } from '../features/sparql/csvExport';
+import { SparqlStatsDialog } from '../features/sparql/SparqlStatsDialog';
 
 const EXAMPLE_QUERIES = [
   {
@@ -83,8 +84,11 @@ interface SparqlQueryPageProps {
 
 export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) {
   const [isFormatting, setIsFormatting] = useState(false);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [execResult, setExecResult] = useState<SparqlSelectResponse | null>(null);
+  const [statsResult, setStatsResult] = useState<SparqlStatsResponse | null>(null);
+  const [statsDialogOpen, setStatsDialogOpen] = useState(false);
   const [popupError, setPopupError] = useState<string | null>(null);
   const [completionOpen, setCompletionOpen] = useState(false);
   const [completionCursor, setCompletionCursor] = useState<number | null>(null);
@@ -120,6 +124,27 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
       setPopupError(error instanceof Error ? error.message : 'Formatting failed.');
     } finally {
       setIsFormatting(false);
+    }
+  }
+
+  async function handleQueryStats() {
+    if (!hasQuery) {
+      setPopupError('Enter a SPARQL query before inspecting its statistics.');
+      return;
+    }
+
+    setIsLoadingStats(true);
+    setStatsResult(null);
+    setStatsDialogOpen(true);
+    setPopupError(null);
+
+    try {
+      setStatsResult(await fetchSparqlStats(query));
+    } catch (error) {
+      setPopupError(error instanceof Error ? error.message : 'Loading query statistics failed.');
+      setStatsDialogOpen(false);
+    } finally {
+      setIsLoadingStats(false);
     }
   }
 
@@ -273,7 +298,7 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
       }}
     >
       <Stack spacing={3}>
-        <RestCallProgress visible={isFormatting || isExecuting} />
+        <RestCallProgress visible={isFormatting || isLoadingStats || isExecuting} />
         <Box
           sx={{
             display: 'flex',
@@ -392,6 +417,9 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
                     </Button>
                     <Button variant="contained" onClick={handleFormatQuery} disabled={!hasQuery || isFormatting}>
                       {isFormatting ? 'Formatting query' : 'Format query'}
+                    </Button>
+                    <Button variant="contained" onClick={handleQueryStats} disabled={!hasQuery || isLoadingStats}>
+                      {isLoadingStats ? 'Loading stats' : 'Query stats'}
                     </Button>
                   </Stack>
 
@@ -517,6 +545,12 @@ export function SparqlQueryPage({ query, onQueryChange }: SparqlQueryPageProps) 
           </Card>
         </Box>
       </Stack>
+      <SparqlStatsDialog
+        open={statsDialogOpen}
+        loading={isLoadingStats}
+        stats={statsResult}
+        onClose={() => setStatsDialogOpen(false)}
+      />
       <Snackbar
         open={Boolean(popupError)}
         onClose={() => setPopupError(null)}

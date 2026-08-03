@@ -1,5 +1,6 @@
 package io.github.pkjpathania.dependencyrisk.workbench.assistant.service;
 
+import dev.langchain4j.model.TokenCountEstimator;
 import dev.langchain4j.model.chat.ChatModel;
 import graphql.ExecutionResult;
 import graphql.language.Document;
@@ -9,17 +10,26 @@ import graphql.language.Selection;
 import graphql.language.SelectionSet;
 import graphql.language.StringValue;
 import graphql.parser.Parser;
+import io.github.pkjpathania.dependencyrisk.workbench.config.BuggyOrchestrationProperties;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.bsc.langgraph4j.CompiledGraph;
+import org.bsc.langgraph4j.GraphStateException;
+import org.bsc.langgraph4j.StateGraph;
+import org.bsc.langgraph4j.state.AgentState;
+import org.bsc.langgraph4j.utils.EdgeMappings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.graphql.ExecutionGraphQlService;
@@ -30,28 +40,95 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @Slf4j
 public class GraphQlBuggyAssistantService {
+  private static final String GENERATE_AND_EXECUTE = "generate_and_execute";
+  private static final String PREPARE_ANSWER = "prepare_answer";
+  private static final String ANSWER_DIRECTLY = "answer_directly";
+  private static final String ANSWER_FROM_CHUNKS = "answer_from_chunks";
+  private static final String DIRECT_ROUTE = "direct";
+  private static final String CHUNKED_ROUTE = "chunked";
   private static final int MAX_QUERY_ATTEMPTS = 2;
   private static final Pattern GRAPHQL_FENCE =
       Pattern.compile("```(?:graphql)?\\s*(.*?)```", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
   private static final String QUERY_RULES =
       """
-      Create exactly one read-only GraphQL query that retrieves the minimum data needed to
-      answer the user's question.
+      You are a GraphQL query planner.
 
-      Rules:
-      - Use only fields and arguments present in the supplied schema.
-      - Generate a query operation only. Never generate a mutation or subscription.
-      - Include identifiers and human-readable fields needed to support the answer.
-      - Return only the executable GraphQL document. Do not use Markdown or add an explanation.
-      - Use the shortest relationship path that can answer the question.
-      - An id argument accepts only a complete RDF IRI, such as a value beginning with urn: or
-        https://. Use an id argument only when that exact IRI appears in the user's question.
-      - Never guess an RDF IRI or convert a human-readable name into an id. For example, never use
-        applicationOccurrence(id: "iceberg") when "iceberg" is only an application name.
-      - When the user provides a name rather than an exact RDF IRI, query the corresponding plural
-        collection field, include id and name, and retrieve the shortest nested data needed to
-        answer the question. The final answer step will select the matching named entity.
+      Create exactly one minimal, read-only GraphQL query that retrieves the data
+      required to answer the user's question.
+
+      ROOT-SELECTION POLICY
+
+      1. Identify the entity type the user wants returned.
+      2. Select the root collection corresponding to that entity:
+         - applications → applicationOccurrences
+         - packages → packageOccurrences
+         - vulnerabilities → vulnerabilities
+      3. Do not select the root from an entity mentioned only as a condition.
+      4. Prefer a direct field on the requested entity over a reverse traversal
+         through another entity.
+      5. Use the fewest relationship hops and selected fields possible.
+
+      DOMAIN SEMANTICS
+
+      - ApplicationOccurrence.vulnerabilities contains vulnerabilities affecting
+        packages used directly or transitively by the application.
+      - PackageOccurrence.vulnerabilities contains vulnerabilities affecting that
+        specific package occurrence.
+      - PackageOccurrence.applications contains applications using that specific
+        package occurrence.
+      - Vulnerability.applications contains applications impacted by the
+        vulnerability.
+      - Vulnerability.packages contains package occurrences affected by the
+        vulnerability.
+
+      APPLICATION-VULNERABILITY RULE
+
+      Questions including any of the following meanings must start from
+      applicationOccurrences:
+
+      - Which applications are vulnerable?
+      - Which applications are affected?
+      - Which applications use a vulnerable package?
+      - List applications with vulnerabilities.
+      - Show impacted applications.
+
+      For those questions, generate exactly this shape unless additional fields are
+      explicitly requested:
+
+      query ApplicationOccurrences {
+        applicationOccurrences {
+          id
+          vulnerabilities {
+            id
+          }
+        }
+      }
+
+      Never use packageOccurrences → vulnerabilities → applications for this intent.
+
+      FIELD-SELECTION RULES
+
+      - Always include id.
+      - Include name only when explicitly requested.
+      - Do not retrieve summaries, details, aliases, versions, packages or other
+        fields unless necessary for the question.
+      - Generate a query operation only.
+      - Never generate a mutation or subscription.
+      - Return only the executable GraphQL document.
+      - Do not use Markdown fences.
+      - Do not include an explanation.
+
+      ID RULES
+
+      - Use a singular field with an id argument only when the exact complete RDF IRI
+        appears in the user's question.
+      - Never manufacture or infer an RDF IRI from a human-readable name.
+      - When no exact IRI is supplied, use the appropriate plural collection.
+
+      GraphQL schema:
+
+      {{schema}}
       """;
 
   private static final String ANSWER_RULES =
@@ -67,20 +144,43 @@ public class GraphQlBuggyAssistantService {
       - Do not mention the query-generation process unless the GraphQL result contains errors.
       """;
 
+  private static final String EVIDENCE_RULES =
+      """
+      Extract only facts from this GraphQL-result fragment that help answer the user's question.
+      Return compact JSON Lines (JSONL), with one self-contained fact per line. Preserve exact IDs,
+      names, versions, vulnerability IDs, and fixed versions. Return an empty response when the
+      fragment contains no relevant facts. Do not answer the question and do not add prose.
+      """;
+
+  private static final String REDUCE_RULES =
+      """
+      Merge and deduplicate the supplied evidence. Return compact JSON Lines (JSONL), with one
+      self-contained fact per line. Keep only facts needed for the user's question and preserve
+      exact IDs, names, versions, vulnerability IDs, and fixed versions. Do not answer the question.
+      """;
+
   private final ChatModel chatModel;
   private final ExecutionGraphQlService graphQlService;
   private final ObjectMapper objectMapper;
+  private final TokenCountEstimator tokenCountEstimator;
+  private final BuggyOrchestrationProperties orchestrationProperties;
   private final String schema;
+  private final CompiledGraph<BuggyWorkflowState> workflow;
 
   public GraphQlBuggyAssistantService(
       ChatModel chatModel,
       ExecutionGraphQlService graphQlService,
       ObjectMapper objectMapper,
+      TokenCountEstimator tokenCountEstimator,
+      BuggyOrchestrationProperties orchestrationProperties,
       @Value("classpath:graphql/schema.graphqls") Resource schemaResource) {
     this.chatModel = chatModel;
     this.graphQlService = graphQlService;
     this.objectMapper = objectMapper;
+    this.tokenCountEstimator = tokenCountEstimator;
+    this.orchestrationProperties = orchestrationProperties;
     this.schema = readSchema(schemaResource);
+    this.workflow = compileWorkflow();
   }
 
   public String ask(String question) {
@@ -89,8 +189,119 @@ public class GraphQlBuggyAssistantService {
       throw new IllegalArgumentException("Question must not be blank");
     }
 
-    QueryExecution queryExecution = generateAndExecute(normalizedQuestion);
-    return generateAnswer(normalizedQuestion, queryExecution);
+    try {
+      BuggyWorkflowState finalState =
+          workflow
+              .invoke(Map.of(BuggyWorkflowState.QUESTION, normalizedQuestion))
+              .orElseThrow(
+                  () -> new IllegalStateException("Buggy workflow produced no final state"));
+      return finalState.finalAnswer();
+    } catch (CompletionException exception) {
+      throw unwrapWorkflowException(exception);
+    }
+  }
+
+  private RuntimeException unwrapWorkflowException(CompletionException exception) {
+    Throwable cause = exception;
+    while (cause.getCause() != null) {
+      cause = cause.getCause();
+    }
+    return cause instanceof RuntimeException runtimeException ? runtimeException : exception;
+  }
+
+  private CompiledGraph<BuggyWorkflowState> compileWorkflow() {
+    try {
+      StateGraph<BuggyWorkflowState> graph = new StateGraph<>(BuggyWorkflowState::new);
+      graph
+          .addNode(
+              GENERATE_AND_EXECUTE,
+              org.bsc.langgraph4j.action.AsyncNodeAction.node_async(
+                  state ->
+                      Map.of(
+                          BuggyWorkflowState.QUERY_EXECUTION,
+                          generateAndExecute(state.question()))))
+          .addNode(
+              PREPARE_ANSWER,
+              org.bsc.langgraph4j.action.AsyncNodeAction.node_async(this::prepareAnswer))
+          .addNode(
+              ANSWER_DIRECTLY,
+              org.bsc.langgraph4j.action.AsyncNodeAction.node_async(this::answerDirectly))
+          .addNode(
+              ANSWER_FROM_CHUNKS,
+              org.bsc.langgraph4j.action.AsyncNodeAction.node_async(this::answerFromChunks))
+          .addEdge(StateGraph.START, GENERATE_AND_EXECUTE)
+          .addEdge(GENERATE_AND_EXECUTE, PREPARE_ANSWER)
+          .addConditionalEdges(
+              PREPARE_ANSWER,
+              org.bsc.langgraph4j.action.AsyncEdgeAction.edge_async(this::answerRoute),
+              EdgeMappings.builder()
+                  .to(ANSWER_DIRECTLY, DIRECT_ROUTE)
+                  .to(ANSWER_FROM_CHUNKS, CHUNKED_ROUTE)
+                  .build())
+          .addEdge(ANSWER_DIRECTLY, StateGraph.END)
+          .addEdge(ANSWER_FROM_CHUNKS, StateGraph.END);
+      return graph.compile();
+    } catch (GraphStateException exception) {
+      throw new IllegalStateException("Could not compile the Buggy orchestration graph", exception);
+    }
+  }
+
+  private Map<String, Object> prepareAnswer(BuggyWorkflowState state) {
+    String prompt = createAnswerPrompt(state.question(), state.queryExecution());
+    return Map.of(
+        BuggyWorkflowState.ANSWER_PROMPT,
+        prompt,
+        BuggyWorkflowState.ANSWER_PROMPT_TOKENS,
+        estimateTokens(prompt));
+  }
+
+  private String answerRoute(BuggyWorkflowState state) {
+    int tokenCount = state.answerPromptTokens();
+    if (tokenCount <= orchestrationProperties.inputBudget()) {
+      log.debug("Routing Buggy answer prompt directly ({} tokens)", tokenCount);
+      return DIRECT_ROUTE;
+    }
+    log.info(
+        "Routing oversized Buggy answer prompt through JSONL chunks ({} tokens, {} token budget)",
+        tokenCount,
+        orchestrationProperties.inputBudget());
+    return CHUNKED_ROUTE;
+  }
+
+  private Map<String, Object> answerDirectly(BuggyWorkflowState state) {
+    return Map.of(
+        BuggyWorkflowState.FINAL_ANSWER,
+        requireAnswer(chatWithinBudget(state.answerPrompt(), "final answer")));
+  }
+
+  private Map<String, Object> answerFromChunks(BuggyWorkflowState state) {
+    QueryExecution queryExecution = state.queryExecution();
+    String result = writeJson(queryExecution.result());
+    List<String> fragments =
+        splitToTokenBudget(
+            result,
+            fragment -> createEvidencePrompt(state.question(), queryExecution.query(), fragment),
+            orchestrationProperties.chunkInputTokens());
+
+    List<String> evidence = new ArrayList<>(fragments.size());
+    for (int index = 0; index < fragments.size(); index++) {
+      String prompt =
+          createEvidencePrompt(state.question(), queryExecution.query(), fragments.get(index));
+      String summary =
+          chatWithinBudget(prompt, "evidence fragment " + (index + 1) + " of " + fragments.size());
+      String compactSummary =
+          truncateToTokenLimit(summary, orchestrationProperties.chunkSummaryTokens());
+      if (StringUtils.isNotBlank(compactSummary)) {
+        evidence.add(compactSummary);
+      }
+    }
+
+    evidence = reduceEvidenceToFit(state.question(), queryExecution.query(), evidence);
+    String finalPrompt =
+        createChunkedAnswerPrompt(state.question(), queryExecution.query(), evidence);
+    return Map.of(
+        BuggyWorkflowState.FINAL_ANSWER,
+        requireAnswer(chatWithinBudget(finalPrompt, "chunked final answer")));
   }
 
   private QueryExecution generateAndExecute(String question) {
@@ -99,7 +310,7 @@ public class GraphQlBuggyAssistantService {
 
     for (int attempt = 1; attempt <= MAX_QUERY_ATTEMPTS; attempt++) {
       String prompt = createQueryPrompt(question, previousQuery, previousErrors);
-      String query = normalizeQuery(chatModel.chat(prompt));
+      String query = normalizeQuery(chatWithinBudget(prompt, "GraphQL query generation"));
       try {
         validateReadOnlyQuery(query, question);
       } catch (IllegalArgumentException exception) {
@@ -113,12 +324,13 @@ public class GraphQlBuggyAssistantService {
 
       ExecutionResult result = execute(query);
       if (result.getErrors().isEmpty() || attempt == MAX_QUERY_ATTEMPTS) {
-         return new QueryExecution(query, result.toSpecification());
+        return new QueryExecution(query, result.toSpecification());
       }
 
       previousQuery = query;
       previousErrors = result.getErrors().stream().map(error -> error.toSpecification()).toList();
-      log.debug("Generated GraphQL query failed; asking the model to repair it: {}", previousErrors);
+      log.debug(
+          "Generated GraphQL query failed; asking the model to repair it: {}", previousErrors);
     }
 
     throw new IllegalStateException("Buggy could not generate a GraphQL query");
@@ -150,12 +362,7 @@ public class GraphQlBuggyAssistantService {
         graphQlService
             .execute(
                 new DefaultExecutionGraphQlRequest(
-                    query,
-                    null,
-                    Map.of(),
-                    Map.of(),
-                    "buggy-" + UUID.randomUUID(),
-                    Locale.ROOT))
+                    query, null, Map.of(), Map.of(), "buggy-" + UUID.randomUUID(), Locale.ROOT))
             .block();
 
     if (response == null) {
@@ -164,21 +371,203 @@ public class GraphQlBuggyAssistantService {
     return response.getExecutionResult();
   }
 
-  private String generateAnswer(String question, QueryExecution queryExecution) {
-    String prompt =
-        ANSWER_RULES
-            + "\nUser question:\n"
-            + question
-            + "\n\nExecuted GraphQL query:\n"
-            + queryExecution.query()
-            + "\n\nGraphQL result:\n"
-            + writeJson(queryExecution.result());
+  private String createAnswerPrompt(String question, QueryExecution queryExecution) {
+    return ANSWER_RULES
+        + "\nUser question:\n"
+        + question
+        + "\n\nExecuted GraphQL query:\n"
+        + queryExecution.query()
+        + "\n\nGraphQL result:\n"
+        + writeJson(queryExecution.result());
+  }
 
-    String answer = StringUtils.trimToNull(chatModel.chat(prompt));
+  private String createEvidencePrompt(String question, String query, String fragment) {
+    return EVIDENCE_RULES
+        + "\nUser question:\n"
+        + question
+        + "\n\nExecuted GraphQL query:\n"
+        + query
+        + "\n\nGraphQL-result fragment:\n"
+        + fragment;
+  }
+
+  private String createChunkedAnswerPrompt(String question, String query, List<String> evidence) {
+    return ANSWER_RULES
+        + "\nThe complete GraphQL result exceeded the model context window, so it was processed "
+        + "in fragments. The compact JSONL evidence below was extracted from those fragments.\n"
+        + "\nUser question:\n"
+        + question
+        + "\n\nExecuted GraphQL query:\n"
+        + query
+        + "\n\nExtracted GraphQL evidence (JSONL):\n"
+        + String.join("\n", evidence);
+  }
+
+  private String createReductionPrompt(String question, List<String> evidence) {
+    return REDUCE_RULES
+        + "\nUser question:\n"
+        + question
+        + "\n\nEvidence to merge (JSONL):\n"
+        + String.join("\n", evidence);
+  }
+
+  private List<String> reduceEvidenceToFit(
+      String question, String query, List<String> initialEvidence) {
+    List<String> evidence = List.copyOf(initialEvidence);
+    while (estimateTokens(createChunkedAnswerPrompt(question, query, evidence))
+        > orchestrationProperties.inputBudget()) {
+      List<List<String>> batches = partitionEvidence(question, evidence);
+      if (batches.size() >= evidence.size()) {
+        String joinedEvidence = String.join("\n", evidence);
+        return List.of(truncateEvidenceToFinalPromptBudget(question, query, joinedEvidence));
+      }
+
+      List<String> reduced = new ArrayList<>(batches.size());
+      for (int index = 0; index < batches.size(); index++) {
+        String prompt = createReductionPrompt(question, batches.get(index));
+        String summary =
+            chatWithinBudget(prompt, "evidence reduction " + (index + 1) + " of " + batches.size());
+        String compactSummary =
+            truncateToTokenLimit(summary, orchestrationProperties.chunkSummaryTokens());
+        if (StringUtils.isNotBlank(compactSummary)) {
+          reduced.add(compactSummary);
+        }
+      }
+      evidence = List.copyOf(reduced);
+    }
+    return evidence;
+  }
+
+  private String truncateEvidenceToFinalPromptBudget(
+      String question, String query, String evidence) {
+    int low = 0;
+    int high = evidence.length();
+    int bestEnd = 0;
+    while (low <= high) {
+      int middle = low + (high - low) / 2;
+      int end = safeEnd(evidence, middle);
+      String candidate = evidence.substring(0, end);
+      if (estimateTokens(createChunkedAnswerPrompt(question, query, List.of(candidate)))
+          <= orchestrationProperties.inputBudget()) {
+        bestEnd = end;
+        low = middle + 1;
+      } else {
+        high = middle - 1;
+      }
+    }
+    return evidence.substring(0, bestEnd);
+  }
+
+  private List<List<String>> partitionEvidence(String question, List<String> evidence) {
+    List<List<String>> batches = new ArrayList<>();
+    List<String> batch = new ArrayList<>();
+    for (String item : evidence) {
+      List<String> candidate = new ArrayList<>(batch);
+      candidate.add(item);
+      if (!batch.isEmpty()
+          && estimateTokens(createReductionPrompt(question, candidate))
+              > orchestrationProperties.chunkInputTokens()) {
+        batches.add(List.copyOf(batch));
+        batch.clear();
+      }
+      batch.add(item);
+    }
+    if (!batch.isEmpty()) {
+      batches.add(List.copyOf(batch));
+    }
+    return batches;
+  }
+
+  private List<String> splitToTokenBudget(
+      String text, Function<String, String> promptFactory, int tokenBudget) {
+    if (estimateTokens(promptFactory.apply("")) > tokenBudget) {
+      throw new IllegalStateException(
+          "Buggy's question and instructions exceed the configured chunk token budget");
+    }
+
+    List<String> fragments = new ArrayList<>();
+    int offset = 0;
+    while (offset < text.length()) {
+      int low = offset + 1;
+      int high = text.length();
+      int bestEnd = -1;
+      while (low <= high) {
+        int middle = low + (high - low) / 2;
+        String candidate = text.substring(offset, safeEnd(text, middle));
+        if (estimateTokens(promptFactory.apply(candidate)) <= tokenBudget) {
+          bestEnd = safeEnd(text, middle);
+          low = middle + 1;
+        } else {
+          high = middle - 1;
+        }
+      }
+      if (bestEnd <= offset) {
+        throw new IllegalStateException(
+            "Could not split the GraphQL result within the token budget");
+      }
+
+      int delimiter = text.lastIndexOf("},", bestEnd - 1);
+      if (delimiter > offset + ((bestEnd - offset) * 3 / 4)) {
+        bestEnd = delimiter + 2;
+      }
+      fragments.add(text.substring(offset, bestEnd));
+      offset = bestEnd;
+    }
+    return fragments;
+  }
+
+  private String chatWithinBudget(String prompt, String stage) {
+    int tokenCount = estimateTokens(prompt);
+    if (tokenCount > orchestrationProperties.inputBudget()) {
+      throw new IllegalStateException(
+          "Buggy's "
+              + stage
+              + " prompt requires "
+              + tokenCount
+              + " tokens, above the configured input budget of "
+              + orchestrationProperties.inputBudget());
+    }
+    log.debug("Sending Buggy {} prompt to the chat model ({} tokens)", stage, tokenCount);
+    return chatModel.chat(prompt);
+  }
+
+  private String requireAnswer(String modelResponse) {
+    String answer = StringUtils.trimToNull(modelResponse);
     if (answer == null) {
       throw new IllegalStateException("Buggy produced no final answer");
     }
     return answer;
+  }
+
+  private String truncateToTokenLimit(String value, int tokenLimit) {
+    if (estimateTokens(value) <= tokenLimit) {
+      return value;
+    }
+    int low = 0;
+    int high = value.length();
+    int bestEnd = 0;
+    while (low <= high) {
+      int middle = low + (high - low) / 2;
+      int end = safeEnd(value, middle);
+      if (estimateTokens(value.substring(0, end)) <= tokenLimit) {
+        bestEnd = end;
+        low = middle + 1;
+      } else {
+        high = middle - 1;
+      }
+    }
+    return value.substring(0, bestEnd);
+  }
+
+  private int safeEnd(String value, int end) {
+    if (end > 0 && end < value.length() && Character.isHighSurrogate(value.charAt(end - 1))) {
+      return end - 1;
+    }
+    return end;
+  }
+
+  private int estimateTokens(String text) {
+    return tokenCountEstimator.estimateTokenCountInText(text);
   }
 
   private String normalizeQuery(String modelResponse) {
@@ -257,7 +646,40 @@ public class GraphQlBuggyAssistantService {
     }
   }
 
-  private record QueryExecution(String query, Map<String, Object> result) {
+  private static final class BuggyWorkflowState extends AgentState {
+    private static final String QUESTION = "question";
+    private static final String QUERY_EXECUTION = "queryExecution";
+    private static final String ANSWER_PROMPT = "answerPrompt";
+    private static final String ANSWER_PROMPT_TOKENS = "answerPromptTokens";
+    private static final String FINAL_ANSWER = "finalAnswer";
+
+    private BuggyWorkflowState(Map<String, Object> initData) {
+      super(initData);
+    }
+
+    private String question() {
+      return value(QUESTION).map(String.class::cast).orElseThrow();
+    }
+
+    private QueryExecution queryExecution() {
+      return value(QUERY_EXECUTION).map(QueryExecution.class::cast).orElseThrow();
+    }
+
+    private String answerPrompt() {
+      return value(ANSWER_PROMPT).map(String.class::cast).orElseThrow();
+    }
+
+    private int answerPromptTokens() {
+      return value(ANSWER_PROMPT_TOKENS).map(Integer.class::cast).orElseThrow();
+    }
+
+    private String finalAnswer() {
+      return value(FINAL_ANSWER).map(String.class::cast).orElseThrow();
+    }
+  }
+
+  private record QueryExecution(String query, Map<String, Object> result)
+      implements java.io.Serializable {
     private QueryExecution {
       Objects.requireNonNull(query);
       result = Map.copyOf(result);

@@ -228,6 +228,13 @@ export interface SparqlSelectResponse {
   rows: Array<Record<string, string>>;
 }
 
+export interface SparqlStatsResponse {
+  raw: string;
+  optimized: string;
+  rawSse: string;
+  optimizedSse: string;
+}
+
 export interface DependencyPathNode {
   iri?: string | null;
   label?: string | null;

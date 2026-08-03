@@ -1,7 +1,8 @@
-import type { SparqlSelectResponse } from './types';
+import type { SparqlSelectResponse, SparqlStatsResponse } from './types';
 import { readApiErrorMessage } from './httpError';
 
 const SPARQL_FORMAT_URL = '/api/v1/sparql/format';
+const SPARQL_STATS_URL = '/api/v1/sparql/stats';
 const SPARQL_EXEC_URL = '/api/v1/sparql/exec';
 
 export async function formatSparqlQuery(query: string): Promise<string> {
@@ -38,6 +39,23 @@ export async function executeSparqlQuery(query: string): Promise<SparqlSelectRes
   }
 
   return (await response.json()) as SparqlSelectResponse;
+}
+
+export async function fetchSparqlStats(query: string): Promise<SparqlStatsResponse> {
+  const response = await fetch(SPARQL_STATS_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain'
+    },
+    body: query
+  });
+
+  if (!response.ok) {
+    const message = await readApiErrorMessage(response, 'Loading query statistics failed');
+    throw new Error(message);
+  }
+
+  return (await response.json()) as SparqlStatsResponse;
 }
 
 function normalizeFormattedQuery(body: string, contentType: string): string {
